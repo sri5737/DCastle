@@ -1,17 +1,12 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Modified principles: None — existing I–VI unchanged
+Version change: 1.1.0 → 1.2.0
+Modified principles: None — existing I–VIII unchanged
 Added sections:
-  - Principle VII — Unit Testing Coverage (NON-NEGOTIABLE)
-  - Principle VIII — CI/CD Pipeline with Isolated Test Job (NON-NEGOTIABLE)
+  - Principle IX — Idempotent Database Migrations (NON-NEGOTIABLE)
 Removed sections: None
-Templates requiring updates:
-  - .specify/templates/plan-template.md      ⚠ pending — Constitution Check should reference 8 principles; add test + CI verification
-  - .specify/templates/spec-template.md      ⚠ pending — add testing requirements field to spec definition-of-done
-  - .specify/templates/tasks-template.md     ⚠ pending — add task types for unit-test authoring and CI pipeline maintenance
-  - .specify/templates/commands/*.md         ⚠ pending — verify no outdated principle counts or agent-specific references remain
+Templates requiring updates: None
 Follow-up TODOs:
   - None — all fields populated
 -->
@@ -136,6 +131,22 @@ Pipeline job order (enforced via `needs:` dependencies):
 - Any change that disables or bypasses the `test` job constitutes a
   constitution violation and MUST NOT be merged.
 
+### IX. Idempotent Database Migrations (NON-NEGOTIABLE)
+
+All SQL migration files MUST be idempotent and safe to re-run across QA and prod
+environments without errors. This enables shared databases (e.g., QA used by
+both local dev and QA servers) and safe re-deployment.
+
+- Tables: `CREATE TABLE IF NOT EXISTS`
+- Indexes: `CREATE INDEX IF NOT EXISTS`
+- Functions: `CREATE OR REPLACE FUNCTION`
+- Policies: `DROP POLICY IF EXISTS` before `CREATE POLICY`
+- Triggers: `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`
+- Realtime publications: check `pg_publication_tables` before `ALTER PUBLICATION`
+- Seed data: `INSERT ... ON CONFLICT DO NOTHING` (or `DO UPDATE` where appropriate)
+- Never use bare `CREATE TABLE`, `CREATE INDEX`, `CREATE POLICY`, or
+  `CREATE TRIGGER` without the idempotency guard.
+
 ## Approved Tech Stack
 
 The following stack is FINALIZED for v1 and MUST NOT be changed without a
@@ -187,7 +198,7 @@ Amendments require:
 - MINOR: new principle or section added; materially expanded guidance.
 - PATCH: clarifications, wording fixes, typo corrections.
 
-All PRs MUST verify compliance with the eight Core Principles above before merge.
+All PRs MUST verify compliance with the nine Core Principles above before merge.
 Complexity MUST be justified; if a simpler approach exists, it MUST be preferred.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-03
+**Version**: 1.2.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-03

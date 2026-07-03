@@ -24,12 +24,12 @@
 
 **Purpose**: Project initialization, dependencies, configuration files
 
-- [ ] T001 Initialize Next.js 14 project with TypeScript (`strict: true` in tsconfig.json), Tailwind CSS, and App Router in project root (`package.json`, `tsconfig.json`, `next.config.js`, `tailwind.config.ts`, `postcss.config.js`)
-- [ ] T002 Install all dependencies: `@supabase/supabase-js`, `@ducanh2912/next-pwa`, `@cloudflare/next-on-pages`, `bcryptjs`, `shadcn/ui` init, `vitest`, `@testing-library/react`, `@types/bcryptjs`
-- [ ] T003 [P] Configure `next.config.js` with `@ducanh2912/next-pwa` wrapper and `@cloudflare/next-on-pages` adapter settings
-- [ ] T004 [P] Create `.env.example` with all required environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
-- [ ] T005 [P] Configure Vitest in `vitest.config.ts` with path aliases and jsdom environment
-- [ ] T006 [P] Create root layout with Tailwind globals and PWA meta tags in `src/app/layout.tsx`
+- [x] T001 Initialize Next.js 14 project with TypeScript (`strict: true` in tsconfig.json), Tailwind CSS, and App Router in project root (`package.json`, `tsconfig.json`, `next.config.js`, `tailwind.config.ts`, `postcss.config.js`)
+- [x] T002 Install all dependencies: `@supabase/supabase-js`, `@ducanh2912/next-pwa`, `@cloudflare/next-on-pages`, `bcryptjs`, `shadcn/ui` init, `vitest`, `@testing-library/react`, `@types/bcryptjs`
+- [x] T003 [P] Configure `next.config.js` with `@ducanh2912/next-pwa` wrapper and `@cloudflare/next-on-pages` adapter settings
+- [x] T004 [P] Create `.env.example` with all required environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
+- [x] T005 [P] Configure Vitest in `vitest.config.ts` with path aliases and jsdom environment
+- [x] T006 [P] Create root layout with Tailwind globals and PWA meta tags in `src/app/layout.tsx`
 
 ---
 
@@ -41,22 +41,22 @@
 
 **Constitution Note**: All API route files (`route.ts`) MUST include `export const runtime = 'edge'` at the top. Use only Edge-compatible packages (bcryptjs, Web Crypto API). No Node.js-only imports.
 
-- [ ] T007 Create Supabase SQL migration with all tables (`hostelers`, `invite_tokens`, `food_preferences`, `meal_rates`, `monthly_bills`, `settings`), indexes, constraints, and RLS policies in `supabase/migrations/001_initial_schema.sql`
-- [ ] T008 Create seed SQL with default settings (`deadline_time = '21:00'`) and initial meal rates (breakfast ₹30, lunch ₹50, dinner ₹40) in `supabase/seed.sql`
-- [ ] T009 [P] Create Supabase browser client helper (anon key) in `src/lib/supabase/client.ts`
-- [ ] T010 [P] Create Supabase server client helper (service role, Edge-compatible) in `src/lib/supabase/server.ts`
-- [ ] T011 [P] Define all shared TypeScript types and interfaces (Hosteler, FoodPreference, MealRate, MonthlyBill, Settings, API response types) in `src/types/index.ts`
-- [ ] T012 [P] Create deadline validation utility (IST time comparison using `Intl.DateTimeFormat`) in `src/lib/deadline.ts`
-- [ ] T013 [P] Create shared utility functions (IST date helpers, `getTomorrowDate()`, format helpers) in `src/lib/utils.ts`
-- [ ] T014 Create auth session management helpers (get session, get user role, verify owner) in `src/lib/auth/session.ts`
-- [ ] T015 Create auth guard utilities (requireHosteler, requireOwner, requireAuth) in `src/lib/auth/guards.ts`
-- [ ] T016 Create Next.js middleware for auth-based route protection and redirects in `src/middleware.ts`
-- [ ] T017 [P] Create owner login page (email/password form via Supabase Auth) in `src/app/(auth)/admin/login/page.tsx`
-- [ ] T018 [P] Create owner layout shell with navigation and auth guard in `src/app/(owner)/layout.tsx`
-- [ ] T019 [P] Create hosteler layout shell with navigation and auth guard in `src/app/(hosteler)/layout.tsx`
-- [ ] T020 [P] Create landing page with role-based redirect logic in `src/app/page.tsx`
-- [ ] T021 [P] Initialize shadcn/ui components (Button, Card, Input, Toggle, Tabs, Dialog, Badge, Table) in `src/components/ui/`
-- [ ] T022 Implement `GET /api/settings` endpoint (returns deadline_time and current rates) in `src/app/api/settings/route.ts`
+- [x] T007 Create Supabase SQL migration with all tables (`hostelers`, `invite_tokens`, `food_preferences`, `meal_rates`, `monthly_bills`, `settings`), indexes, constraints, and RLS policies in `supabase/migrations/001_initial_schema.sql`
+- [x] T008 Create seed SQL with default settings (`deadline_time = '21:00'`) and initial meal rates (breakfast ₹30, lunch ₹50, dinner ₹40) in `supabase/seed.sql`
+- [x] T009 [P] Create Supabase browser client helper (anon key) in `src/lib/supabase/client.ts`
+- [x] T010 [P] Create Supabase server client helper (service role, Edge-compatible) in `src/lib/supabase/server.ts`
+- [x] T011 [P] Define all shared TypeScript types and interfaces (Hosteler, FoodPreference, MealRate, MonthlyBill, Settings, API response types) in `src/types/index.ts`
+- [x] T012 [P] Create deadline validation utility (IST time comparison using `Intl.DateTimeFormat`) in `src/lib/deadline.ts`
+- [x] T013 [P] Create shared utility functions (IST date helpers, `getTomorrowDate()`, format helpers) in `src/lib/utils.ts`
+- [x] T014 Create auth session management helpers (get session, get user role, verify owner) in `src/lib/auth/session.ts`
+- [x] T015 Create auth guard utilities (requireHosteler, requireOwner, requireAuth) in `src/lib/auth/guards.ts`
+- [x] T016 Create Next.js middleware for auth-based route protection and redirects in `src/middleware.ts`
+- [x] T017 [P] Create owner login page (email/password form via Supabase Auth) in `src/app/(auth)/admin/login/page.tsx`
+- [x] T018 [P] Create owner layout shell with navigation and auth guard in `src/app/(owner)/layout.tsx`
+- [x] T019 [P] Create hosteler layout shell with navigation and auth guard in `src/app/(hosteler)/layout.tsx`
+- [x] T020 [P] Create landing page with role-based redirect logic in `src/app/page.tsx`
+- [x] T021 [P] Initialize shadcn/ui components (Button, Card, Input, Toggle, Tabs, Dialog, Badge, Table) in `src/components/ui/`
+- [x] T022 Implement `GET /api/settings` endpoint (returns deadline_time and current rates) in `src/app/api/settings/route.ts`
 
 **Checkpoint**: Foundation ready — database deployed, auth framework in place, user story implementation can begin
 
@@ -72,13 +72,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implement `POST /api/hostelers` endpoint (create hosteler with pending status + generate invite token) in `src/app/api/hostelers/route.ts`
-- [ ] T024 [US3] Implement `POST /api/invite/generate` endpoint (generate/regenerate invite token, invalidate previous) in `src/app/api/invite/generate/route.ts`
-- [ ] T025 [US3] Implement `POST /api/invite/activate` endpoint (validate token, activate via Google or PIN, create Supabase Auth user, return session) in `src/app/api/invite/activate/route.ts`
-- [ ] T026 [US3] Implement `GET /api/auth/callback` route (Google OAuth callback handler for Supabase Auth redirect flow) in `src/app/api/auth/callback/route.ts`
-- [ ] T027 [US3] Create invite activation page with welcome message, Google sign-in button, and PIN setup form in `src/app/(auth)/join/[token]/page.tsx`
-- [ ] T028 [US3] Add invite token validation logic (check expiry, used status) and display error states (expired, already used) on the activation page in `src/app/(auth)/join/[token]/page.tsx`
-- [ ] T028b [US3] Write unit tests for invite token validation (expiry, reuse rejection), PIN hashing with bcryptjs, and Google OAuth account linking in `src/app/api/invite/activate/route.test.ts`
+- [x] T023 [US3] Implement `POST /api/hostelers` endpoint (create hosteler with pending status + generate invite token) in `src/app/api/hostelers/route.ts`
+- [x] T024 [US3] Implement `POST /api/invite/generate` endpoint (generate/regenerate invite token, invalidate previous) in `src/app/api/invite/generate/route.ts`
+- [x] T025 [US3] Implement `POST /api/invite/activate` endpoint (validate token, activate via Google or PIN, create Supabase Auth user, return session) in `src/app/api/invite/activate/route.ts`
+- [x] T026 [US3] Implement `GET /api/auth/callback` route (Google OAuth callback handler for Supabase Auth redirect flow) in `src/app/api/auth/callback/route.ts`
+- [x] T027 [US3] Create invite activation page with welcome message, Google sign-in button, and PIN setup form in `src/app/(auth)/join/[token]/page.tsx`
+- [x] T028 [US3] Add invite token validation logic (check expiry, used status) and display error states (expired, already used) on the activation page in `src/app/(auth)/join/[token]/page.tsx`
+- [x] T028b [US3] Write unit tests for invite token validation (expiry, reuse rejection), PIN hashing with bcryptjs, and Google OAuth account linking in `src/app/api/invite/activate/route.test.ts`
 
 **Checkpoint**: Owner can register hostelers and hostelers can activate their accounts via invite links
 
@@ -92,11 +92,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T029 [US4] Implement `POST /api/auth/pin/verify` endpoint (validate phone + PIN against hostelers.pin_hash, create Supabase session) in `src/app/api/auth/pin/verify/route.ts`
-- [ ] T030 [US4] Create hosteler login page with Google sign-in and phone+PIN form in `src/app/(auth)/login/page.tsx`
-- [ ] T031 [US4] Implement unregistered Google account rejection (display "not registered" message when Google ID has no matching hosteler) in `src/app/(auth)/login/page.tsx`
-- [ ] T032 [US4] Configure Supabase Auth session expiry to 30 days for hostelers and 7 days for owner in `src/lib/auth/session.ts`
-- [ ] T032b [US4] Write unit tests for PIN verification (correct/incorrect PIN, inactive account rejection) and unregistered Google sign-in rejection in `src/app/api/auth/pin/verify/route.test.ts`
+- [x] T029 [US4] Implement `POST /api/auth/pin/verify` endpoint (validate phone + PIN against hostelers.pin_hash, create Supabase session) in `src/app/api/auth/pin/verify/route.ts`
+- [x] T030 [US4] Create hosteler login page with Google sign-in and phone+PIN form in `src/app/(auth)/login/page.tsx`
+- [x] T031 [US4] Implement unregistered Google account rejection (display "not registered" message when Google ID has no matching hosteler) in `src/app/(auth)/login/page.tsx`
+- [x] T032 [US4] Configure Supabase Auth session expiry to 30 days for hostelers and 7 days for owner in `src/lib/auth/session.ts`
+- [x] T032b [US4] Write unit tests for PIN verification (correct/incorrect PIN, inactive account rejection) and unregistered Google sign-in rejection in `src/app/api/auth/pin/verify/route.test.ts`
 
 **Checkpoint**: Both auth methods work, sessions persist correctly, unregistered users are rejected
 
@@ -110,14 +110,14 @@
 
 ### Implementation for User Story 1
 
-- [ ] T033 [P] [US1] Create `FoodToggle` component (three meal toggles with time labels: Breakfast 7–9 AM, Lunch 12:30–2 PM, Dinner 7:30–9:30 PM) in `src/components/food-toggle.tsx`
-- [ ] T034 [P] [US1] Create `CountdownBanner` component (shows time remaining to deadline, visible when < 2 hours) in `src/components/countdown-banner.tsx`
-- [ ] T035 [US1] Implement `POST /api/food/submit` endpoint (validate auth + active status, enforce deadline via server IST time, upsert food_preferences) in `src/app/api/food/submit/route.ts`
-- [ ] T036 [US1] Create food preference submission page with meal toggles, deadline countdown, and read-only state after deadline in `src/app/(hosteler)/submit/page.tsx`
-- [ ] T037 [US1] Create hosteler dashboard page showing submission status (green confirmation with selected meals), countdown banner, and link to submit in `src/app/(hosteler)/dashboard/page.tsx`
-- [ ] T038 [US1] Add pre-fill logic to submission page (fetch existing preference for tomorrow via Supabase client, populate toggle states) in `src/app/(hosteler)/submit/page.tsx`
-- [ ] T038b [US1] Implement `GET /api/food/today-status` endpoint (return submission status for tomorrow + deadline info + server time) in `src/app/api/food/today-status/route.ts`
-- [ ] T038c [US1] Write unit tests for deadline enforcement logic, food submission upsert, and today-status response in `src/app/api/food/submit/route.test.ts` and `src/lib/deadline.test.ts`
+- [x] T033 [P] [US1] Create `FoodToggle` component (three meal toggles with time labels: Breakfast 7–9 AM, Lunch 12:30–2 PM, Dinner 7:30–9:30 PM) in `src/components/food-toggle.tsx`
+- [x] T034 [P] [US1] Create `CountdownBanner` component (shows time remaining to deadline, visible when < 2 hours) in `src/components/countdown-banner.tsx`
+- [x] T035 [US1] Implement `POST /api/food/submit` endpoint (validate auth + active status, enforce deadline via server IST time, upsert food_preferences) in `src/app/api/food/submit/route.ts`
+- [x] T036 [US1] Create food preference submission page with meal toggles, deadline countdown, and read-only state after deadline in `src/app/(hosteler)/submit/page.tsx`
+- [x] T037 [US1] Create hosteler dashboard page showing submission status (green confirmation with selected meals), countdown banner, and link to submit in `src/app/(hosteler)/dashboard/page.tsx`
+- [x] T038 [US1] Add pre-fill logic to submission page (fetch existing preference for tomorrow via Supabase client, populate toggle states) in `src/app/(hosteler)/submit/page.tsx`
+- [x] T038b [US1] Implement `GET /api/food/today-status` endpoint (return submission status for tomorrow + deadline info + server time) in `src/app/api/food/today-status/route.ts`
+- [x] T038c [US1] Write unit tests for deadline enforcement logic, food submission upsert, and today-status response in `src/app/api/food/submit/route.test.ts` and `src/lib/deadline.test.ts`
 
 **Checkpoint**: Hostelers can submit and update food preferences with server-enforced deadline — core value delivered
 
@@ -131,13 +131,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T039 [P] [US2] Create `MealCountCard` component (displays count per meal type with animated increment) in `src/components/meal-count-card.tsx`
-- [ ] T040 [P] [US2] Create `HostelerList` component (shows name + room, used for pending/submitted lists) in `src/components/hosteler-list.tsx`
-- [ ] T041 [US2] Create owner dashboard page with three meal count cards, pending hostelers list, submitted hostelers collapsible list, and deadline countdown in `src/app/(owner)/dashboard/page.tsx`
-- [ ] T042 [US2] Implement Supabase Realtime subscription on `food_preferences` table (filter by tomorrow's date, update counts on INSERT/UPDATE events) in `src/app/(owner)/dashboard/page.tsx`
-- [ ] T043 [US2] Implement reconnection handling (auto-reconnect, show "Live updates paused — reconnecting…" banner after 10s disconnect) in `src/app/(owner)/dashboard/page.tsx`
-- [ ] T044 [US2] Implement initial data fetch for dashboard (aggregate meal counts + pending/submitted hosteler lists via Supabase queries) in `src/app/(owner)/dashboard/page.tsx`
-- [ ] T044b [US2] Write unit tests for food counts aggregation logic and Realtime reconnection banner behavior in `src/app/(owner)/dashboard/dashboard.test.tsx`
+- [x] T039 [P] [US2] Create `MealCountCard` component (displays count per meal type with animated increment) in `src/components/meal-count-card.tsx`
+- [x] T040 [P] [US2] Create `HostelerList` component (shows name + room, used for pending/submitted lists) in `src/components/hosteler-list.tsx`
+- [x] T041 [US2] Create owner dashboard page with three meal count cards, pending hostelers list, submitted hostelers collapsible list, and deadline countdown in `src/app/(owner)/dashboard/page.tsx`
+- [x] T042 [US2] Implement Supabase Realtime subscription on `food_preferences` table (filter by tomorrow's date, update counts on INSERT/UPDATE events) in `src/app/(owner)/dashboard/page.tsx`
+- [x] T043 [US2] Implement reconnection handling (auto-reconnect, show "Live updates paused — reconnecting…" banner after 10s disconnect) in `src/app/(owner)/dashboard/page.tsx`
+- [x] T044 [US2] Implement initial data fetch for dashboard (aggregate meal counts + pending/submitted hosteler lists via Supabase queries) in `src/app/(owner)/dashboard/page.tsx`
+- [x] T044b [US2] Write unit tests for food counts aggregation logic and Realtime reconnection banner behavior in `src/app/(owner)/dashboard/dashboard.test.tsx`
 
 **Checkpoint**: Owner sees live meal counts and submission status without manual refresh
 
