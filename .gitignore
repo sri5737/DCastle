@@ -1,0 +1,25 @@
+# IDE / Editor
+.vscode/
+
+# GitHub Copilot agent prompts (local only)
+.github/
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Vercel / Cloudflare
+.vercel/
+.wrangler/
