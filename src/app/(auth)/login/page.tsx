@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,14 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const searchParams = useSearchParams();
 
   const [phone, setPhone] = useState('');
@@ -190,6 +199,16 @@ export default function LoginPage() {
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
+      </Card>
+    </div>
+  );
+}
+
+function LoginLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md p-6 text-center">
+        <p className="text-sm text-gray-500">Loading...</p>
       </Card>
     </div>
   );
