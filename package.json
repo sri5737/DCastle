@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:us1": "vitest run src/app/api/food/ src/lib/deadline.test.ts",
+    "test:us2": "vitest run src/app/admin/dashboard/",
+    "test:us3": "vitest run src/app/api/invite/",
+    "test:us4": "vitest run src/app/api/auth/",
+    "test:e2e": "playwright test",
+    "test:all": "vitest run && playwright test"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.0",
@@ -24,6 +30,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^16.0.0",
     "@types/bcryptjs": "^2.4.6",
@@ -32,6 +39,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.19",
+    "dotenv": "^17.4.2",
     "jsdom": "^24.1.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",

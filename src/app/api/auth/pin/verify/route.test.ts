@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import bcrypt from 'bcryptjs';
 
-// Mock Supabase
+// Mock Supabase service client
 const mockSingle = vi.fn();
 const mockEq = vi.fn().mockReturnValue({ single: mockSingle });
 const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
@@ -16,6 +16,16 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerClient: vi.fn(),
 }));
 
+// Mock @supabase/supabase-js createClient for signInWithPassword
+const mockSignInWithPassword = vi.fn();
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    auth: {
+      signInWithPassword: mockSignInWithPassword,
+    },
+  }),
+}));
+
 function createRequest(body: Record<string, unknown>) {
   return new Request('http://localhost/api/auth/pin/verify', {
     method: 'POST',
@@ -28,6 +38,17 @@ describe('POST /api/auth/pin/verify', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    // Default: signInWithPassword succeeds
+    mockSignInWithPassword.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'real-jwt-token',
+          refresh_token: 'real-refresh-token',
+          expires_in: 2592000,
+        },
+      },
+      error: null,
+    });
   });
 
   it('should authenticate with correct phone and PIN', async () => {
@@ -56,8 +77,13 @@ describe('POST /api/auth/pin/verify', () => {
     expect(data.hosteler.id).toBe('hosteler-1');
     expect(data.hosteler.name).toBe('John Doe');
     expect(data.hosteler.room_number).toBe('101');
-    expect(data.session.access_token).toBe('auth-user-1');
-    expect(data.session.expires_in).toBe(60 * 60 * 24 * 30);
+    expect(data.session.access_token).toBe('real-jwt-token');
+    expect(data.session.refresh_token).toBe('real-refresh-token');
+    expect(data.session.expires_in).toBe(2592000);
+    expect(mockSignInWithPassword).toHaveBeenCalledWith({
+      email: '9876543210@hosteler.dcastle.local',
+      password: '1234',
+    });
   });
 
   it('should reject incorrect PIN', async () => {

@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [phone, setPhone] = useState('');
@@ -48,7 +47,17 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/dashboard');
+      // Set cookies for middleware auth (session JWT from server-side Supabase sign-in)
+      document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+      document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+
+      // Set session in Supabase client so client-side auth checks work
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+
+      window.location.href = '/dashboard';
     } catch {
       setError('Network error. Please try again.');
     } finally {

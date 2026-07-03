@@ -25,6 +25,7 @@ const PUBLIC_PATHS = [
   '/join',
   '/api/auth/callback',
   '/api/invite/activate',
+  '/api/invite/validate',
 ];
 
 function isPublicPath(pathname: string): boolean {

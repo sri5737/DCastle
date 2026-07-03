@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (!pin || !PIN_REGEX.test(pin)) {
       return NextResponse.json({ error: 'PIN must be exactly 4 digits' }, { status: 400 });
     }
-    const pin_hash = await bcrypt.hash(pin, 10);
+    const pin_hash = bcrypt.hashSync(pin, 10);
     updateData = { pin_hash, status: 'active', activated_at: new Date().toISOString() };
   } else {
     // Google OAuth path
@@ -89,11 +89,23 @@ export async function POST(request: NextRequest) {
   }
 
   // Create Supabase Auth user for the hosteler
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+  const createUserPayload: Record<string, unknown> = {
+    email: `${hosteler.phone}@hosteler.dcastle.local`,
+    email_confirm: true,
     phone: hosteler.phone,
     phone_confirm: true,
     user_metadata: { hosteler_id: hosteler.id, name: hosteler.name },
-  });
+  };
+
+  // For PIN-based activation, set the PIN as the Supabase Auth password
+  // so that signInWithPassword works in the PIN verify flow
+  if (method === 'pin' && pin) {
+    createUserPayload.password = pin;
+  }
+
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser(
+    createUserPayload as Parameters<typeof supabase.auth.admin.createUser>[0]
+  );
 
   if (authError) {
     return NextResponse.json({ error: 'Failed to create auth user' }, { status: 500 });
@@ -116,27 +128,7 @@ export async function POST(request: NextRequest) {
     .update({ used: true })
     .eq('id', inviteToken.id);
 
-  // Generate session token for the new user
-  const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
-    type: 'magiclink',
-    email: `${hosteler.phone}@hosteler.dcastle.local`,
-  });
-
-  // For the response, we'll provide a sign-in session
-  // Using admin.createUser already creates the user. We sign them in via custom token approach.
-  const { data: signInData, error: signInError } = await supabase.auth.admin.generateLink({
-    type: 'magiclink',
-    email: `${hosteler.phone}@hosteler.dcastle.local`,
-  });
-
-  // Since we can't directly generate a session via admin API in edge,
-  // return auth user id and let the client establish the session
   return NextResponse.json({
-    session: {
-      access_token: authUser.user.id, // Client will exchange for real session
-      refresh_token: '',
-      expires_in: 3600,
-    },
     hosteler: {
       id: hosteler.id,
       name: hosteler.name,

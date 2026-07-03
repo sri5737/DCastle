@@ -1,5 +1,6 @@
-import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 import type { SessionUser, UserRole } from '@/types';
+import { createServiceClient } from '@/lib/supabase/server';
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL || '';
 
@@ -17,40 +18,59 @@ export function getSessionMaxAge(role: UserRole): number {
 }
 
 /**
- * Get the current authenticated session user from Supabase Auth.
- * Returns null if not authenticated.
+ * Decode JWT payload locally without network call.
+ * Same approach as middleware — fast, no SSL/proxy issues.
+ */
+function decodeJwtPayload(token: string): { email?: string; sub?: string; exp?: number } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the current authenticated session user from the JWT cookie.
+ * Decodes locally (no network call) — matches middleware approach.
+ * Returns null if not authenticated or token expired.
  */
 export async function getSession(): Promise<SessionUser | null> {
-  const supabase = await createServerClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('sb-access-token')?.value;
 
-  if (error || !user) return null;
+  if (!accessToken) return null;
 
-  const role = getUserRole(user.email);
+  const payload = decodeJwtPayload(accessToken);
+  if (!payload || !payload.sub) return null;
+
+  const email = payload.email || '';
+  const role = getUserRole(email);
 
   if (role === 'owner') {
     return {
-      id: user.id,
-      email: user.email,
+      id: payload.sub,
+      email,
       role: 'owner',
     };
   }
 
-  // Look up the hosteler linked to this auth user
-  const serviceClient = createServiceClient();
-  const { data: hosteler } = await serviceClient
+  // Look up hosteler_id from auth_user_id
+  const supabase = createServiceClient();
+  const { data: hosteler } = await supabase
     .from('hostelers')
     .select('id')
-    .eq('auth_user_id', user.id)
+    .eq('auth_user_id', payload.sub)
     .single();
 
-  if (!hosteler) return null;
-
   return {
-    id: user.id,
-    email: user.email,
+    id: payload.sub,
+    email,
     role: 'hosteler',
-    hosteler_id: hosteler.id,
+    hosteler_id: hosteler?.id,
   };
 }
 

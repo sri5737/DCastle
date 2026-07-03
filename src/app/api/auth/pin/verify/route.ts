@@ -1,6 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/server';
 import bcrypt from 'bcryptjs';
 
@@ -47,33 +48,52 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verify PIN
+  // Verify PIN (use compareSync — async compare uses setImmediate which isn't Edge-compatible)
   if (!hosteler.pin_hash) {
     return NextResponse.json({ error: 'Invalid phone number or PIN' }, { status: 401 });
   }
 
-  const isValidPin = await bcrypt.compare(pin, hosteler.pin_hash);
+  const isValidPin = bcrypt.compareSync(pin, hosteler.pin_hash);
   if (!isValidPin) {
     return NextResponse.json({ error: 'Invalid phone number or PIN' }, { status: 401 });
   }
 
-  // Generate session for the authenticated hosteler
-  // Use the existing auth_user_id to create a session via admin generateLink
   if (!hosteler.auth_user_id) {
     return NextResponse.json({ error: 'Invalid phone number or PIN' }, { status: 401 });
   }
 
-  // Return session info for the authenticated hosteler
-  return NextResponse.json({
-    session: {
-      access_token: hosteler.auth_user_id,
-      refresh_token: '',
-      expires_in: 60 * 60 * 24 * 30, // 30 days
-    },
-    hosteler: {
-      id: hosteler.id,
-      name: hosteler.name,
-      room_number: hosteler.room_number,
-    },
-  });
+  // Sign in with Supabase Auth to get a real JWT session (server-side)
+  try {
+    const authClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
+      email: `${phone}@hosteler.dcastle.local`,
+      password: pin,
+    });
+
+    if (signInError || !signInData?.session) {
+      console.error('Supabase signIn error:', signInError?.message);
+      return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      session: {
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+        expires_in: signInData.session.expires_in,
+      },
+      hosteler: {
+        id: hosteler.id,
+        name: hosteler.name,
+        room_number: hosteler.room_number,
+      },
+    });
+  } catch (err) {
+    console.error('signInWithPassword threw:', err);
+    return NextResponse.json({ error: 'Authentication service unavailable' }, { status: 503 });
+  }
 }

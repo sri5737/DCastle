@@ -277,8 +277,13 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 
 **Automated Quality Gate**
 
-- **FR-051**: All automated tests MUST pass before any build or deployment can proceed.
+- **FR-051**: All automated tests (unit, integration, and E2E) MUST pass before any build or deployment can proceed.
 - **FR-052**: The deployment pipeline MUST be blocked if tests or the build step fail.
+- **FR-053**: Each user story MUST have corresponding E2E tests that verify its acceptance scenarios in a real browser environment.
+- **FR-054**: After completing any phase, all relevant automated tests MUST be executed and pass before the phase is considered done.
+- **FR-055**: Per-story test scripts MUST exist to allow running tests scoped to a specific user story independently.
+- **FR-056**: E2E tests MUST use a global setup that seeds required test data (test owner user, test hosteler user with known credentials) into Supabase before tests run, and a global teardown that cleans up test data after tests complete.
+- **FR-057**: E2E test credentials MUST be stored in environment variables (not hardcoded) and use a dedicated test owner account and test hosteler account that are pre-provisioned in the Supabase project.
 
 ---
 

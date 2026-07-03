@@ -100,6 +100,11 @@
 
 **Checkpoint**: Both auth methods work, sessions persist correctly, unregistered users are rejected
 
+### Bug Fix: PIN Login Session (T029 incomplete implementation)
+
+- [x] T032c [US4] Fix `POST /api/auth/pin/verify` to generate a real Supabase session (using `supabase.auth.admin.generateLink` or `signInWithPassword` with a service-generated password) and return proper JWT access/refresh tokens in `src/app/api/auth/pin/verify/route.ts`
+- [x] T032d [US4] Fix hosteler login page to set `sb-access-token` and `sb-refresh-token` cookies after successful PIN verify (matching owner login pattern) and use `window.location.href` instead of `router.push` for full page reload through middleware in `src/app/(auth)/login/page.tsx`
+
 ---
 
 ## Phase 5: User Story 1 — Hosteler Submits Daily Food Preferences (Priority: P1) 🎯 MVP
@@ -156,6 +161,7 @@
 - [ ] T047 [US5] Implement `POST /api/hostelers/[id]/reset-invite` endpoint (invalidate existing tokens, generate new invite token with 7-day expiry; does NOT change hosteler status — only regenerates the link) in `src/app/api/hostelers/[id]/reset-invite/route.ts`
 - [ ] T048 [US5] Create hosteler management page with status tabs (active/pending/inactive), add hosteler form, and per-hosteler action buttons in `src/app/(owner)/hostelers/page.tsx`
 - [ ] T049 [US5] Implement deactivation confirmation dialog (shows future preference count warning) and invite link copy functionality in `src/app/(owner)/hostelers/page.tsx`
+- [ ] T049b [US5] Create E2E test: owner adds hosteler → views in active list → deactivates → appears in inactive tab → reactivates → returns to active tab → resets invite link in `e2e/us5-hosteler-management.spec.ts`
 
 **Checkpoint**: Owner can fully manage hosteler lifecycle
 
@@ -174,6 +180,7 @@
 - [ ] T050 [US10] Implement `PATCH /api/settings` endpoint (update deadline_time immediately, insert new meal_rates row with effective_from = tomorrow) in `src/app/api/settings/route.ts`
 - [ ] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) in `src/app/(owner)/settings/page.tsx`
 - [ ] T052 [US10] Add validation for deadline format (HH:MM, 24-hour) and rate values (positive numbers) with error feedback in `src/app/(owner)/settings/page.tsx`
+- [ ] T052b [US10] Create E2E test: owner changes deadline time → verify new deadline displayed → change meal rate → verify rate shown as "effective from tomorrow" → hosteler form locks at new deadline time in `e2e/us10-settings.spec.ts`
 
 **Checkpoint**: Owner can configure deadline and rates; changes apply correctly to submissions and billing
 
@@ -193,6 +200,7 @@
 - [ ] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day breakdown with applicable rates for a hosteler's bill) in `src/app/api/billing/detail/route.ts`
 - [ ] T057 [US6] Create owner billing page with month/year selector, generate button, bill summary table (name, room, meal counts, total), and per-hosteler detail drill-down in `src/app/(owner)/billing/page.tsx`
 - [ ] T057b [US6] Write unit tests for billing calculation: single rate month, mid-month rate change, zero-preference month, deactivated hosteler inclusion in `src/lib/billing.test.ts`
+- [ ] T057c [US6] Create E2E test: seed food preferences for a month → owner navigates to billing page → selects month → generates bills → verify summary table shows correct totals → drill into hosteler detail → verify per-day breakdown in `e2e/us6-monthly-bills.spec.ts`
 
 **Checkpoint**: Owner can generate and review accurate monthly bills accounting for mid-month rate changes
 
@@ -208,6 +216,7 @@
 
 - [ ] T058 [US7] Implement `GET /api/food/history` endpoint (return per-day food preferences and summary counts for hosteler's selected month) in `src/app/api/food/history/route.ts`
 - [ ] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) in `src/app/(hosteler)/history/page.tsx`
+- [ ] T059b [US7] Create E2E test: hosteler submits food preferences for multiple days → navigates to history page → selects current month → verifies day-by-day list matches submissions → verifies monthly totals are correct in `e2e/us7-food-history.spec.ts`
 
 **Checkpoint**: Hostelers can review their own food preference history by month
 
@@ -223,6 +232,7 @@
 
 - [ ] T060 [US8] Create hosteler bill view page with month selector, meal count/rate/subtotal breakdown, highlighted total, and "confirmed by owner" note in `src/app/(hosteler)/bill/page.tsx`
 - [ ] T061 [US8] Add "bill not yet available" empty state when no bill has been generated for the selected month in `src/app/(hosteler)/bill/page.tsx`
+- [ ] T061b [US8] Create E2E test: hosteler navigates to bill page with no bills → sees "not available" state → owner generates bill → hosteler refreshes → sees meal breakdown with correct counts, rates, and total in `e2e/us8-hosteler-bill.spec.ts`
 
 **Checkpoint**: Hostelers can independently view and understand their monthly charges
 
@@ -239,21 +249,57 @@
 - [ ] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id` filter, date range params, and `format=csv` response in `src/app/api/food/history/route.ts`
 - [ ] T063 [US9] Create owner food history page with hosteler dropdown filter, date range picker, results table, and "Export CSV" download button in `src/app/(owner)/history/page.tsx`
 - [ ] T064 [US9] Implement CSV generation (build CSV string from filtered data, trigger browser download) in `src/app/(owner)/history/page.tsx`
+- [ ] T064b [US9] Create E2E test: owner navigates to food history → filters by specific hosteler → filters by date range → verifies table shows correct entries → clicks Export CSV → verifies downloaded file contains matching data in `e2e/us9-owner-food-history.spec.ts`
 
 **Checkpoint**: Owner can review and export food history for record-keeping and dispute resolution
 
 ---
 
-## Phase 13: Polish & Cross-Cutting Concerns
+## Phase 13: Automation & E2E Testing
 
-**Purpose**: PWA configuration, CI/CD pipeline, nightly backup, offline handling, and final validation
+**Purpose**: Set up Playwright E2E testing, per-story test scripts, and CI/CD pipeline to enforce quality gates after every development phase
 
-- [ ] T065 [P] Create PWA manifest with app name, icons, theme color, and standalone display mode in `public/manifest.json`
-- [ ] T066 [P] Create PWA icons (192x192 and 512x512) in `public/icons/`
-- [ ] T067 [P] Implement install prompt handling (capture `beforeinstallprompt` event, show custom install UI on first mobile visit) in `src/components/install-prompt.tsx`
-- [ ] T068 [P] Create GitHub Actions CI workflow with three jobs: `test` (pnpm install → vitest run), `build` (needs: test → @cloudflare/next-on-pages), `deploy` (needs: build → wrangler pages deploy) in `.github/workflows/ci.yml`
-- [ ] T069 [P] Create GitHub Actions nightly backup workflow (cron 2:00 AM IST → pg_dump → gzip → upload to Cloudflare R2 → 90-day retention cleanup) in `.github/workflows/backup.yml`. Include failure alert via GitHub Actions built-in email notifications (configure `if: failure()` step that logs error; repo owner receives automatic failure email from GitHub)
-- [ ] T070 [P] Add offline indicator component (detect network status, show "You're offline" on data screens) in `src/components/offline-indicator.tsx`
+**⚠️ CRITICAL**: After this phase, all future phases MUST have passing tests before completion
+
+### E2E Testing Infrastructure
+
+- [x] T065a Install Playwright and configure `playwright.config.ts` (baseURL: localhost:3000, projects: chromium + mobile-chrome, webServer auto-start) in project root
+- [x] T065b [P] Add per-story test scripts to `package.json`: `test:us1`, `test:us2`, `test:us3`, `test:us4`, `test:e2e`, `test:all`
+- [x] T065c [P] Create E2E test helper utilities (login as owner, login as hosteler, seed test data) in `e2e/helpers.ts`
+
+### E2E Test Suites (per user story)
+
+- [x] T065d [US3] Create E2E test: owner registers hosteler → generates invite → hosteler opens link → activates via PIN in `e2e/us3-invite-activation.spec.ts`
+- [x] T065e [US4] Create E2E test: activated hosteler logs in via PIN → sees dashboard → session persists in `e2e/us4-hosteler-login.spec.ts`
+- [x] T065f [US1] Create E2E test: hosteler toggles meals → saves → dashboard shows confirmation → form locks after deadline in `e2e/us1-food-submission.spec.ts`
+- [x] T065g [US2] Create E2E test: owner views dashboard → hosteler submits → counts update live without refresh in `e2e/us2-owner-dashboard.spec.ts`
+
+### CI/CD Pipeline
+
+- [x] T068 [P] Create GitHub Actions CI workflow with jobs: `test` (npm ci → vitest run → playwright test), `build` (needs: test → next build), `deploy` (needs: build → wrangler pages deploy) in `.github/workflows/ci.yml`
+- [x] T069 [P] Create GitHub Actions nightly backup workflow (cron 2:00 AM IST → pg_dump → gzip → upload to Cloudflare R2 → 90-day retention cleanup) in `.github/workflows/backup.yml`. Include failure alert via GitHub Actions built-in email notifications (configure `if: failure()` step that logs error; repo owner receives automatic failure email from GitHub)
+
+### E2E Test Data & Authentication Fix
+
+- [x] T069a Create Playwright global setup (`e2e/global-setup.ts`) that seeds a test owner user and test hosteler (with known phone+PIN) into Supabase using the service role key before tests run. Add E2E test env vars (`E2E_TEST_OWNER_EMAIL`, `E2E_TEST_OWNER_PASSWORD`, `E2E_TEST_HOSTELER_PHONE`, `E2E_TEST_HOSTELER_PIN`) to `.env.local` and `.env.example`.
+- [x] T069b Create Playwright global teardown (`e2e/global-teardown.ts`) that cleans up test-seeded data from Supabase after tests complete.
+- [x] T069c Update `playwright.config.ts` to reference `globalSetup` and `globalTeardown`, load env vars via `dotenv`.
+- [x] T069d Update `e2e/helpers.ts` login helpers to use env-based test credentials and fix login flows to match the actual app login pages (correct selectors, cookie-based auth).
+- [x] T069e Update all E2E test specs (`us1`, `us2`, `us3`, `us4`) to use seeded test data from global setup and pass with the actual running app.
+
+**Checkpoint**: All completed stories have passing E2E tests; CI blocks deployment on test failure
+
+---
+
+## Phase 14: Polish & Cross-Cutting Concerns
+
+**Purpose**: PWA configuration, offline handling, and final validation
+
+- [ ] T070a [P] Create PWA manifest with app name, icons, theme color, and standalone display mode in `public/manifest.json`
+- [ ] T070b [P] Create PWA icons (192x192 and 512x512) in `public/icons/`
+- [ ] T070c [P] Implement install prompt handling (capture `beforeinstallprompt` event, show custom install UI on first mobile visit) in `src/components/install-prompt.tsx`
+- [ ] T070d [P] Add offline indicator component (detect network status, show "You're offline" on data screens) in `src/components/offline-indicator.tsx`
+- [ ] T070e Create E2E test: verify PWA manifest loads correctly → verify app installs as standalone → verify offline indicator appears when network disconnected → verify app recovers when network restored in `e2e/pwa-offline.spec.ts`
 - [ ] T071 Validate complete application against quickstart.md scenarios: manually execute all 11 validation scenarios end-to-end on a mobile device (375px viewport). Pass criteria: each scenario completes without errors, correct data persists in DB, deadline enforcement works at configured time, PWA installs successfully. Document pass/fail per scenario.
 
 ---
@@ -290,7 +336,8 @@ Phase 2 (Foundational)
   ├── Phase 8 (US10: Settings) — independent
   │     └── Phase 9 (US6: Monthly Bills) — needs US1 + US10
   │           └── Phase 11 (US8: Hosteler Bill View)
-  └── Phase 13 (Polish) — independent of stories
+  ├── Phase 13 (Automation & E2E) — after US1-US4 complete
+  └── Phase 14 (Polish) — independent of stories
 ```
 
 ### Within Each User Story

@@ -16,7 +16,14 @@ A mobile-first PWA for managing daily food preferences at Deekshana Castle PG (~
 
 **Storage**: Supabase PostgreSQL (free tier) with Row Level Security + Realtime subscriptions
 
-**Testing**: Vitest + @testing-library/react (co-located test files)
+**Testing**: Vitest + @testing-library/react (co-located test files), Playwright (E2E browser tests in `e2e/` directory)
+
+**Testing Strategy**:
+- **Unit tests** (Vitest): Business logic, utilities, API route handlers — co-located as `*.test.ts` next to source
+- **E2E tests** (Playwright): Full browser flows per user story — in `e2e/` directory at project root
+- **E2E test data**: Global setup (`e2e/global-setup.ts`) seeds a test owner and test hosteler into Supabase using the service role key before tests run. Global teardown cleans up test data. Credentials stored in `.env.local` as `E2E_TEST_OWNER_EMAIL`, `E2E_TEST_OWNER_PASSWORD`, `E2E_TEST_HOSTELER_PHONE`, `E2E_TEST_HOSTELER_PIN`.
+- **Per-story scripts**: `npm run test:us1` through `test:us4` for targeted story verification
+- **CI gate**: All tests must pass before deployment proceeds (`npm run test:run` + `npm run test:e2e`)
 
 **Target Platform**: Mobile-first PWA (375px baseline), Edge Runtime (Cloudflare Workers)
 
