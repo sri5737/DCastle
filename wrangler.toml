@@ -2,6 +2,7 @@ name = "dcastle"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 main = ".vercel/output/static/_worker.js"
+find_additional_modules = true
 
 [assets]
 directory = ".vercel/output/static"
