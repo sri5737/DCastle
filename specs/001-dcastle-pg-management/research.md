@@ -4,12 +4,12 @@
 
 ## Research Tasks & Findings
 
-### 1. Next.js 14 + Cloudflare Pages (Edge Runtime)
+### 1. Next.js 15.3.3 + Cloudflare Pages (Edge Runtime)
 
 **Decision**: Use `@cloudflare/next-on-pages` adapter with App Router
 
 **Rationale**: 
-- Cloudflare Pages supports Next.js via the `@cloudflare/next-on-pages` adapter
+- Cloudflare Pages supports the repository's Next.js 15.3.3 baseline via the `@cloudflare/next-on-pages` adapter
 - All route handlers must export `const runtime = 'edge'` — no Node.js runtime available
 - Static pages are pre-rendered at build time; dynamic routes use Edge Functions
 - `next.config.js` must be configured for the adapter (no `output: 'export'`)
@@ -200,7 +200,7 @@ WHERE fp.hosteler_id = $1 AND fp.date BETWEEN $2 AND $3
 
 All technical unknowns resolved. Architecture decisions are finalized:
 
-1. Next.js 14 + Cloudflare Pages via `@cloudflare/next-on-pages`
+1. Next.js 15.3.3 + Cloudflare Pages via `@cloudflare/next-on-pages`
 2. Supabase Auth (Google OAuth) + custom PIN verify route
 3. Supabase Realtime for live meal counts
 4. True PWA via `@ducanh2912/next-pwa` with Android Chrome installability validation
@@ -212,8 +212,24 @@ All technical unknowns resolved. Architecture decisions are finalized:
 10. Session invalidation on deactivation via Supabase Admin API `signOut(userId, 'global')`
 11. Unlimited concurrent sessions — no device limit enforcement
 12. Deleted hosteler lifecycle uses soft-delete metadata on the hosteler plus soft-cancellation markers on future-dated food preferences
+13. Honest E2E acceptance evidence is a delivery requirement: exact business outcomes, real UI/API paths, cross-role producer-to-consumer proof, dashboard initial/live/reload-stable evidence, auth reload stability through server-side routes, PIN lockout coverage, story-scoped scripts through US12, and scoped SC-001/SC-010 performance evidence
 
 ---
+
+### 13. Honest E2E Audit and Scoped Acceptance Evidence
+
+**Decision**: Treat FR-066 through FR-069 and Constitution XI as a cross-cutting audit/correction requirement for every completed and future story E2E suite.
+
+**Rationale**:
+- E2E tests are acceptance evidence, so a passing suite must prove a falsifiable business outcome from the relevant independent test rather than only proving that a route, heading, or broad placeholder rendered.
+- The most important workflows are cross-role. Food submission only proves business value when the owner dashboard consumes the submitted choices as exact counts and Pending/Submitted membership.
+- Auth proxy validation must prove real login behavior through server-side routes and reload-stable authenticated pages; direct cookie or localStorage injection can support setup but cannot replace the core proof.
+- SC-001 and SC-010 are scoped v1 acceptance checks. They require representative browser/manual timing and seeded 100-hosteler evidence, not a new load-testing platform.
+
+**Alternatives considered**:
+- Keeping existing E2E tests unchanged after the clarification — rejected because FR-066 through FR-069 explicitly require audit and correction.
+- Using direct database writes or injected sessions as the primary proof — rejected because those shortcuts bypass the behavior users rely on.
+- Adding full performance/load-test infrastructure for SC-001/SC-010 — rejected because the clarified success criteria require scoped acceptance evidence only.
 
 ## Addendum: Session & Security Clarifications (2026-07-04)
 

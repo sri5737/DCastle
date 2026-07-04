@@ -353,6 +353,11 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **FR-063**: Per-story test scripts MUST exist to allow running tests scoped to a specific user story independently.
 - **FR-064**: E2E tests MUST use a global setup that seeds required test data (test owner user, test hosteler user with known credentials) into Supabase before tests run, and a global teardown that cleans up test data after tests complete.
 - **FR-065**: E2E test credentials MUST be stored in environment variables (not hardcoded) and use a dedicated test owner account and test hosteler account that are pre-provisioned in the Supabase project.
+- **FR-066**: Existing and future E2E tests MUST be audited and corrected so each completed story proves at least one exact, falsifiable business outcome from its independent test, using the real UI and real Next.js API routes for the behavior under test. Route mocks, conditional skips, broad placeholder assertions, and direct cookie or localStorage session injection MUST NOT be accepted as core evidence for the feature being validated.
+- **FR-067**: Cross-role E2E workflows MUST prove producer-to-consumer behavior in the same test or an explicitly linked sequence. For food submission and owner dashboard validation, a hosteler MUST submit exact breakfast, lunch, and dinner preferences through the UI, and the owner dashboard MUST show the exact resulting meal counts and move that hosteler from Pending to Submitted.
+- **FR-068**: Owner dashboard E2E validation MUST cover both the initial fetched dashboard state and a live update caused by a real hosteler submission. The same resulting counts and Pending/Submitted membership MUST remain correct after a page reload so the accepted evidence proves both live and reload-stable behavior.
+- **FR-069**: Authentication E2E validation MUST log in owner and hosteler users through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated page, and verify the user remains on the correct role surface. Direct cookie or localStorage injection is allowed only for documented setup helpers, never as the core proof that login works.
+- **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit tests or E2E tests may not exercise.
 
 ---
 
@@ -372,7 +377,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 
 ### Measurable Outcomes
 
-- **SC-001**: A hosteler can log in and submit food preferences for the next day in under 30 seconds on a mobile device.
+- **SC-001**: A hosteler can log in and submit food preferences for the next day in under 30 seconds on a mobile device. For v1 acceptance, this is validated through scoped browser or manual acceptance evidence for the documented login-and-submit flow, not a full performance load-testing program.
 - **SC-002**: On Android Chrome, an eligible user can install the app within 5 seconds of the install action becoming available, and the installed Deekshana Castle icon appears in the Android app drawer.
 - **SC-003**: The owner's daily food counts update within 3 seconds of a hosteler submitting or changing preferences, without any page refresh.
 - **SC-004**: Monthly bill generation produces verified-accurate meal counts and amounts for all hostelers for any selected month, including months containing mid-month rate changes.
@@ -381,7 +386,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **SC-007**: The complete app is fully usable on a 375 px wide mobile viewport with no horizontal scrolling on any screen.
 - **SC-008**: All automated tests pass on every push to the main branch before any deployment proceeds.
 - **SC-009**: The owner can generate a new invite link and onboard a hosteler in under 2 minutes from start to the hosteler's first successful login.
-- **SC-010**: The system supports up to 100 concurrent hostelers without degradation in submission response time.
+- **SC-010**: The system supports up to 100 concurrent hostelers without degradation in submission response time. For v1 acceptance, this is validated through scoped seeded-data evidence with up to 100 hostelers and representative submission/dashboard checks; full load-testing infrastructure is out of scope unless a future specification explicitly adds it.
 - **SC-011**: In an installed Android PWA session with network disabled, the app shell loads in under 3 seconds and shows an offline state for data-dependent actions instead of a blank, browser error, or broken page.
 - **SC-012**: PWA verification produces passing automated evidence for manifest, service worker, offline shell, and install prompt behavior, plus manual Android evidence for app drawer presence and standalone launch.
 - **SC-013**: The owner can delete an active or pending hosteler and later locate that deleted record, with its retained audit context, in under 30 seconds; for active deletions, the deleted record keeps past and same-day history, exposes canceled future-dated food preferences only in the deleted/audit view, and ensures those canceled records never appear in normal owner history/export, dashboard counts, or bill inputs.
@@ -406,6 +411,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Android Chrome is the primary required installability target; iOS Safari add-to-home-screen support remains desirable where the browser permits it, but Android app drawer appearance is the required validation outcome.
 - The nightly backup runs on a fixed cron schedule (2:00 AM IST) and uses the owner's Cloudflare R2 storage for retention.
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
+- The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.
 
 ---
 
@@ -431,3 +437,8 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Q: When an active hosteler is deleted, should future-dated food preferences remain for billing/audit or be canceled? → A: Preserve past and same-day history, but cancel any future-dated food preferences after the deletion takes effect so they no longer affect future counts or billing.
 - Q: After an active hosteler is deleted, where should canceled future-dated food preferences remain visible? → A: They remain visible only inside that deleted hosteler's dedicated deleted/audit view and are excluded from normal owner history/export, dashboard counts, and billing.
 - Q: After activation, can a hosteler log in with both Google and PIN, or only with the credential actually linked during activation? → A: Only the credential actually linked during activation is valid for login in v1. The system does not require the hosteler to add the second credential later.
+- Q: How should completed E2E tests be treated after adding Honest E2E Validation guardrails? → A: Existing and future E2E tests must be audited and corrected to prove exact business outcomes through the real UI and real Next.js API routes; broad render, route, placeholder, mock, or injected-session checks are not sufficient completion evidence.
+- Q: What must owner dashboard E2E evidence prove for food-count workflows? → A: A real hosteler UI submission must change the exact breakfast, lunch, and dinner counts, move that hosteler from Pending to Submitted, and remain correct for both initial fetch and live/reload-stable dashboard behavior.
+- Q: What must auth E2E evidence prove after the server-side auth proxy work? → A: Owner and hosteler login must use the real login UI and server-side auth routes, survive post-login client effects plus reload, and must not use direct cookie or localStorage injection as the core authentication proof.
+- Q: How is the Next.js version conflict resolved for this feature? → A: The actual repository stack, Next.js 15.3.3, is intended; planning and constitution artifacts must align to that baseline rather than downgrading the implementation.
+- Q: How should SC-001 and SC-010 be validated for v1 acceptance? → A: Treat them as scoped acceptance evidence tasks using representative browser/manual timing and seeded 100-hosteler scenarios; full load-testing infrastructure is not required unless explicitly documented later.

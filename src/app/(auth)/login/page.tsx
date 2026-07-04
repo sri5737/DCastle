@@ -1,7 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -23,6 +22,11 @@ function LoginForm() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   // Handle error params from Google OAuth callback
   const callbackError = searchParams.get('error');
@@ -120,7 +124,7 @@ function LoginForm() {
           onClick={handleGoogleSignIn}
           variant="outline"
           className="w-full h-12 text-base mb-4"
-          disabled={loading}
+          disabled={loading || !hydrated}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -165,7 +169,7 @@ function LoginForm() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               maxLength={10}
-              disabled={loading}
+              disabled={loading || !hydrated}
             />
           </div>
 
@@ -181,11 +185,11 @@ function LoginForm() {
               onChange={(e) => setPin(e.target.value)}
               maxLength={4}
               inputMode="numeric"
-              disabled={loading}
+              disabled={loading || !hydrated}
             />
           </div>
 
-          <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+          <Button type="submit" className="w-full h-12 text-base" disabled={loading || !hydrated}>
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>

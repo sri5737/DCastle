@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cloudflare": "node scripts/cloudflare-build-parity.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",

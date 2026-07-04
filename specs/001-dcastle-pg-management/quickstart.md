@@ -62,6 +62,8 @@ npm run test:run
 npm run test:e2e
 ```
 
+Story-scoped validation commands must exist for every user story and include the honest E2E evidence for that story, including `npm run test:us12` for the server-side auth proxy flow. Existing completed-story suites must be audited before acceptance so they prove exact business outcomes through the real UI and real Next.js API routes.
+
 ---
 
 ## Validation Scenarios
@@ -154,6 +156,7 @@ Contracts referenced: [food-preferences.md](contracts/food-preferences.md), [set
 Expected:
 - Counts update within 3 seconds without refresh.
 - Pending and submitted lists update accordingly.
+- The same exact counts and Pending/Submitted membership are correct on initial fetch, after a real hosteler UI submission live update, and after reloading the dashboard.
 - If the Realtime connection drops for 10 seconds, a reconnecting banner appears.
 
 Contracts referenced: [food-preferences.md](contracts/food-preferences.md)
@@ -302,6 +305,26 @@ Expected:
 - Reactivation allows the hosteler to log in fresh but does not restore old sessions
 
 **Contracts referenced**: [hostelers.md](contracts/hostelers.md), [auth.md](contracts/auth.md)
+
+---
+
+### Scenario 14: Honest E2E Evidence Audit
+
+**Steps**:
+1. Run each story-scoped command from US1 through US12, including `npm run test:us12` once added.
+2. Review each Playwright suite and confirm the core story action is performed through the real UI and real Next.js API route.
+3. For cross-role food/dashboard flows, confirm the hosteler submits exact meal choices through the UI and the owner dashboard shows exact resulting counts plus Pending-to-Submitted movement.
+4. For auth flows, confirm owner and hosteler login use the real login UI and server-side auth routes, wait for post-login client effects, reload, and remain on the correct role surface.
+5. Confirm no suite accepts route mocks, direct cookie/localStorage injection, broad placeholder assertions, conditional skips, or URL/heading-only checks as the core story proof.
+6. Record scoped acceptance evidence for SC-001 and SC-010: representative login-and-submit timing under 30 seconds and seeded up-to-100-hosteler submission/dashboard behavior.
+
+**Expected**:
+- Completed and future story E2E suites prove exact, falsifiable business outcomes.
+- US2 owner dashboard evidence covers initial fetch, live update, and reload-stable state.
+- US4/US12 auth evidence proves reload-stable login through the server-side routes without injected-session shortcuts.
+- PIN lockout and scoped performance acceptance evidence are covered before the related story or phase is marked complete.
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [food-preferences.md](contracts/food-preferences.md), [hostelers.md](contracts/hostelers.md)
 
 ---
 

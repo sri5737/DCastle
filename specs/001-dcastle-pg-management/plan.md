@@ -6,7 +6,7 @@
 
 ## Summary
 
-A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, and Android installability. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing.
+A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, and Android installability. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The post-clarification planning delta aligns the implementation plan with Constitution v1.5.1 and FR-066 through FR-069 by requiring an honest E2E audit and correction pass for completed and future stories before any story or phase can be considered accepted.
 
 ## Technical Context
 
@@ -19,20 +19,24 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 **Testing**: Vitest with `@testing-library/react` for unit/component coverage, Playwright for E2E browser coverage
 
 **Testing Strategy**:
-- Unit tests cover invite activation, PIN verification and lockout, deadline enforcement, hosteler lifecycle transitions, deleted-record visibility, future-preference cancellation, and billing eligibility rules.
-- E2E tests cover each documented story flow, including pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, and exclusion of those canceled rows from normal owner history/export, dashboards, and billing inputs.
+- Unit tests cover invite activation, PIN verification and 5-attempt/15-minute lockout, deadline enforcement, hosteler lifecycle transitions, deleted-record visibility, future-preference cancellation, billing eligibility rules, and server-side auth proxy retry/error handling.
+- Existing and future E2E tests must be audited and corrected so each completed story proves at least one exact, falsifiable business outcome from its independent test using the real UI and real Next.js API routes. Route mocks, conditional skips, broad placeholder assertions, URL/heading-only checks, and direct cookie or localStorage session injection are not acceptable as core evidence for the feature being validated.
+- Cross-role E2E workflows must prove producer-to-consumer behavior in one test or an explicitly linked sequence. For food submission and owner dashboard validation, a hosteler must submit exact breakfast/lunch/dinner preferences through the UI, then the owner dashboard must show the exact resulting counts and move that hosteler from Pending to Submitted.
+- Owner dashboard E2E evidence must cover the initial fetched dashboard state, a live update caused by a real hosteler submission, and reload-stable state after the update. Counts and Pending/Submitted membership must remain exact across all three observations.
+- Auth E2E evidence must log owner and hosteler users in through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated surface, and verify the user remains on the correct role page. US12 proxy coverage must prove `/api/auth/login` and `/api/auth/pin/verify` are used without injected-session shortcuts.
+- E2E tests cover each documented story flow, including PIN lockout, pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, exclusion of those canceled rows from normal owner history/export, dashboards, and billing inputs, and scoped performance evidence for SC-001 and SC-010.
 - PWA checks validate manifest metadata, icon metadata, service worker registration, offline app-shell behavior, and install-prompt gating.
 - Manual Android validation remains required for installability, app-drawer presence, standalone launch, and installed offline-shell behavior.
-- Existing per-story scripts currently cover `npm run test:us1` through `npm run test:us4`; `/speckit.tasks` should refresh story-scoped scripts so US5 and remaining documented stories have direct coverage commands for the v1.2 scope.
-- CI quality gate remains `npm run test:run` and `npm run test:e2e` before build/deploy.
+- Per-story scripts must cover every documented story, including `npm run test:us12` for the server-side auth proxy. `/speckit.tasks` should refresh any missing scripts and ensure each story command runs the honest E2E evidence for that story in addition to relevant unit coverage.
+- CI quality gate remains `npm run test:run` and `npm run test:e2e` before build/deploy, and deployment readiness must also run `npm run build:cloudflare` so strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures are caught before production deployment.
 
 **Target Platform**: Mobile-first true PWA (375 px baseline), Android Chrome installability target, Edge Runtime deployment on Cloudflare Pages
 
 **Project Type**: Full-stack Next.js monolith with App Router and co-located API routes
 
-**Performance Goals**: Food submission interaction completes in under 30 seconds, owner count updates propagate in under 3 seconds, owner can find a deleted record inside the deleted tab in under 30 seconds, and the system supports up to 100 hostelers without paid infrastructure
+**Performance Goals**: Food submission interaction completes in under 30 seconds using scoped browser or manual acceptance evidence for the documented login-and-submit flow, owner count updates propagate in under 3 seconds, owner can find a deleted record inside the deleted tab in under 30 seconds, and the system supports up to 100 hostelers with scoped seeded-data evidence and representative submission/dashboard checks rather than full load-testing infrastructure
 
-**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell
+**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell, honest E2E acceptance evidence for every completed story, no injected-session shortcut as core auth proof, real UI/API execution for feature evidence, and scoped SC-001/SC-010 performance evidence without adding load-test infrastructure unless a future spec requires it
 
 **Scale/Scope**: Single-property deployment, about 40 active hostelers at launch and up to 100, owner and hosteler web surfaces in the current Next.js app, plus Supabase-backed API and data model changes for lifecycle and billing history
 
@@ -49,11 +53,12 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 | V | Zero-Cost Infrastructure | PASS | No new paid dependencies; lifecycle archive behavior is modeled inside existing Supabase/PostgreSQL data structures |
 | VI | TypeScript Strict Mode & Simplicity | PASS | Deleted-record support extends the current hosteler/food-preference model instead of introducing a separate service or paid audit product |
 | VII | Unit Testing Coverage | PASS | Plan explicitly adds coverage for deletion, archived visibility, future-preference cancellation, and billing inclusion/exclusion rules |
-| VIII | CI/CD Pipeline with Isolated Test Job | PASS | Existing `test -> build -> deploy` pipeline remains unchanged and still gates deploy on tests |
+| VIII | CI/CD Pipeline with Isolated Test Job | PASS | Existing `test -> build -> deploy` pipeline remains unchanged, deploy remains gated on tests, and the build step mirrors Cloudflare Pages through `npm run build:cloudflare` |
 | IX | Idempotent Database Migrations | PASS | v1.2 requires additive guarded migration updates for deleted lifecycle metadata and cancelable food-preference rows; no destructive migration strategy is required |
 | X | True Progressive Web App | PASS | PWA scope is unchanged and remains validated independently of the lifecycle additions |
+| XI | Honest End-to-End Validation | PASS | FR-066 through FR-069 require audit/correction of completed and future E2E tests for exact business outcomes, cross-role producer-to-consumer proof, dashboard initial/live/reload-stable evidence, and auth reload stability through real login UI/server routes |
 
-**Gate Result**: ALL PASS. The v1.2 deletion/archive behavior fits the constitution through additive schema and contract updates inside the existing Next.js plus Supabase architecture.
+**Gate Result**: ALL PASS. The v1.2 deletion/archive behavior and honest E2E clarification fit the constitution through additive schema/contract updates and stricter acceptance evidence inside the existing Next.js 15.3.3 plus Supabase architecture.
 
 ## Project Structure
 
@@ -176,13 +181,13 @@ supabase/
 
 **Motivation**: Corporate proxy environments (common in PG/hostel WiFi networks) can block direct browser-to-Supabase TLS connections. By proxying auth through the Next.js server (which runs on Cloudflare Edge with reliable outbound connectivity), login works regardless of client network restrictions.
 
-**Independent Test**: Owner logs in via proxy route → session established → hosteler logs in via proxy route → session established → both paths return identical cookies as before → direct Supabase calls from client are no longer required for login
+**Independent Test**: Owner logs in through the real owner login UI and `/api/auth/login` proxy route → post-login client effects settle → reload remains on the admin surface → hosteler logs in through the real PIN login UI and `/api/auth/pin/verify` → post-login client effects settle → reload remains on the hosteler surface → both paths return the expected session cookies and no direct browser-to-Supabase auth call is required for login. Direct cookie/localStorage injection is not accepted as the core proof.
 
 ### Scope
 
 | Change | Description |
 |--------|-------------|
-| New route: `POST /api/auth/login` | Server-side owner email/password authentication via Supabase Admin API; returns session cookies |
+| New route: `POST /api/auth/login` | Server-side owner email/password authentication via Supabase API; returns session cookies |
 | Update: `POST /api/auth/pin/verify` | Already exists; extend to handle the full auth flow server-side (currently creates session but client still calls Supabase directly in some paths) |
 | Update: Admin login page | Replace direct `supabase.auth.signInWithPassword()` with `fetch('/api/auth/login')` |
 | Update: Hosteler login page | Replace any remaining direct Supabase auth calls with `fetch('/api/auth/pin/verify')` |
@@ -247,3 +252,32 @@ supabase/
 | Cookie domain mismatch if proxy sets cookies differently | Use identical `Set-Cookie` headers as current direct flow |
 
 **Checkpoint**: All login flows route through server-side API routes; corporate proxy environments no longer block authentication; E2E login tests pass unchanged
+
+---
+
+## Phase 17: Honest E2E Audit & Correction (Cross-Cutting)
+
+**Goal**: Audit completed and future Playwright suites against Constitution XI and FR-066 through FR-069, then correct any weak evidence before the related story or phase is treated as complete.
+
+**Scope**:
+
+| Evidence Area | Required Proof |
+|---------------|----------------|
+| Exact business outcomes | Each story E2E asserts a falsifiable domain result from the story's independent test, not only route reachability, rendered headings, or broad placeholder text |
+| Real app path | Tests exercise the real UI and real Next.js API routes for the behavior under test; direct DB writes are setup/teardown only and do not replace the core action |
+| Cross-role producer-to-consumer | Food submission/dashboard tests submit exact meal choices through the hosteler UI, then verify exact owner counts and Pending/Submitted membership |
+| Owner dashboard stability | Owner dashboard evidence covers initial fetch, live update, and reload-stable state with exact counts and list membership |
+| Auth reload stability | Owner and hosteler login tests use the real login UI and server-side routes, wait for client effects, reload, and remain on the correct authenticated role surface |
+| PIN lockout | Hosteler PIN tests cover five failed attempts, 15-minute lockout, correct-PIN rejection during lockout, and success after cooldown or deterministic reset |
+| Per-story scripts | Story-scoped scripts exist for US1 through US12, including `test:us12`, and run the relevant honest E2E suite plus any story-specific unit coverage |
+| Scoped performance acceptance | SC-001 uses representative browser/manual timing for login-and-submit under 30 seconds; SC-010 uses seeded up-to-100-hosteler evidence and representative submission/dashboard checks |
+
+**Phase Planning Rules**:
+
+1. Audit already completed E2E suites (`us1`, `us2`, `us3`, `us4`, `us5`, `us10`, and `us12`) before marking the post-clarification plan complete for implementation.
+2. Correct any suite that would pass while the core workflow is broken; add deterministic setup rather than conditional skips when time/state would otherwise block the core path.
+3. Add or refresh missing story-scoped npm scripts for US6 through US12, including `test:us12`.
+4. For future story phases, include the honest E2E proof in the same phase as the implementation task; do not defer acceptance evidence to final polish.
+5. Run `npm run test:run`, the affected `npm run test:usN` command, `npm run test:e2e`, and `npm run build:cloudflare` before declaring the audited or deployment-ready scope complete.
+
+**Checkpoint**: Existing and future E2E suites satisfy Constitution XI and FR-066 through FR-069; weak tests are corrected, story-scoped scripts include US12, and acceptance evidence covers exact business outcomes, cross-role proof, dashboard reload stability, auth reload stability, PIN lockout, and scoped SC-001/SC-010 performance evidence.

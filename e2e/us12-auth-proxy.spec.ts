@@ -9,6 +9,8 @@ import {
 } from './helpers';
 
 test.describe('US12: Server-Side Auth Proxy', () => {
+	test.setTimeout(60_000);
+
 	test('Owner can log in via server-side proxy', async ({ page }) => {
 		await loginAsAdmin(page, TEST_OWNER.email, TEST_OWNER.password);
 		await verifyAdminDashboard(page);

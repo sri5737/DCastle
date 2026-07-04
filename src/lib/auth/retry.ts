@@ -8,7 +8,7 @@ const INITIAL_BACKOFF = 500; // 500ms
 function isTransientError(error: unknown): boolean {
 	if (error instanceof AuthError) {
 		// 5xx errors are considered transient
-		return error.status >= 500 && error.status <= 599;
+		return typeof error.status === 'number' && error.status >= 500 && error.status <= 599;
 	}
 	// Also consider generic network errors, which may not have a status
 	if (error instanceof Error && error.message.toLowerCase().includes('network')) {

@@ -93,8 +93,9 @@ After completing any phase or user story:
 
 1. Run `npm run test:run` — all unit/integration tests MUST pass.
 2. Run `npm run test:e2e` — all E2E tests for completed stories MUST pass.
-3. If any test fails, fix the code before marking the phase complete.
-4. New features MUST include corresponding test coverage (unit + E2E) as part of the same phase.
+3. Run `npm run build:cloudflare` — the local build gate MUST catch strict TypeScript, Next.js production build, and Cloudflare adapter/runtime failures before deployment.
+4. If any test or build fails, fix the code before marking the phase complete.
+5. New features MUST include corresponding test coverage (unit + E2E) as part of the same phase.
 
 Per-story test commands:
 - `npm run test:us1` — Food submission tests
@@ -108,12 +109,14 @@ The agent MUST NOT mark a phase as complete if automated tests are failing.
 ## Validation Rule
 
 Implementation agents must perform:
-- build
+- Cloudflare production build parity via `npm run build:cloudflare`
 - unit tests
 - integration tests
 - E2E tests
 
 Any failures must be fixed automatically and retested.
+
+`npm run test:run`, per-story tests, and Playwright E2E are necessary but not sufficient deployment evidence without `npm run build:cloudflare`. Cloudflare Pages production builds execute `npx @cloudflare/next-on-pages`, so local validation must run the same gate where available. On Windows without Bash, the repository wrapper may fall back to `next build` for local strict TypeScript and production build validation, while CI/Linux must still execute the full adapter path.
 
 Human approval is not required for iterative fixes, testing, or refactoring.
 

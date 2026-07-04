@@ -29,10 +29,19 @@ export async function loginAsAdmin(page: Page, email?: string, password?: string
   const loginEmail = email || TEST_OWNER.email;
   const loginPassword = password || TEST_OWNER.password;
 
-  await page.goto('/admin/login');
+  await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });
+  const submitButton = page.locator('form button[type="submit"]');
+  await expect(submitButton).toBeEnabled();
   await page.fill('#email', loginEmail);
   await page.fill('#password', loginPassword);
-  await page.click('button[type="submit"]');
+
+  const loginResponsePromise = page.waitForResponse(
+    response => response.url().includes('/api/auth/login') && response.request().method() === 'POST',
+    { timeout: 30000 },
+  );
+  await submitButton.click();
+  const loginResponse = await loginResponsePromise;
+  expect(loginResponse.ok()).toBeTruthy();
   
   // Wait for navigation to dashboard after successful login
   await expect(page).toHaveURL(/\/admin\/dashboard/, { timeout: 30000 });
@@ -47,12 +56,21 @@ export async function loginAsHosteler(page: Page, phone?: string, pin?: string) 
   const hostelerPhone = phone || TEST_HOSTELER.phone;
   const hostelerPin = pin || TEST_HOSTELER.pin;
 
-  await page.goto('/login');
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  const submitButton = page.locator('form button[type="submit"]');
+  await expect(submitButton).toBeEnabled();
   
   // Fill in the PIN login form (not Google OAuth)
   await page.fill('#phone', hostelerPhone);
   await page.fill('#pin', hostelerPin);
-  await page.click('button[type="submit"]');
+
+  const loginResponsePromise = page.waitForResponse(
+    response => response.url().includes('/api/auth/pin/verify') && response.request().method() === 'POST',
+    { timeout: 30000 },
+  );
+  await submitButton.click();
+  const loginResponse = await loginResponsePromise;
+  expect(loginResponse.ok()).toBeTruthy();
   
   // Wait for navigation to dashboard after successful login
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 });

@@ -24,7 +24,7 @@
 
 **Purpose**: Project initialization, dependencies, configuration files
 
-- [x] T001 Initialize Next.js 14 project with TypeScript (`strict: true` in tsconfig.json), Tailwind CSS, and App Router in project root (`package.json`, `tsconfig.json`, `next.config.js`, `tailwind.config.ts`, `postcss.config.js`)
+- [x] T001 Initialize Next.js 15.3.3 project with TypeScript (`strict: true` in tsconfig.json), Tailwind CSS, and App Router in project root (`package.json`, `tsconfig.json`, `next.config.js`, `tailwind.config.ts`, `postcss.config.js`)
 - [x] T002 Install all dependencies: `@supabase/supabase-js`, `@ducanh2912/next-pwa`, `@cloudflare/next-on-pages`, `bcryptjs`, `shadcn/ui` init, `vitest`, `@testing-library/react`, `@types/bcryptjs`
 - [x] T003 [P] Configure `next.config.js` with `@ducanh2912/next-pwa` wrapper and `@cloudflare/next-on-pages` adapter settings
 - [x] T004 [P] Create `.env.example` with all required environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
@@ -295,7 +295,8 @@
 - [x] T069c Update `playwright.config.ts` to reference `globalSetup` and `globalTeardown`, load env vars via `dotenv`.
 - [x] T069d Update `e2e/helpers.ts` login helpers to use env-based test credentials and fix login flows to match the actual app login pages (correct selectors, cookie-based auth).
 - [x] T069e Update all E2E test specs (`us1`, `us2`, `us3`, `us4`) to use seeded test data from global setup and pass with the actual running app.
-- [ ] T069f [P] Add story-scoped npm scripts for the remaining documented flows (`test:us5`, `test:us6`, `test:us7`, `test:us8`, `test:us9`, `test:us10`, `test:us11`) in `package.json`
+
+**Post-clarification note**: FR-066 through FR-069 and FR-006a remediation tasks are dependency-ordered in Phase 17. Previously completed E2E task history remains marked complete, but those weak suites are not accepted as final evidence until Phase 17 remediation passes.
 
 **Checkpoint**: All completed stories have passing E2E tests; CI blocks deployment on test failure
 
@@ -348,7 +349,7 @@
 
 **Goal**: Route owner email/password login and hosteler PIN login through server-side Next.js API routes instead of direct browser-to-Supabase calls, eliminating CORS and network failures in corporate proxy environments
 
-**Independent Test**: Owner logs in via `/api/auth/login` proxy route → session established with cookies → hosteler logs in via `/api/auth/pin/verify` → session established → both paths work identically to previous client-side flow → no direct browser-to-Supabase auth calls remain
+**Independent Test**: Owner logs in through the real owner login UI and `/api/auth/login` proxy route → post-login client effects settle → reload remains on the admin surface → hosteler logs in through the real PIN login UI and `/api/auth/pin/verify` → post-login client effects settle → reload remains on the hosteler surface → both paths return the expected session cookies and no direct browser-to-Supabase auth call is required for login. Direct cookie/localStorage injection is not accepted as the core proof.
 
 ### Implementation for User Story 12
 
@@ -362,6 +363,33 @@
 **Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
 
 **Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
+
+---
+
+## Phase 17: Honest E2E Remediation & Acceptance Evidence Gate (Cross-Cutting)
+
+**Goal**: Bring completed and future story evidence into compliance with Constitution XI, FR-066 through FR-069, FR-006a, SC-001, and SC-010 without pretending earlier broad or shortcut E2E tests are sufficient.
+
+**Independent Test**: Run the story-scoped scripts through US12 plus `npm run test:run` and `npm run test:e2e`; verify completed-story E2E suites prove exact business outcomes through the real UI and real Next.js API routes, US2 proves cross-role initial/live/reload-stable dashboard behavior, US12 proves reload-stable auth through server-side routes, PIN lockout is enforced, and scoped SC-001/SC-010 evidence is recorded.
+
+**Blocking Rule**: This phase must be completed before any previously completed story is considered accepted under the Honest E2E rules, and before future story implementation work (US6, US7, US8, US9, US11 polish, or final release validation) is marked complete.
+
+### Remediation for FR-006a, FR-066 through FR-069, SC-001, and SC-010
+
+- [ ] T091 [P] Add story-scoped npm scripts for every documented flow through US12 (`test:us6`, `test:us7`, `test:us8`, `test:us9`, `test:us10`, `test:us11`, `test:us12`), add `build:cloudflare` for Cloudflare Pages build parity, and update existing `test:us1` through `test:us5` scripts so each command runs the story's honest E2E suite plus relevant unit coverage in `package.json`
+- [ ] T092 [US4] Add an idempotent `pin_login_attempts` migration for FR-006a if missing from deployed schema, including `phone`, `attempts`, `locked_until`, and `updated_at`, in `supabase/migrations/003_pin_login_attempts.sql`
+- [ ] T093 [US4] Implement FR-006a PIN lockout tracking in `POST /api/auth/pin/verify`, returning HTTP 429 after five consecutive failures for the same phone for 15 minutes and clearing attempts after success or cooldown in `src/app/api/auth/pin/verify/route.ts`
+- [ ] T094 [US5] Clear PIN lockout state when an active hosteler is deactivated or deleted so lifecycle actions do not leave stale throttling rows in `src/app/api/hostelers/[id]/route.ts`
+- [ ] T095 [P] [US4] Add unit tests for FR-006a covering attempts 1-4 returning 401, attempt 5 creating a 15-minute lockout, correct PIN rejected during lockout with 429, cooldown reset, and successful login clearing attempts in `src/app/api/auth/pin/verify/route.test.ts`
+- [ ] T096 [P] [US1] [US3] [US5] [US10] Audit and correct previously completed E2E suites so each completed story proves an exact business outcome through the real UI and real Next.js API routes, replacing broad render/route/placeholder checks and conditional skips in `e2e/us1-food-submission.spec.ts`, `e2e/us3-invite-activation.spec.ts`, `e2e/us5-hosteler-management.spec.ts`, and `e2e/us10-settings.spec.ts`
+- [ ] T097 [US2] Correct owner dashboard E2E evidence so a real hosteler UI submission of exact breakfast/lunch/dinner choices changes exact counts, moves that hosteler from Pending to Submitted, proves the initial fetched state, proves the live update within the acceptance window, and proves the same state after dashboard reload in `e2e/us2-owner-dashboard.spec.ts`
+- [ ] T098 [US4] Correct hosteler login E2E evidence so PIN login uses the real login UI and server-side `/api/auth/pin/verify` route, waits for client effects, reloads the authenticated page, remains on the hosteler surface, and avoids direct cookie/localStorage injection as core proof in `e2e/us4-hosteler-login.spec.ts`
+- [ ] T099 [US12] Correct auth proxy E2E evidence so owner login uses the real owner login UI and `/api/auth/login`, hosteler PIN login uses `/api/auth/pin/verify`, both authenticated pages survive reload, and the test asserts no direct browser-to-Supabase auth request is used as the login path in `e2e/us12-auth-proxy.spec.ts`
+- [ ] T100 [US4] Add E2E coverage for FR-006a PIN lockout: five failed attempts, 15-minute lockout response, correct-PIN rejection during lockout, and deterministic success after cooldown or test reset in `e2e/us4-hosteler-login.spec.ts`
+- [ ] T101 [US1] [US2] Add scoped acceptance evidence for SC-001 and SC-010: representative login-and-submit timing under 30 seconds and seeded up-to-100-hosteler submission/dashboard checks without introducing full load-test infrastructure in `e2e/us1-food-submission.spec.ts`, `e2e/us2-owner-dashboard.spec.ts`, and `specs/001-dcastle-pg-management/quickstart.md`
+- [ ] T102 Validate the remediation gate by running `npm run test:run`, every available `npm run test:usN` command from US1 through US12, `npm run test:e2e`, and `npm run build:cloudflare`; record any blocked command, missing environment variable, failing story, or Cloudflare build issue in `specs/001-dcastle-pg-management/quickstart.md`
+
+**Checkpoint**: Completed and future E2E suites satisfy Constitution XI and FR-066 through FR-069; per-story scripts include US12; FR-006a lockout is implemented and tested; SC-001/SC-010 evidence is scoped and recorded; no weak completed E2E suite is treated as acceptance evidence.
 
 ---
 
@@ -384,7 +412,8 @@
 - **Automation & E2E (Phase 13)**: Existing completed automation foundation for US1–US4; future story E2E tasks remain in each story phase
 - **US11 Android PWA (Phase 14)**: Depends on Foundational; can run in parallel with story work after Phase 2, but must complete before production delivery
 - **US12 Auth Proxy (Phase 16)**: Depends on Foundational + US4 (PIN verify route must exist); can run in parallel with Phases 9–12
-- **Final Polish (Phase 15)**: Depends on desired user stories plus US11 for full quickstart validation
+- **Honest E2E Remediation Gate (Phase 17)**: Depends on completed US1, US2, US3, US4, US5, US10, and US12 surfaces; blocks acceptance of completed stories under FR-066 through FR-069 and blocks marking any future story phase complete
+- **Final Polish (Phase 15)**: Depends on desired user stories, US11, and Phase 17 for full quickstart validation
 
 ### User Story Dependencies
 
@@ -405,7 +434,8 @@ Phase 2 (Foundational)
   ├── Phase 13 (Automation & E2E) — after US1-US4 complete
   ├── Phase 14 (US11: Android PWA) — independent after Foundational, required before production delivery
   ├── Phase 16 (US12: Auth Proxy) — depends on Foundational + US4; parallel with Phases 9–12
-  └── Phase 15 (Final Polish) — validates completed story set
+  ├── Phase 17 (Honest E2E Remediation Gate) — depends on completed story surfaces US1/US2/US3/US4/US5/US10/US12; blocks acceptance and future phase completion
+  └── Phase 15 (Final Polish) — validates completed story set after Phase 17
 ```
 
 ### Within Each User Story
@@ -430,10 +460,13 @@ Phase 2 (Foundational)
 
 **Phase 14** (US11): T070, T071, T072, T073, T074, T075, T078, T079, and T081 can run in parallel where file ownership does not overlap; T076, T077, T080, T082, and T083 depend on the corresponding assets/components/tests existing first
 
+**Phase 17** (Honest E2E Remediation): T091, T092, T095, T096, and T101 can begin in parallel because they touch distinct files; T093 depends on T092, T094 depends on T093, T100 depends on T093 and T095, T097 depends on deterministic test data/helpers from T091, T098/T099 depend on T091 and the existing US12 auth proxy, and T102 depends on T091 through T101
+
 **Cross-story parallelism** (after Foundational):
 - US5 (Hosteler Management) can be worked on in parallel with US3/US4/US1 sequence
 - US10 (Settings) can be worked on in parallel with the US3→US4→US1 sequence
 - US11 (Android PWA) can be worked on in parallel with US3/US4/US1/US2 after Foundational because it owns manifest, icons, service worker, install UI, offline UI, and PWA validation evidence
+- Phase 17 remediation can start now because the target completed story surfaces already exist, but future story completion remains blocked until Phase 17 passes
 
 ---
 
@@ -453,7 +486,8 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 1. **US2 (Owner Dashboard)** — Completes the owner's daily operational need
 2. **US5 (Hosteler Management)** — Enables ongoing hosteler lifecycle management
 3. **US10 (Settings)** — Enables deadline/rate configuration
-4. **US6 (Monthly Bills)** — Monthly billing workflow
-5. **US7, US8, US9** — Transparency and reporting features
-6. **US11 (Android PWA)** — True PWA installability, offline app shell, automated checks, and manual Android evidence if not already completed alongside MVP
-7. **Final Polish** — Full quickstart validation and release readiness checks
+4. **Phase 17 (Honest E2E Remediation Gate)** — Required before accepting completed stories under FR-066 through FR-069 or marking future stories complete
+5. **US6 (Monthly Bills)** — Monthly billing workflow
+6. **US7, US8, US9** — Transparency and reporting features
+7. **US11 (Android PWA)** — True PWA installability, offline app shell, automated checks, and manual Android evidence if not already completed alongside MVP
+8. **Final Polish** — Full quickstart validation and release readiness checks

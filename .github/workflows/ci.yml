@@ -57,5 +57,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application
-        run: npm run build
+      - name: Build Cloudflare Pages application
+        run: npm run build:cloudflare

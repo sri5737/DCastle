@@ -1,18 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.4.1 -> 1.5.0
+Version change: 1.5.1 -> 1.5.2
 Modified principles:
-  - VII. Unit Testing Coverage expanded to include honest E2E validation expectations.
-Added sections:
-  - XI. Honest End-to-End Validation (NON-NEGOTIABLE)
+  - VIII. CI/CD Pipeline with Isolated Test Job: build gate now explicitly requires Cloudflare adapter parity.
+Modified sections:
+  - Governance: validation evidence must include Cloudflare build parity before deployment or phase-complete claims.
+Added sections: None
 Removed sections: None
 Clarifications:
-  - E2E tests must prove the actual independent-test behavior from the spec, not merely navigation, rendering, or mocked success.
-  - Cross-role workflows must assert the producer action becomes visible to the consumer surface.
-  - E2E tests must not bypass core flows with direct cookies, localStorage sessions, route mocks, or conditional skips unless explicitly documented as non-core setup.
+  - `npm run build:cloudflare` is required because unit tests and E2E can pass while strict TypeScript or Cloudflare adapter/runtime builds fail.
+  - On Windows without Bash, the local wrapper may run `next build` as a parity fallback; CI/Linux must still execute the full `@cloudflare/next-on-pages` adapter.
 Templates requiring updates:
-  - .github/copilot-instructions.md updated with matching Honest E2E Validation Guardrails.
+  - .specify/templates/plan-template.md checked; no update required.
+  - .specify/templates/spec-template.md checked; no update required.
+  - .specify/templates/tasks-template.md checked; no update required.
+  - .specify/templates/commands/*.md checked; no files present.
+  - .github/copilot-instructions.md updated.
+  - specs/001-dcastle-pg-management/spec.md updated.
+  - specs/001-dcastle-pg-management/plan.md updated.
+  - specs/001-dcastle-pg-management/tasks.md updated.
 Follow-up TODOs: None
 -->
 
@@ -162,12 +169,14 @@ dedicated job** — never merged into the build or deploy job.
 Pipeline job order (enforced via `needs:` dependencies):
 
 1. `test` — runs `vitest run`; MUST pass before any subsequent job proceeds.
-2. `build` — depends on `test` passing; runs Next.js + Cloudflare Pages build.
+2. `build` — depends on `test` passing; runs the Cloudflare Pages adapter build.
 3. `deploy` — depends on `build` passing; deploys to Cloudflare Pages.
 
 - The `deploy` job MUST never run if `test` or `build` fails.
 - The `test` job MUST run on every push and every pull request to `main`.
 - Pipeline MUST be defined in `.github/workflows/ci.yml`.
+- Local and CI deployment validation MUST include `npm run build:cloudflare`, which wraps `npx @cloudflare/next-on-pages` where available, so strict TypeScript, Next.js production build, and Cloudflare adapter/runtime failures are caught before Cloudflare Pages deployment.
+- `npm run test:run`, story-scoped tests, and Playwright E2E are necessary but not sufficient deployment evidence without the Cloudflare build gate.
 - Any change that disables or bypasses the `test` job constitutes a
   constitution violation and MUST NOT be merged.
 
@@ -214,7 +223,7 @@ constitution amendment:
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Framework | Next.js 14 (App Router, TypeScript) | App Router only — no Pages Router |
+| Framework | Next.js 15.3.3 (Next.js 15 App Router, TypeScript) | App Router only — no Pages Router |
 | Styling | Tailwind CSS + shadcn/ui | shadcn/ui preferred over custom components |
 | Database + Auth | Supabase (PostgreSQL + RLS + Realtime) | Free tier |
 | PWA | Best available npmjs.org-compatible PWA tooling, currently @ducanh2912/next-pwa unless superseded by a better maintained option | Must be Android-installable, app-drawer visible, standalone, and offline app-shell capable |
@@ -250,6 +259,10 @@ or explicitly ratified via governance amendment.
 
 This constitution supersedes all other project practices. Every pull request
 MUST include a brief "Constitution Check" confirming no principles are violated.
+Before declaring deployment readiness or phase completion, validation evidence
+MUST include unit/integration tests, applicable E2E tests, and
+`npm run build:cloudflare` unless the task is explicitly documented as
+non-deployable documentation-only work.
 Amendments require:
 
 1. A written proposal describing the change, its rationale, and a migration plan
@@ -312,4 +325,4 @@ autonomously through the documented task scope:
     requested.
 12. Provide a final summary after all validation passes.
 
-**Version**: 1.5.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
+**Version**: 1.5.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
