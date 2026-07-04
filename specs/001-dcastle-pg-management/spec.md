@@ -307,7 +307,7 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 
 - **FR-056**: A full database backup MUST run automatically every night.
 - **FR-057**: Backups MUST be retained for 90 days, after which they are automatically deleted.
-- **FR-058**: The owner MUST receive an alert notification if a nightly backup fails.
+- **FR-058**: If a nightly backup fails, GitHub Actions MUST send a failure notification to a subscribed owner/admin account; no in-app backup failure notification UI is provided in v1.
 - **FR-058a**: Backup restoration is a manual developer/admin process only. No restore UI is provided in v1; restoring from backup requires direct infrastructure access.
 
 **Automated Quality Gate**
@@ -342,7 +342,7 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - **SC-003**: The owner's daily food counts update within 3 seconds of a hosteler submitting or changing preferences, without any page refresh.
 - **SC-004**: Monthly bill generation produces verified-accurate meal counts and amounts for all hostelers for any selected month, including months containing mid-month rate changes.
 - **SC-005**: The food preference form is reliably locked for submission after the configured deadline — no late submission is accepted.
-- **SC-006**: Nightly database backups succeed on every scheduled run, and any backup failure triggers an owner alert within 15 minutes.
+- **SC-006**: Nightly database backups succeed on every scheduled run, and any backup failure triggers a GitHub Actions failure notification to a subscribed owner/admin account within 15 minutes.
 - **SC-007**: The complete app is fully usable on a 375 px wide mobile viewport with no horizontal scrolling on any screen.
 - **SC-008**: All automated tests pass on every push to the main branch before any deployment proceeds.
 - **SC-009**: The owner can generate a new invite link and onboard a hosteler in under 2 minutes from start to the hosteler's first successful login.
@@ -389,3 +389,4 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - Q: Can a hosteler be logged in on multiple devices simultaneously? → A: Yes, unlimited concurrent sessions are allowed. Each device maintains its own independent 30-day session.
 - Q: Who can trigger a database backup restore? → A: Restore is a manual developer/admin process only. No restore UI exists in v1; the owner is notified of backup failures but restoration requires direct infrastructure access.
 - Q: When the owner regenerates a bill that a hosteler may have already viewed, is the hosteler notified of the change? → A: No notification. The hosteler sees the latest bill the next time they open the bill view. Notifications are explicitly out of scope for v1.
+- Q: How should a nightly database backup failure notify the responsible user? → A: GitHub Actions failure notification to a subscribed owner/admin account; no in-app backup UI.

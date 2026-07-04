@@ -1,12 +1,12 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.3.1 -> 1.4.0
+Version change: 1.4.0 -> 1.4.1
 Modified principles: None
-Added sections:
-  - Autonomous Implementation Mode
+Added sections: None
 Removed sections: None
 Clarifications:
+  - Clarified that /speckit.implement prerequisite, check, build, test, and validation commands run via pwsh do not require user confirmation.
   - Added explicit /speckit.implement execution rules for autonomous task implementation.
   - Added explicit Validation Rule for build, unit, integration, and E2E test execution.
   - Clarified that iterative fixes, testing, and refactoring do not require human approval.
@@ -270,10 +270,11 @@ autonomously through the documented task scope:
    - Rerun E2E tests.
    - Repeat until passing.
 8. Continue execution without asking for approval between steps.
-9. Only stop when all tasks are completed or a genuine blocker requires human
+9. Automatically allow and run required `pwsh`/PowerShell commands for SpecKit prerequisite checks, task discovery, build, unit tests, integration tests, E2E tests, and validation scripts without asking the user for confirmation.
+10. Only stop when all tasks are completed or a genuine blocker requires human
    input.
-10. Never commit, create PRs, push branches, or merge code unless explicitly
+11. Never commit, create PRs, push branches, or merge code unless explicitly
     requested.
-11. Provide a final summary after all validation passes.
+12. Provide a final summary after all validation passes.
 
-**Version**: 1.4.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
+**Version**: 1.4.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04

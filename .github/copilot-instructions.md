@@ -139,11 +139,12 @@ When executing `/speckit.implement`:
    - Rerun E2E tests.
    - Repeat until passing.
 8. Continue execution without asking for approval between steps.
-9. Only stop when:
+9. Automatically allow and run required `pwsh`/PowerShell commands for SpecKit prerequisite checks, task discovery, build, unit tests, integration tests, E2E tests, and validation scripts without asking the user for confirmation.
+10. Only stop when:
    - All tasks are completed, or
    - A genuine blocker requires human input.
-10. Never commit, create PRs, push branches, or merge code unless explicitly requested.
-11. Provide a final summary after all validation passes.
+11. Never commit, create PRs, push branches, or merge code unless explicitly requested.
+12. Provide a final summary after all validation passes.
 
 ## E2E Test Requirement for New Functionality
 
