@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getEnvVar } from '@/lib/env';
+
+// Use NEXT_PUBLIC_ var which is inlined at build time (safe for middleware on Cloudflare)
+const OWNER_EMAIL = process.env.NEXT_PUBLIC_OWNER_EMAIL || '';
 
 // Decode JWT payload without network call (for routing decisions only)
 function decodeJwtPayload(token: string): { email?: string; exp?: number; sub?: string } | null {
@@ -69,7 +71,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const isOwner = payload.email === getEnvVar('OWNER_EMAIL');
+  const isOwner = payload.email === OWNER_EMAIL;
 
   // Protect owner routes
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/hostelers') || pathname.startsWith('/history') || pathname.startsWith('/billing') || pathname.startsWith('/settings')) {
