@@ -1,8 +1,9 @@
 # IDE / Editor
 .vscode/
 
-# GitHub Copilot agent prompts (local only)
-.github/
+# Local GitHub Copilot agent customizations
+.github/agents/
+.github/prompts/
 
 # Dependencies
 node_modules/

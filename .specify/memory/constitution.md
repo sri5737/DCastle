@@ -1,14 +1,19 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.1.0 → 1.2.0
-Modified principles: None — existing I–VIII unchanged
+Version change: 1.3.1 -> 1.4.0
+Modified principles: None
 Added sections:
-  - Principle IX — Idempotent Database Migrations (NON-NEGOTIABLE)
+  - Autonomous Implementation Mode
 Removed sections: None
-Templates requiring updates: None
-Follow-up TODOs:
-  - None — all fields populated
+Clarifications:
+  - Added explicit /speckit.implement execution rules for autonomous task implementation.
+  - Added explicit Validation Rule for build, unit, integration, and E2E test execution.
+  - Clarified that iterative fixes, testing, and refactoring do not require human approval.
+  - Clarified that commit and push operations always require explicit user instruction.
+Templates requiring updates:
+  - .github/copilot-instructions.md updated with matching Validation Rule and Autonomous Implementation Mode.
+Follow-up TODOs: None
 -->
 
 # Deekshana Castle (dCastle) Constitution
@@ -147,6 +152,26 @@ both local dev and QA servers) and safe re-deployment.
 - Never use bare `CREATE TABLE`, `CREATE INDEX`, `CREATE POLICY`, or
   `CREATE TRIGGER` without the idempotency guard.
 
+### X. True Progressive Web App (NON-NEGOTIABLE)
+
+The website MUST be built and validated as a true Progressive Web App, not only
+a mobile-responsive website. Android Chrome is the required installability
+target: users MUST be able to install Deekshana Castle so it appears in the
+Android app drawer alongside native apps.
+
+- The manifest MUST include app name, short name, start URL, scope, standalone
+  display mode, theme color, background color, and Android-suitable icon
+  metadata.
+- Launcher icons MUST include 192x192 and 512x512 sizes and maskable icon
+  support.
+- A service worker MUST cache the core app shell so layout, navigation, login
+  entry points, and primary owner/hosteler shells load offline.
+- Install UI MUST only appear when browser installability is available and MUST
+  trigger the native PWA installation flow.
+- PWA completion requires automated validation for manifest/service-worker/
+  offline-shell behavior plus manual Android device or emulator evidence that
+  the installed app appears in the app drawer and launches standalone.
+
 ## Approved Tech Stack
 
 The following stack is FINALIZED for v1 and MUST NOT be changed without a
@@ -157,10 +182,16 @@ constitution amendment:
 | Framework | Next.js 14 (App Router, TypeScript) | App Router only — no Pages Router |
 | Styling | Tailwind CSS + shadcn/ui | shadcn/ui preferred over custom components |
 | Database + Auth | Supabase (PostgreSQL + RLS + Realtime) | Free tier |
-| PWA | @ducanh2912/next-pwa | Installable, offline-capable |
+| PWA | Best available npmjs.org-compatible PWA tooling, currently @ducanh2912/next-pwa unless superseded by a better maintained option | Must be Android-installable, app-drawer visible, standalone, and offline app-shell capable |
 | Deployment | Cloudflare Pages + @cloudflare/next-on-pages | Edge adapter required |
 | PIN hashing | bcryptjs | NOT bcrypt — must be Edge Runtime compatible |
 | Backups | GitHub Actions → Cloudflare R2 | Daily, free 10 GB tier |
+
+Local dependency installation:
+- Local `npm install` MUST use the public npm registry command:
+  `npm install --registry=https://registry.npmjs.org/ --progress=false`
+- Do not run bare `npm install` locally for this repository, because it can
+  regenerate lockfiles with environment-specific registry metadata.
 
 Authentication flow:
 - **Hostelers**: Owner-provisioned invite link → Google OAuth (primary) or
@@ -198,7 +229,51 @@ Amendments require:
 - MINOR: new principle or section added; materially expanded guidance.
 - PATCH: clarifications, wording fixes, typo corrections.
 
-All PRs MUST verify compliance with the nine Core Principles above before merge.
+All PRs MUST verify compliance with the ten Core Principles above before merge.
 Complexity MUST be justified; if a simpler approach exists, it MUST be preferred.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-03
+### Validation Rule
+
+Implementation agents MUST perform all required validation before declaring work
+complete:
+
+- Build validation.
+- Unit tests.
+- Integration tests.
+- E2E tests.
+
+Any validation failure MUST be fixed automatically and retested until the
+completed scope passes or a genuine blocker is identified. Human approval is NOT
+required for iterative fixes, testing, or refactoring within the documented task
+scope.
+
+Commit and push operations always require explicit user instruction.
+
+### Autonomous Implementation Mode
+
+When executing `/speckit.implement`, implementation agents MUST proceed
+autonomously through the documented task scope:
+
+1. Do not ask for confirmation before modifying files.
+2. Implement all tasks automatically.
+3. Run unit tests automatically.
+4. If tests fail:
+   - Analyze failures.
+   - Apply fixes.
+   - Rerun tests.
+   - Repeat until passing or blocked by missing requirements.
+5. Run integration tests automatically.
+6. Run E2E tests automatically.
+7. If E2E tests fail:
+   - Diagnose the root cause.
+   - Fix bugs.
+   - Rerun E2E tests.
+   - Repeat until passing.
+8. Continue execution without asking for approval between steps.
+9. Only stop when all tasks are completed or a genuine blocker requires human
+   input.
+10. Never commit, create PRs, push branches, or merge code unless explicitly
+    requested.
+11. Provide a final summary after all validation passes.
+
+**Version**: 1.4.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
