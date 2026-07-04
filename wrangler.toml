@@ -5,6 +5,10 @@ main = ".vercel/output/static/_worker.js/index.js"
 base_dir = ".vercel/output/static/_worker.js"
 find_additional_modules = true
 
+[[rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
 [assets]
 directory = ".vercel/output/static"
 
