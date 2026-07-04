@@ -3,9 +3,27 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
+import type { DeletedFromStatus, HostelerStatus } from '@/types';
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const INVITE_EXPIRY_DAYS = 7;
+
+type HostelerListRow = {
+  id: string;
+  name: string;
+  phone: string;
+  room_number: string;
+  status: HostelerStatus;
+  activated_at: string | null;
+  deleted_at: string | null;
+  deleted_from_status: DeletedFromStatus | null;
+  deletion_effective_date: string | null;
+  created_at: string;
+};
+
+type HostelerListResponseRow = HostelerListRow & {
+  canceled_future_preference_count?: number;
+};
 
 export async function GET(request: NextRequest) {
   const authResult = await requireOwner();
@@ -14,13 +32,16 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
+  const validStatuses = ['active', 'pending', 'inactive', 'deleted'];
 
   let query = supabase
     .from('hostelers')
-    .select('id, name, phone, room_number, status, activated_at, created_at')
+    .select(
+      'id, name, phone, room_number, status, activated_at, deleted_at, deleted_from_status, deletion_effective_date, created_at'
+    )
     .order('created_at', { ascending: false });
 
-  if (status && ['active', 'pending', 'inactive'].includes(status)) {
+  if (status && validStatuses.includes(status)) {
     query = query.eq('status', status);
   }
 
@@ -39,6 +60,7 @@ export async function GET(request: NextRequest) {
     active: 0,
     pending: 0,
     inactive: 0,
+    deleted: 0,
   };
 
   if (allHostelers) {
@@ -46,10 +68,39 @@ export async function GET(request: NextRequest) {
       if (h.status === 'active') counts.active++;
       else if (h.status === 'pending') counts.pending++;
       else if (h.status === 'inactive') counts.inactive++;
+      else if (h.status === 'deleted') counts.deleted++;
     }
   }
 
-  return NextResponse.json({ hostelers, counts });
+  const hostelerRows = (hostelers ?? []) as HostelerListRow[];
+  const deletedActiveIds = hostelerRows
+    .filter((hosteler) => hosteler.status === 'deleted' && hosteler.deleted_from_status === 'active')
+    .map((hosteler) => hosteler.id);
+
+  const canceledCounts = new Map<string, number>();
+  if (deletedActiveIds.length > 0) {
+    const { data: canceledRows } = await supabase
+      .from('food_preferences')
+      .select('hosteler_id')
+      .in('hosteler_id', deletedActiveIds)
+      .not('canceled_at', 'is', null);
+
+    for (const row of canceledRows ?? []) {
+      canceledCounts.set(row.hosteler_id, (canceledCounts.get(row.hosteler_id) ?? 0) + 1);
+    }
+  }
+
+  const responseHostelers: HostelerListResponseRow[] = hostelerRows.map((hosteler) => ({
+    ...hosteler,
+    ...(hosteler.status === 'deleted'
+      ? {
+          canceled_future_preference_count:
+            canceledCounts.get(hosteler.id) ?? 0,
+        }
+      : {}),
+  }));
+
+  return NextResponse.json({ hostelers: responseHostelers, counts });
 }
 
 export async function POST(request: NextRequest) {

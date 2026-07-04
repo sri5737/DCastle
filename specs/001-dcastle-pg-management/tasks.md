@@ -150,9 +150,9 @@
 
 ## Phase 7: User Story 5 — Owner Manages Hosteler Registrations (Priority: P2)
 
-**Goal**: Owner views hostelers by status (active/pending/inactive), deactivates, reactivates, and generates new invite links
+**Goal**: Owner views hostelers by status (active/pending/inactive/deleted), deactivates, reactivates, deletes pending or active hostelers with the required confirmations, opens a dedicated deleted-hosteler audit view, and generates new invite links while preserving owner-visible audit records
 
-**Independent Test**: Add hosteler → deactivate → reactivate → reset invite → verify all status changes reflect correctly
+**Independent Test**: Add hostelers → deactivate one → reactivate one → reset one invite → delete one pending hosteler → delete one active hosteler with future preferences → verify deleted-tab visibility, access revocation, preserved same-day/past history, deleted-hosteler audit visibility for canceled future rows, and exclusion of those canceled rows from normal owner history/export, dashboard counts, and billing inputs
 
 ### Implementation for User Story 5
 
@@ -162,8 +162,17 @@
 - [x] T048 [US5] Create hosteler management page with status tabs (active/pending/inactive), add hosteler form, and per-hosteler action buttons in `src/app/(owner)/hostelers/page.tsx`
 - [x] T049 [US5] Implement deactivation confirmation dialog (shows future preference count warning) and invite link copy functionality in `src/app/(owner)/hostelers/page.tsx`
 - [x] T049b [US5] Create E2E test: owner adds hosteler → views in active list → deactivates → appears in inactive tab → reactivates → returns to active tab → resets invite link in `e2e/us5-hosteler-management.spec.ts`
+- [x] T049c [US5] Add additive deletion-lifecycle migration for `hostelers.deleted_at`, `hostelers.deleted_from_status`, `hostelers.deletion_effective_date`, `food_preferences.canceled_at`, and `food_preferences.cancellation_reason` in `supabase/migrations/002_hosteler_deletion_lifecycle.sql`
+- [x] T049d [P] [US5] Extend shared lifecycle types for deleted hostelers, deletion metadata, and canceled food-preference rows in `src/types/index.ts`
+- [x] T049e [US5] Extend `GET /api/hostelers` to return deleted-tab records and per-status counts that include `deleted` in `src/app/api/hostelers/route.ts`
+- [x] T049f [US5] Implement owner-only `GET /api/hostelers/[id]` detail support with `view=audit` so deleted hostelers expose preserved-history metadata and canceled future preferences only through the dedicated audit response in `src/app/api/hostelers/[id]/route.ts`
+- [x] T049g [US5] Extend `PATCH /api/hostelers/[id]` to support pending delete, active delete confirmation, invite invalidation, auth-session revocation, and future-preference cancellation after `deletion_effective_date` in `src/app/api/hostelers/[id]/route.ts`
+- [x] T049h [US5] Extend the owner hosteler management UI with a deleted tab, pending-delete and active-delete confirmation flows, and a dedicated deleted-hosteler audit detail surface that shows deletion metadata plus canceled future preferences only inside that view in `src/app/admin/hostelers/page.tsx`
+- [x] T049i [US5] Update owner dashboard aggregation and live-refresh queries to exclude `food_preferences` rows where `canceled_at IS NOT NULL` after active-hosteler deletion in `src/app/admin/dashboard/page.tsx`
+- [x] T049j [US5] Add unit coverage for deleted-hosteler audit retrieval, delete lifecycle transitions, invite invalidation, auth revocation, and future-preference cancellation in `src/app/api/hostelers/[id]/route.test.ts`
+- [x] T049k [US5] Extend owner lifecycle E2E coverage for pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, and exclusion of those canceled rows from normal owner history/export, dashboard counts, and billing inputs in `e2e/us5-hosteler-management.spec.ts`
 
-**Checkpoint**: Owner can fully manage hosteler lifecycle
+**Checkpoint**: Owner can fully manage hosteler lifecycle, including owner-visible deleted records, a dedicated deleted-hosteler audit view for canceled future preferences, and exclusion of those canceled rows from operational owner surfaces
 
 ---
 
@@ -194,13 +203,13 @@
 
 ### Implementation for User Story 6
 
-- [ ] T053 [US6] Implement billing calculation logic (per-day rate lookup from `meal_rates` with `effective_from <= day`, sum per meal type) in `src/lib/billing.ts`
-- [ ] T054 [US6] Implement `POST /api/billing/generate` endpoint (compute bills for all hostelers with preferences in target month, upsert into monthly_bills) in `src/app/api/billing/generate/route.ts`
-- [ ] T055 [US6] Implement `GET /api/billing` endpoint (return bill summary for month, all hostelers or single hosteler) in `src/app/api/billing/route.ts`
-- [ ] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day breakdown with applicable rates for a hosteler's bill) in `src/app/api/billing/detail/route.ts`
+- [ ] T053 [US6] Implement billing calculation logic that uses only non-canceled `food_preferences` rows, applies per-day `meal_rates` lookups, and preserves billing eligibility for inactive or deleted-from-active hostelers with retained history in `src/lib/billing.ts`
+- [ ] T054 [US6] Implement `POST /api/billing/generate` endpoint (compute bills from preserved non-canceled history for active, inactive, and deleted-from-active hostelers in the target month, then upsert into `monthly_bills`) in `src/app/api/billing/generate/route.ts`
+- [ ] T055 [US6] Implement `GET /api/billing` endpoint (return month summary for owners, including deleted-hosteler rows, or a single authenticated hosteler bill) in `src/app/api/billing/route.ts`
+- [ ] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day preserved-history breakdown with applicable rates, excluding canceled future rows) in `src/app/api/billing/detail/route.ts`
 - [ ] T057 [US6] Create owner billing page with month/year selector, generate button, bill summary table (name, room, meal counts, total), and per-hosteler detail drill-down in `src/app/(owner)/billing/page.tsx`
-- [ ] T057b [US6] Write unit tests for billing calculation: single rate month, mid-month rate change, zero-preference month, deactivated hosteler inclusion in `src/lib/billing.test.ts`
-- [ ] T057c [US6] Create E2E test: seed food preferences for a month → owner navigates to billing page → selects month → generates bills → verify summary table shows correct totals → drill into hosteler detail → verify per-day breakdown in `e2e/us6-monthly-bills.spec.ts`
+- [ ] T057b [US6] Write unit tests for billing calculation covering single-rate months, mid-month rate changes, zero-preference months, inactive-hosteler inclusion, deleted-from-active preserved-history inclusion, and canceled-future-row exclusion in `src/lib/billing.test.ts`
+- [ ] T057c [US6] Create E2E test: seed preserved and canceled food preferences for a month → owner generates bills → verify deleted-from-active history is billed, canceled future rows are excluded, and per-day detail matches retained history in `e2e/us6-monthly-bills.spec.ts`
 
 **Checkpoint**: Owner can generate and review accurate monthly bills accounting for mid-month rate changes
 
@@ -214,7 +223,7 @@
 
 ### Implementation for User Story 7
 
-- [ ] T058 [US7] Implement `GET /api/food/history` endpoint (return per-day food preferences and summary counts for hosteler's selected month) in `src/app/api/food/history/route.ts`
+- [ ] T058 [US7] Implement `GET /api/food/history` endpoint (return the authenticated hosteler's preserved per-day food preferences and summary counts for the selected month, excluding canceled rows) in `src/app/api/food/history/route.ts`
 - [ ] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) in `src/app/(hosteler)/history/page.tsx`
 - [ ] T059b [US7] Create E2E test: hosteler submits food preferences for multiple days → navigates to history page → selects current month → verifies day-by-day list matches submissions → verifies monthly totals are correct in `e2e/us7-food-history.spec.ts`
 
@@ -240,16 +249,16 @@
 
 ## Phase 12: User Story 9 — Owner Views and Exports Food History (Priority: P3)
 
-**Goal**: Owner filters food history by hosteler and/or date range, views results in a table, exports as CSV
+**Goal**: Owner filters preserved food history by hosteler and/or date range, views results in a table, and exports the same preserved dataset as CSV
 
-**Independent Test**: Filter by specific hosteler and date range → verify table shows correct data → export CSV → verify file matches table
+**Independent Test**: Filter by specific hosteler and date range → verify table shows only preserved rows → export CSV → verify the file matches the table and excludes audit-only canceled future rows
 
 ### Implementation for User Story 9
 
-- [ ] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id` filter, date range params, and `format=csv` response in `src/app/api/food/history/route.ts`
-- [ ] T063 [US9] Create owner food history page with hosteler dropdown filter, date range picker, results table, and "Export CSV" download button in `src/app/(owner)/history/page.tsx`
+- [ ] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id`, deleted-hosteler preserved-history filtering, date range params, and `format=csv`, while excluding audit-only canceled future rows from all normal history/export results in `src/app/api/food/history/route.ts`
+- [ ] T063 [US9] Create owner food history page with hosteler dropdown filter (including deleted records for preserved history only), date range picker, preserved-history results table, and `Export CSV` download button in `src/app/(owner)/history/page.tsx`
 - [ ] T064 [US9] Implement CSV generation (build CSV string from filtered data, trigger browser download) in `src/app/(owner)/history/page.tsx`
-- [ ] T064b [US9] Create E2E test: owner navigates to food history → filters by specific hosteler → filters by date range → verifies table shows correct entries → clicks Export CSV → verifies downloaded file contains matching data in `e2e/us9-owner-food-history.spec.ts`
+- [ ] T064b [US9] Create E2E test: owner filters food history for an active and a deleted hosteler → verifies deleted-hosteler preserved rows appear, canceled future rows remain unavailable in normal history/export and visible only from the deleted-hosteler audit view, and exported CSV matches the filtered on-screen data in `e2e/us9-owner-food-history.spec.ts`
 
 **Checkpoint**: Owner can review and export food history for record-keeping and dispute resolution
 
@@ -286,6 +295,7 @@
 - [x] T069c Update `playwright.config.ts` to reference `globalSetup` and `globalTeardown`, load env vars via `dotenv`.
 - [x] T069d Update `e2e/helpers.ts` login helpers to use env-based test credentials and fix login flows to match the actual app login pages (correct selectors, cookie-based auth).
 - [x] T069e Update all E2E test specs (`us1`, `us2`, `us3`, `us4`) to use seeded test data from global setup and pass with the actual running app.
+- [ ] T069f [P] Add story-scoped npm scripts for the remaining documented flows (`test:us5`, `test:us6`, `test:us7`, `test:us8`, `test:us9`, `test:us10`, `test:us11`) in `package.json`
 
 **Checkpoint**: All completed stories have passing E2E tests; CI blocks deployment on test failure
 
@@ -334,6 +344,25 @@
 
 ---
 
+## Phase 16: User Story 12 — Server-Side Auth Proxy for Reliable Login (Priority: P3)
+
+**Goal**: Route owner email/password login and hosteler PIN login through server-side Next.js API routes instead of direct browser-to-Supabase calls, eliminating CORS and network failures in corporate proxy environments
+
+**Independent Test**: Owner logs in via `/api/auth/login` proxy route → session established with cookies → hosteler logs in via `/api/auth/pin/verify` → session established → both paths work identically to previous client-side flow → no direct browser-to-Supabase auth calls remain
+
+### Implementation for User Story 12
+
+- [ ] T085 [US12] Create `POST /api/auth/login` endpoint (accept `{ email, password }`, call `supabase.auth.signInWithPassword()` server-side with retry logic, set `sb-access-token` and `sb-refresh-token` cookies, return success/error response) in `src/app/api/auth/login/route.ts`
+- [ ] T086 [US12] Update admin login page to call `POST /api/auth/login` instead of direct `supabase.auth.signInWithPassword()`, handle API response (redirect on success, show error on failure), and remove unused direct Supabase client auth imports in `src/app/(auth)/admin/login/page.tsx`
+- [ ] T087 [US12] Update hosteler login page to ensure PIN login path uses only `POST /api/auth/pin/verify` with no direct Supabase auth calls remaining (Google OAuth path unchanged — already uses server callback) in `src/app/(auth)/login/page.tsx`
+- [ ] T088 [P] [US12] Add retry/TLS error handling utility for server-side Supabase auth calls (1 retry with 500ms exponential backoff on transient network/5xx errors, no retry on 4xx) in `src/lib/auth/retry.ts` and integrate into `/api/auth/login` and `/api/auth/pin/verify` routes
+- [ ] T089 [P] [US12] Write unit tests for `POST /api/auth/login` route (successful login sets cookies, invalid credentials return 401, transient error triggers retry, retry exhaustion returns 500) in `src/app/api/auth/login/route.test.ts`
+- [ ] T090 [US12] Create E2E test verifying login still works through proxy routes: owner logs in via `/api/auth/login` → reaches admin dashboard → hosteler logs in via `/api/auth/pin/verify` → reaches hosteler dashboard → sessions persist correctly in `e2e/us12-auth-proxy.spec.ts`
+
+**Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -346,12 +375,13 @@
 - **US2 Owner Dashboard (Phase 6)**: Depends on Foundational + US1 (needs food data to display counts)
 - **US5 Hosteler Management (Phase 7)**: Depends on Foundational only (uses same invite infrastructure as US3)
 - **US10 Settings (Phase 8)**: Depends on Foundational — should precede US6 (rates needed for billing)
-- **US6 Monthly Bills (Phase 9)**: Depends on US1 (needs food preference data) + US10 (needs rate history)
+- **US6 Monthly Bills (Phase 9)**: Depends on US1 (needs food preference data) + US5 (needs deleted/canceled lifecycle semantics) + US10 (needs rate history)
 - **US7 Food History (Phase 10)**: Depends on US1 (needs food preference data)
 - **US8 Hosteler Bill View (Phase 11)**: Depends on US6 (needs generated bills)
-- **US9 Owner Food History (Phase 12)**: Depends on US1 (needs food preference data)
+- **US9 Owner Food History (Phase 12)**: Depends on US1 (needs food preference data) + US5 (needs deleted-record preserved-history and audit-only visibility semantics)
 - **Automation & E2E (Phase 13)**: Existing completed automation foundation for US1–US4; future story E2E tasks remain in each story phase
 - **US11 Android PWA (Phase 14)**: Depends on Foundational; can run in parallel with story work after Phase 2, but must complete before production delivery
+- **US12 Auth Proxy (Phase 16)**: Depends on Foundational + US4 (PIN verify route must exist); can run in parallel with Phases 9–12
 - **Final Polish (Phase 15)**: Depends on desired user stories plus US11 for full quickstart validation
 
 ### User Story Dependencies
@@ -364,12 +394,15 @@ Phase 2 (Foundational)
   │                 ├── Phase 6 (US2: Owner Dashboard)
   │                 ├── Phase 10 (US7: Hosteler Food History)
   │                 └── Phase 12 (US9: Owner Food History)
-  ├── Phase 7 (US5: Hosteler Management) — independent
+  ├── Phase 7 (US5: Hosteler Management)
+  │     ├── Phase 9 (US6: Monthly Bills)
+  │     └── Phase 12 (US9: Owner Food History)
   ├── Phase 8 (US10: Settings) — independent
   │     └── Phase 9 (US6: Monthly Bills) — needs US1 + US10
   │           └── Phase 11 (US8: Hosteler Bill View)
   ├── Phase 13 (Automation & E2E) — after US1-US4 complete
   ├── Phase 14 (US11: Android PWA) — independent after Foundational, required before production delivery
+  ├── Phase 16 (US12: Auth Proxy) — depends on Foundational + US4; parallel with Phases 9–12
   └── Phase 15 (Final Polish) — validates completed story set
 ```
 
@@ -390,6 +423,8 @@ Phase 2 (Foundational)
 **Phase 5** (US1): T033, T034 can run in parallel (different component files); T035 can start independently of UI components
 
 **Phase 6** (US2): T039, T040 can run in parallel (different component files)
+
+**Phase 7** (US5): T049c and T049d can run in parallel; after the migration/types land, T049e and T049g can proceed in parallel while T049f handles lifecycle mutation logic
 
 **Phase 14** (US11): T070, T071, T072, T073, T074, T075, T078, T079, and T081 can run in parallel where file ownership does not overlap; T076, T077, T080, T082, and T083 depend on the corresponding assets/components/tests existing first
 

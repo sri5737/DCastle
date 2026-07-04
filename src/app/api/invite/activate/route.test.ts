@@ -171,7 +171,7 @@ describe('Google OAuth Account Linking', () => {
     };
 
     const tokenChain = setupQueryChain(validToken);
-    const hostelerChain = setupQueryChain({ id: 'hosteler-1', name: 'Test', room_number: '101', phone: '9876543210' });
+    const hostelerChain = setupQueryChain({ id: 'hosteler-1', name: 'Test', room_number: '101', phone: '9876543210', status: 'pending' });
 
     let callCount = 0;
     mockFrom.mockImplementation(() => {

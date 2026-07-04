@@ -2,7 +2,11 @@
 // Database Entity Types
 // ============================================================
 
-export type HostelerStatus = 'pending' | 'active' | 'inactive';
+export type HostelerStatus = 'pending' | 'active' | 'inactive' | 'deleted';
+
+export type DeletedFromStatus = 'pending' | 'active';
+
+export type FoodPreferenceCancellationReason = 'hosteler_deleted';
 
 export interface Hosteler {
   id: string;
@@ -14,6 +18,9 @@ export interface Hosteler {
   pin_hash: string | null;
   auth_user_id: string | null;
   activated_at: string | null;
+  deleted_at: string | null;
+  deleted_from_status: DeletedFromStatus | null;
+  deletion_effective_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +45,13 @@ export interface FoodPreference {
   dinner: boolean;
   submitted_at: string;
   updated_at: string;
+  canceled_at: string | null;
+  cancellation_reason: FoodPreferenceCancellationReason | null;
+}
+
+export interface DeletedHostelerAudit {
+  preserved_history_through: string;
+  canceled_future_preferences: FoodPreference[];
 }
 
 export interface MealRate {

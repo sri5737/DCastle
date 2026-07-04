@@ -34,7 +34,8 @@ export default function OwnerDashboardPage() {
       supabase
         .from('food_preferences')
         .select('hosteler_id, breakfast, lunch, dinner')
-        .eq('date', tomorrowDate),
+        .eq('date', tomorrowDate)
+        .is('canceled_at', null),
       supabase.from('hostelers').select('id, name, room_number').eq('status', 'active'),
     ]);
 

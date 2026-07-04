@@ -27,6 +27,13 @@ export async function POST(
     return NextResponse.json({ error: 'Hosteler not found' }, { status: 404 });
   }
 
+  if (hosteler.status === 'deleted') {
+    return NextResponse.json(
+      { error: 'Deleted hostelers are audit-only and cannot receive new invites' },
+      { status: 400 }
+    );
+  }
+
   // Invalidate all existing unused tokens for this hosteler
   await supabase
     .from('invite_tokens')

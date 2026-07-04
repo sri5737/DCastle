@@ -1,6 +1,6 @@
 # Research: Deekshana Castle PG Management App
 
-**Phase**: 0 — Outline & Research | **Date**: 2026-07-03
+**Phase**: 0 — Outline & Research | **Date**: 2026-07-04
 
 ## Research Tasks & Findings
 
@@ -211,6 +211,7 @@ All technical unknowns resolved. Architecture decisions are finalized:
 9. PIN brute-force lockout via `pin_login_attempts` table (5 attempts / 15-minute cooldown)
 10. Session invalidation on deactivation via Supabase Admin API `signOut(userId, 'global')`
 11. Unlimited concurrent sessions — no device limit enforcement
+12. Deleted hosteler lifecycle uses soft-delete metadata on the hosteler plus soft-cancellation markers on future-dated food preferences
 
 ---
 
@@ -258,6 +259,29 @@ All technical unknowns resolved. Architecture decisions are finalized:
 **Rationale**:
 - Target user base is ~40–100 hostelers using 1–2 personal devices
 - Enforcing a device cap adds complexity (session registry, eviction logic) with no business value
+
+---
+
+### 12. Deleted Hosteler Archive and Future-Preference Cancellation
+
+**Decision**: Represent a deleted hosteler as the existing `hostelers` row moved to `status = 'deleted'` with deletion metadata, and cancel future-dated `food_preferences` rows by marking them canceled rather than hard-deleting them, while exposing those canceled rows only through the deleted-hosteler audit detail.
+
+**Rationale**:
+- Preserves joins from the same person to historical food preferences and monthly bills without copying data into a second archive table.
+- Keeps the owner's deleted tab simple because it can read from the existing hosteler lifecycle surface using a new deleted status.
+- Preserves past and same-day operational and billing history while allowing future operational queries and billing generation to exclude rows canceled by deletion.
+- Avoids destructive deletion of operational data while still making the canceled future rows non-billable, absent from normal owner dashboard/history/export flows, and visible only where the spec permits: the deleted-hosteler audit view.
+
+**Implementation approach**:
+- Add `deleted_at`, `deleted_from_status`, and `deletion_effective_date` to `hostelers` and extend the status enum to include `deleted`.
+- When deleting a pending hosteler: mark the hosteler deleted and invalidate any unused invite token immediately.
+- When deleting an active hosteler: revoke sessions immediately, set deletion metadata, and mark every `food_preferences` row with `date > deletion_effective_date` as canceled.
+- Add `canceled_at` and `cancellation_reason` to `food_preferences`; owner dashboard, normal owner history/export, and billing queries filter out canceled rows by default.
+- Serve canceled future rows only from the deleted-hosteler audit detail, keyed by the deleted hosteler identity, so the owner can inspect what was canceled without reintroducing those rows into standard operational surfaces.
+
+**Alternatives considered**:
+- Separate `deleted_hosteler_records` archive table plus hard-delete of the live hosteler row — rejected because it complicates joins to preserved history and bill generation.
+- Hard-delete future food-preference rows — rejected because it removes useful audit context around what was canceled as part of deletion.
 - Supabase Auth naturally supports multiple refresh tokens per user without conflict
 - No security concern at this scale — PIN/Google auth already gates access
 

@@ -49,6 +49,7 @@ const mockSettings = [{ key: 'deadline_time', value: '21:00' }];
 const mockPrefs = [
   { hosteler_id: 'h-1', breakfast: true, lunch: true, dinner: false },
   { hosteler_id: 'h-2', breakfast: true, lunch: false, dinner: true },
+  { hosteler_id: 'h-3', breakfast: true, lunch: true, dinner: true },
 ];
 const mockHostelers = [
   { id: 'h-1', name: 'Alice', room_number: '101' },
@@ -68,7 +69,13 @@ function setupMockFrom() {
     if (table === 'food_preferences') {
       return {
         select: () => ({
-          eq: () => Promise.resolve({ data: mockPrefs, error: null }),
+          eq: () => ({
+            is: (_column: string, value: unknown) =>
+              Promise.resolve({
+                data: value === null ? mockPrefs.slice(0, 2) : mockPrefs,
+                error: null,
+              }),
+          }),
         }),
       };
     }
@@ -132,7 +139,9 @@ describe('Owner Dashboard - Food Counts Aggregation', () => {
       if (table === 'food_preferences') {
         return {
           select: () => ({
-            eq: () => Promise.resolve({ data: [], error: null }),
+            eq: () => ({
+              is: () => Promise.resolve({ data: [], error: null }),
+            }),
           }),
         };
       }
@@ -264,5 +273,18 @@ describe('Owner Dashboard - Realtime Reconnection Banner', () => {
 
     // Should have re-fetched data
     expect(mockFrom).toHaveBeenCalled();
+  });
+
+  it('should exclude canceled future preferences from counts', async () => {
+    const OwnerDashboardPage = (await import('./page')).default;
+    render(<OwnerDashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading dashboard…')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Pending (1)')).toBeInTheDocument();
+    expect(screen.getByText('Submitted (2)')).toBeInTheDocument();
+    expect(screen.queryByText('Pending (0)')).not.toBeInTheDocument();
   });
 });

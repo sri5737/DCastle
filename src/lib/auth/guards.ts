@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { SessionUser } from '@/types';
 
 /**
@@ -37,6 +38,41 @@ export async function requireHosteler(): Promise<
       ),
     };
   }
+
+  if (!result.session.hosteler_id) {
+    return {
+      response: NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const supabase = createServiceClient();
+  const { data: hosteler } = await supabase
+    .from('hostelers')
+    .select('status')
+    .eq('id', result.session.hosteler_id)
+    .single();
+
+  if (!hosteler) {
+    return {
+      response: NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (hosteler.status !== 'active') {
+    return {
+      response: NextResponse.json(
+        { error: 'Account deactivated' },
+        { status: 401 }
+      ),
+    };
+  }
+
   return result;
 }
 

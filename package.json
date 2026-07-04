@@ -13,6 +13,7 @@
     "test:us2": "vitest run src/app/admin/dashboard/",
     "test:us3": "vitest run src/app/api/invite/",
     "test:us4": "vitest run src/app/api/auth/",
+    "test:us5": "vitest run src/app/api/hostelers/",
     "test:e2e": "playwright test",
     "test:all": "vitest run && playwright test"
   },

@@ -1,4 +1,4 @@
-# Feature Specification: Deekshana Castle PG Management App (Full Application — v1.1)
+# Feature Specification: Deekshana Castle PG Management App (Full Application — v1.2)
 
 **Feature Branch**: `001-dcastle-pg-management`
 
@@ -68,42 +68,47 @@ The owner registers a new hosteler by entering their name, phone number, and roo
 
 ### User Story 4 — Hosteler Logs In on Subsequent Visits (Priority: P2)
 
-A returning hosteler opens the app and signs in using either their Google account or their phone number and PIN. They remain logged in for 30 days without needing to re-authenticate.
+A returning hosteler opens the app and signs in using the credential they linked during activation: Google if they activated with Google, or their phone number and PIN if they activated with PIN. In v1, they are not required to add the second credential later. They remain logged in for 30 days without needing to re-authenticate.
 
 **Why this priority**: Friction-free login is critical for daily usage compliance. If login is cumbersome, hostelers will not use the app.
 
-**Independent Test**: Can be tested by activating an account, closing the browser, reopening, and logging in via both methods — verifying access is granted and the session persists for 30 days.
+**Independent Test**: Can be tested by activating one account with Google and another with PIN, closing the browser, reopening, and verifying each account can log in only with its linked credential while the session persists for 30 days.
 
 **Acceptance Scenarios**:
 
-1. **Given** an active hosteler, **When** they sign in with Google, **Then** they are redirected to their dashboard without any manual steps.
-2. **Given** an active hosteler, **When** they enter their phone number and correct 4-digit PIN, **Then** they are logged in and redirected to their dashboard.
-3. **Given** an active hosteler, **When** they enter an incorrect PIN, **Then** they see an error message and are not logged in.
-4. **Given** a Google account not linked to any registered hosteler, **When** the user attempts to sign in with Google, **Then** they see a message: "You are not registered. Contact your PG owner."
-5. **Given** a hosteler is logged in, **When** 30 days have not yet elapsed, **Then** they remain logged in and do not need to re-authenticate.
+1. **Given** an active hosteler whose account was activated with Google, **When** they sign in with the same linked Google account, **Then** they are redirected to their dashboard without any manual steps.
+2. **Given** an active hosteler whose account was activated with PIN, **When** they enter their phone number and correct 4-digit PIN, **Then** they are logged in and redirected to their dashboard.
+3. **Given** an active hosteler whose account does not have a PIN credential linked, **When** they attempt phone-plus-PIN login, **Then** login is rejected and the UI tells them to use their linked Google sign-in.
+4. **Given** an active hosteler whose account is not linked to Google, **When** they attempt Google sign-in, **Then** login is rejected and the UI tells them to use their linked phone number and PIN.
+5. **Given** an active hosteler with a PIN-linked account, **When** they enter an incorrect PIN, **Then** they see an error message and are not logged in.
+6. **Given** a Google account not linked to any registered hosteler, **When** the user attempts to sign in with Google, **Then** they see a message: "You are not registered. Contact your PG owner."
+7. **Given** a hosteler is logged in, **When** 30 days have not yet elapsed, **Then** they remain logged in and do not need to re-authenticate.
 
 ---
 
 ### User Story 5 — Owner Manages Hosteler Registrations (Priority: P2)
 
-The owner views all hostelers grouped by status (active, pending, inactive), can generate a new invite link for anyone, deactivate active hostelers, and reactivate inactive ones.
+The owner views all hostelers grouped by status (active, pending, inactive, deleted), can generate a new invite link for anyone, deactivate active hostelers, reactivate inactive ones, and delete active or pending hostelers while preserving owner-visible audit records.
 
 **Why this priority**: Essential for keeping the system accurate as hostelers move in and out of the PG.
 
-**Independent Test**: Can be tested by adding a hosteler, deactivating them, reactivating them, and generating a new invite — verifying status changes are reflected correctly.
+**Independent Test**: Can be tested by adding hostelers, deactivating one, reactivating one, deleting one pending hosteler, deleting one active hosteler, and generating a new invite — verifying status transitions, access revocation, and deleted-record visibility are reflected correctly.
 
 **Acceptance Scenarios**:
 
-1. **Given** the owner is on the hostelers page, **When** they switch tabs, **Then** each tab shows only hostelers with the matching status (active, pending, inactive).
+1. **Given** the owner is on the hostelers page, **When** they switch tabs, **Then** each tab shows only hostelers with the matching status (active, pending, inactive, deleted).
 2. **Given** an active hosteler with no future food preferences, **When** the owner clicks "Deactivate", **Then** the hosteler's status changes to inactive and they can no longer log in. **Given** an active hosteler who has food preferences recorded for future dates, **When** the owner clicks "Deactivate", **Then** a confirmation dialog appears: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" and the deactivation only proceeds if the owner confirms.
 3. **Given** an inactive hosteler, **When** the owner clicks "Reactivate", **Then** the hosteler's status changes to active and they can log in again.
 4. **Given** any hosteler, **When** the owner clicks "Reset", **Then** a new invite link is generated (the old one is invalidated) and shown with a copy button.
+5. **Given** an active hosteler, **When** the owner clicks "Delete", **Then** a confirmation explains that the hosteler will be treated as moved out of the PG, login access will be revoked, past and same-day owner-visible tracking history will be preserved, any future-dated food preferences after the deletion takes effect will be canceled, and the deletion only proceeds if the owner confirms.
+6. **Given** the owner confirms deletion of an active hosteler, **When** the action completes, **Then** the hosteler no longer appears in the active, pending, or inactive tabs, appears in the deleted tab, their previously recorded past and same-day owner-visible history remains available for tracking and audit, and any food preferences whose record date is later than the deletion effective date are canceled, remain visible only inside that deleted hosteler's dedicated deleted/audit view, and are excluded from normal owner history/export, future operational counts, and billing.
+7. **Given** a pending hosteler, **When** the owner clicks "Delete", **Then** the hosteler is removed from the pending tab, any unused invite is invalidated, and the hosteler appears in the deleted tab for owner tracking and audit.
 
 ---
 
 ### User Story 6 — Owner Generates Monthly Bills (Priority: P3)
 
-The owner selects a month and year and triggers bill generation. The system counts each hosteler's opted meal days, multiplies by the applicable rate (accounting for any mid-month rate changes), and produces a bill summary for all active hostelers.
+The owner selects a month and year and triggers bill generation. The system counts each hosteler's opted meal days, multiplies by the applicable rate (accounting for any mid-month rate changes), and produces a bill summary for every hosteler whose preserved, non-canceled meal history is billable for that month, including active hostelers plus inactive or deleted-from-active hostelers whose retained history falls inside the selected month.
 
 **Why this priority**: Billing is the financial core of the PG business, but it is needed only once per month and is secondary to the daily operational workflows.
 
@@ -111,7 +116,7 @@ The owner selects a month and year and triggers bill generation. The system coun
 
 **Acceptance Scenarios**:
 
-1. **Given** the owner selects a month and year, **When** they click "Generate Bills", **Then** bills are computed for all active hostelers with accurate meal counts and amounts.
+1. **Given** the owner selects a month and year, **When** they click "Generate Bills", **Then** bills are computed for all hostelers with preserved, non-canceled billable history in that month, including active hostelers plus inactive or deleted-from-active hostelers whose retained history falls inside the selected month, with accurate meal counts and amounts.
 2. **Given** a meal rate changed mid-month, **When** bills are generated for that month, **Then** days before the change use the old rate and days after use the new rate.
 3. **Given** bills have been generated, **When** the owner views the bills table, **Then** each row shows the hosteler's name, room, meal day counts, and total amount.
 4. **Given** the owner clicks on a hosteler's row, **When** the detail view opens, **Then** a per-day breakdown shows which meals were opted on each date.
@@ -200,6 +205,24 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 
 ---
 
+### User Story 12 — Server-Side Auth Proxy for Reliable Login (Priority: P3)
+
+The owner login and hosteler PIN login currently call Supabase Auth directly from the browser. In corporate network environments with SSL inspection or proxy appliances, this causes intermittent CORS and network failures because the browser request to supabase.co gets intercepted or blocked. This story routes all authentication calls through server-side API routes (e.g., /api/auth/login) so the Next.js server handles the Supabase communication, where TLS configuration and retry logic can be managed centrally, eliminating browser-side CORS failures entirely.
+
+**Why this priority**: This is a non-functional reliability improvement, not a new user-facing feature. The current client-side auth works correctly in most environments. This becomes important only when users operate behind restrictive corporate proxies or SSL inspection appliances.
+
+**Independent Test**: Can be tested by configuring the owner login and hosteler PIN login to route through the server-side API route, then verifying that authentication succeeds when the browser is behind a proxy that blocks direct requests to supabase.co, and that existing login flows continue to work identically from the user's perspective.
+
+**Acceptance Scenarios**:
+
+1. **Given** an owner on the login page, **When** they submit their email and password, **Then** the authentication request is handled by a server-side API route rather than a direct browser call to Supabase, and login succeeds as before.
+2. **Given** a hosteler on the PIN login page, **When** they submit their phone number and PIN, **Then** the authentication request is handled by a server-side API route rather than a direct browser call to Supabase, and login succeeds as before.
+3. **Given** a user behind a corporate proxy that blocks direct browser requests to supabase.co, **When** they attempt to log in, **Then** authentication succeeds because the server-side route handles the Supabase communication without browser CORS restrictions.
+4. **Given** the server-side auth route encounters a transient TLS or network error communicating with Supabase, **When** the error is retryable, **Then** the route retries the request before returning a failure to the client.
+5. **Given** a user logs in via the server-side auth proxy, **When** authentication completes, **Then** the session is established identically to the previous client-side flow with no change in user experience, session duration, or behavior.
+
+---
+
 ### Edge Cases
 
 - What happens when a hosteler submits preferences exactly at the deadline second? → Submission is rejected server-side; client shows "closed" message.
@@ -215,7 +238,11 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - What happens when a hosteler's invite link expires before they activate? → The owner can generate a fresh invite link via the "Reset" action on the hostelers page.
 - What happens when a deactivated hosteler's device still has an active session cookie? → The next API call returns 401 with "Account deactivated"; the client redirects to the login page.
 - What happens when a hosteler enters a wrong PIN 5 times? → The phone number is locked out for 15 minutes; a message explains the cooldown.
+- What happens if a hosteler tries to log in with a credential type that was not linked during activation? → Login is rejected and the UI tells them to use the credential that was actually linked during activation; v1 does not require or prompt them to add the second credential later.
 - What happens if the owner regenerates a bill that a hosteler previously viewed? → The hosteler sees the updated bill on their next view; no notification is sent.
+- What happens when an active hosteler is deleted after they already have food preferences or billing history? → Their previously recorded past and same-day owner-visible operational and billing history remains preserved for tracking and audit, but once deletion takes effect they immediately lose access on every device, cannot submit anything new, and any food preferences dated after the deletion effective date are canceled, remain visible only in that deleted hosteler's dedicated deleted/audit view, and are excluded from normal owner history/export, future counts, and billing.
+- How is the deletion effective date applied when an active hosteler is deleted? → The deletion effective date is the IST calendar date on which the owner confirms deletion. Food preferences dated on that same IST date and any earlier IST date are preserved; food preferences dated on later IST dates are canceled. Example: if deletion is confirmed on 2026-07-04 IST, records dated 2026-07-04 and earlier are preserved, while records dated 2026-07-05 onward are canceled.
+- What happens when a pending hosteler is deleted after their invite link has already been shared? → The invite becomes unusable immediately, and the deleted pending record remains visible only in the owner's deleted/audit view.
 
 ---
 
@@ -229,8 +256,9 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - **FR-002**: The system MUST generate a unique, single-use invite link for each registered hosteler.
 - **FR-003**: Invite links MUST expire 7 days after generation.
 - **FR-004**: A new hosteler MUST be able to activate their account via the invite link using either a Google account or a 4-digit PIN linked to their phone number.
+- **FR-004a**: Activation MUST link only the credential path actually completed during activation. In v1, the system MUST NOT require the hosteler to add the second credential type later in order to use the app.
 - **FR-005**: The system MUST prevent activation of an invite link that has expired or has already been used.
-- **FR-006**: Hostelers MUST be able to log in using their Google account or phone number plus PIN on subsequent visits.
+- **FR-006**: Hostelers MUST be able to log in on subsequent visits using only the credential type that was successfully linked during activation. Google-linked accounts use the same linked Google account; PIN-linked accounts use phone number plus PIN.
 - **FR-006a**: After 5 consecutive failed PIN attempts for a given phone number, the system MUST lock out PIN login for that phone number for 15 minutes. The lockout resets after the cooldown period elapses.
 - **FR-007**: The system MUST reject sign-in attempts from Google accounts not linked to a provisioned hosteler, displaying a "contact your PG owner" message.
 - **FR-008**: Hosteler sessions MUST remain valid for 30 days without requiring re-authentication. Multiple concurrent sessions (across different devices) are permitted; each device maintains an independent session.
@@ -259,25 +287,31 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 
 **Hosteler Management**
 
-- **FR-025**: The owner MUST be able to view all hostelers, filterable by status: active, pending, or inactive.
+- **FR-025**: The owner MUST be able to view all hostelers, filterable by status: active, pending, inactive, or deleted.
 - **FR-026**: Each hosteler row MUST display the hosteler's name, room number, phone number, and current status.
 - **FR-027**: The owner MUST be able to deactivate any active hosteler. If the hosteler has food preferences recorded for future dates at the time of deactivation, the owner MUST be shown a confirmation dialog: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Deactivation only proceeds upon explicit owner confirmation. Upon deactivation, the hosteler's active sessions MUST be invalidated immediately; any subsequent API call from the deactivated hosteler MUST return HTTP 401 with an "Account deactivated" message.
 - **FR-028**: The owner MUST be able to reactivate any inactive hosteler.
+- **FR-028a**: In v1, deletion is supported only from pending or active status. Inactive hostelers are not directly deletable; the deleted view contains only records deleted from pending or active status.
 - **FR-029**: The owner MUST be able to generate a new invite link for any hosteler (invalidating any existing unused link).
+- **FR-029a**: The owner MUST be able to delete any pending hosteler directly. Deleting a pending hosteler MUST invalidate any unused invite and prevent any future activation, while preserving an owner-visible deleted record for tracking and audit purposes.
+- **FR-029b**: The owner MUST be able to delete any active hosteler. Deleting an active hosteler MUST be treated as a moved-out-of-PG event: login access is revoked immediately across all active sessions on all devices, no new submissions are allowed, past and same-day owner-visible tracked history is preserved rather than removed, and any food preferences dated after the deletion effective date MUST be canceled so they are excluded from normal owner history/export, future operational counts, and billing. The deletion effective date is the IST calendar date on which the owner confirms deletion, so records dated on that same IST date are preserved and only later-dated records are canceled.
+- **FR-029c**: Deleted hostelers MUST remain viewable by the owner in a dedicated deleted status view showing full name, room number, phone number, deletion timestamp, and whether the record was deleted from pending or active status. For active deletions, this deleted/audit view MUST also be the only owner-visible location where canceled future-dated food preferences remain available for audit.
+- **FR-029d**: Deleted hosteler records are audit-only in v1. The owner MUST NOT be able to restore, reactivate, or otherwise move a deleted record back into pending, active, or inactive status from the deleted view.
 
 **Food History**
 
 - **FR-030**: Hostelers MUST be able to view a per-day food preference history for any selected month.
 - **FR-031**: History MUST show whether each meal (breakfast, lunch, dinner) was opted on each date.
 - **FR-032**: A monthly summary MUST show the total number of days each meal type was opted.
-- **FR-033**: The owner MUST be able to view food history for any hosteler, filterable by hosteler and date range.
-- **FR-034**: The owner MUST be able to export the currently filtered food history as a CSV file.
+- **FR-033**: The owner MUST be able to view food history for any non-deleted or preserved historical hosteler records, filterable by hosteler and date range. Canceled future-dated food preferences created by active-hosteler deletion MUST NOT appear in this normal owner food history view.
+- **FR-034**: The owner MUST be able to export the currently filtered food history as a CSV file. Canceled future-dated food preferences created by active-hosteler deletion MUST NOT be included in the normal owner history CSV export.
 
 **Monthly Billing**
 
 - **FR-035**: The owner MUST be able to trigger bill generation for any selected month and year.
 - **FR-036**: Bill generation MUST calculate each hosteler's total as: (days breakfast opted × breakfast rate) + (days lunch opted × lunch rate) + (days dinner opted × dinner rate).
 - **FR-037**: If a meal rate changed during the selected month, the system MUST apply the rate that was effective on each individual day.
+- **FR-037a**: Bill generation MUST include every hosteler who has preserved, non-canceled billable meal history in the selected month, including active hostelers plus inactive or deleted-from-active hostelers whose retained history falls inside that month.
 - **FR-038**: The owner MUST be able to view a bill summary table showing all hostelers' meal counts and total amounts for the selected month.
 - **FR-039**: The owner MUST be able to view a per-day breakdown for any individual hosteler's bill.
 - **FR-040**: Hostelers MUST be able to view their own bill for any month in which a bill has been generated. If a bill is regenerated by the owner, the hosteler sees the latest version on their next view without notification; no explicit change alert is provided in v1.
@@ -324,7 +358,8 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 
 ### Key Entities
 
-- **Hosteler**: A paying guest registered by the owner. Identified by name, phone number, and room number. Has a lifecycle status: pending (invite sent, not yet activated), active (can log in and submit), inactive (deactivated).
+- **Hosteler**: A paying guest registered by the owner. Identified by name, phone number, and room number. Has a lifecycle status of pending (invite sent, not yet activated), active (can log in and submit), or inactive (deactivated). If deleted from pending or active status, the person remains represented through an owner-visible deleted record rather than disappearing from owner tracking.
+- **Deleted Hosteler Record**: An owner-visible audit record created when a pending or active hosteler is deleted. Retains identifying details, deletion timing, prior status, and, for active deletions, the preserved past and same-day operational and billing history associated with the move-out event. Its deletion effective date is the IST calendar date on which the owner confirmed deletion: records dated on that same IST date and earlier remain preserved, while records dated later are canceled. It also retains canceled future-dated food preferences after the deletion effective date as audit-only records visible only inside the deleted hosteler's dedicated deleted/audit view and excluded from normal owner history/export, dashboard counts, and billing. Deleted records are audit-only and are not restorable in v1.
 - **Invite Token**: A unique, time-limited credential generated by the owner to provision a new hosteler. Expires in 7 days and becomes void after first use.
 - **Food Preference**: A hosteler's daily meal selection for a specific date. Records whether the hosteler opted for breakfast, lunch, and/or dinner. One record per hosteler per day; later submissions replace earlier ones.
 - **Meal Rate**: The price per meal type (breakfast, lunch, dinner) as configured by the owner. Each rate record has an effective start date, allowing historical rate lookup for accurate billing.
@@ -349,6 +384,7 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - **SC-010**: The system supports up to 100 concurrent hostelers without degradation in submission response time.
 - **SC-011**: In an installed Android PWA session with network disabled, the app shell loads in under 3 seconds and shows an offline state for data-dependent actions instead of a blank, browser error, or broken page.
 - **SC-012**: PWA verification produces passing automated evidence for manifest, service worker, offline shell, and install prompt behavior, plus manual Android evidence for app drawer presence and standalone launch.
+- **SC-013**: The owner can delete an active or pending hosteler and later locate that deleted record, with its retained audit context, in under 30 seconds; for active deletions, the deleted record keeps past and same-day history, exposes canceled future-dated food preferences only in the deleted/audit view, and ensures those canceled records never appear in normal owner history/export, dashboard counts, or bill inputs.
 
 ---
 
@@ -361,6 +397,7 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - Default meal rates at launch: Breakfast ₹30 per day, Lunch ₹50 per day, Dinner ₹40 per day.
 - Default daily submission deadline: 9:00 PM IST.
 - All time-based logic (deadline enforcement, date assignment for "tomorrow") uses IST (Asia/Kolkata, UTC+5:30). Server time is the authoritative clock for all deadline enforcement; client-side countdowns and displays are display-only and may vary slightly. The calendar day boundary (midnight IST, 00:00) defines when "tomorrow" rolls over to the new day; the owner dashboard meal counts reset at this midnight boundary, not at deadline time.
+- Active-hosteler deletion also uses IST calendar dates. The deletion effective date is the owner's confirmation date in IST; food preferences dated on that same IST date are preserved, and only later-dated records are canceled.
 - Approximately 40 hostelers will be active at launch; maximum design capacity is 100.
 - Bill generation is a manual, owner-triggered action for each month; automatic bill generation is out of scope for v1.
 - Payment collection and processing are out of scope for v1.
@@ -390,3 +427,7 @@ A hosteler or owner opens the website on Android Chrome, receives an install opt
 - Q: Who can trigger a database backup restore? → A: Restore is a manual developer/admin process only. No restore UI exists in v1; the owner is notified of backup failures but restoration requires direct infrastructure access.
 - Q: When the owner regenerates a bill that a hosteler may have already viewed, is the hosteler notified of the change? → A: No notification. The hosteler sees the latest bill the next time they open the bill view. Notifications are explicitly out of scope for v1.
 - Q: How should a nightly database backup failure notify the responsible user? → A: GitHub Actions failure notification to a subscribed owner/admin account; no in-app backup UI.
+- Q: When the owner deletes a hosteler, how should active and pending users differ? → A: Deleting an active hosteler is treated as a moved-out-of-PG event: access is revoked, and owner-visible tracking and audit history is preserved in a deleted record. Pending hostelers may be deleted directly, but they still remain visible to the owner in the deleted view for auditability.
+- Q: When an active hosteler is deleted, should future-dated food preferences remain for billing/audit or be canceled? → A: Preserve past and same-day history, but cancel any future-dated food preferences after the deletion takes effect so they no longer affect future counts or billing.
+- Q: After an active hosteler is deleted, where should canceled future-dated food preferences remain visible? → A: They remain visible only inside that deleted hosteler's dedicated deleted/audit view and are excluded from normal owner history/export, dashboard counts, and billing.
+- Q: After activation, can a hosteler log in with both Google and PIN, or only with the credential actually linked during activation? → A: Only the credential actually linked during activation is valid for login in v1. The system does not require the hosteler to add the second credential later.

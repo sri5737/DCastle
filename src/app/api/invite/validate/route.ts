@@ -34,12 +34,20 @@ export async function GET(request: NextRequest) {
   // Get hosteler info
   const { data: hosteler } = await supabase
     .from('hostelers')
-    .select('name, room_number')
+    .select('name, room_number, status')
     .eq('id', inviteToken.hosteler_id)
     .single();
 
   if (!hosteler) {
     return NextResponse.json({ error: 'Hosteler not found' }, { status: 404 });
+  }
+
+  if (hosteler.status === 'deleted') {
+    return NextResponse.json({ error: 'Invalid or expired invite token' }, { status: 400 });
+  }
+
+  if (hosteler.status === 'active') {
+    return NextResponse.json({ error: 'Token already used' }, { status: 409 });
   }
 
   return NextResponse.json({

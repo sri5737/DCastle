@@ -1,6 +1,6 @@
 # Data Model: Deekshana Castle PG Management App
 
-**Phase**: 1 — Design & Contracts | **Date**: 2026-07-03
+**Phase**: 1 — Design & Contracts | **Date**: 2026-07-04
 
 ## Entity Relationship Overview
 
@@ -8,10 +8,10 @@
 erDiagram
     hostelers ||--o{ food_preferences : submits
     hostelers ||--o{ monthly_bills : receives
-    hostelers ||--o{ invite_tokens : "activated by"
-    hostelers ||--o| pin_login_attempts : "throttled by"
-    meal_rates ||--o{ food_preferences : "priced by"
-    settings ||--|| settings : "singleton config"
+    hostelers ||--o{ invite_tokens : owns
+    hostelers ||--o| pin_login_attempts : throttled_by
+    meal_rates ||--o{ food_preferences : priced_by
+    settings ||--|| settings : singleton_config
 
     hostelers {
         uuid id PK
@@ -23,6 +23,9 @@ erDiagram
         text pin_hash
         uuid auth_user_id
         timestamptz activated_at
+        timestamptz deleted_at
+        text deleted_from_status
+        date deletion_effective_date
         timestamptz created_at
         timestamptz updated_at
     }
@@ -45,6 +48,8 @@ erDiagram
         boolean dinner
         timestamptz submitted_at
         timestamptz updated_at
+        timestamptz canceled_at
+        text cancellation_reason
     }
 
     meal_rates {
@@ -84,11 +89,15 @@ erDiagram
     }
 ```
 
+## Modeling Note
+
+The spec's deleted hosteler record is modeled as the same `hostelers` row moved into `status = 'deleted'` with deletion metadata. This preserves links to historical food and billing data without introducing a separate archive service or duplicate identity records. Canceled future-dated food-preference rows remain attached to that identity strictly for deleted-hosteler audit detail retrieval; they are not part of normal owner history/export, dashboard, or billing datasets.
+
 ## Entities
 
 ### 1. `hostelers`
 
-The core user entity representing a paying guest.
+Core identity and lifecycle record for a hosteler.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -96,33 +105,39 @@ The core user entity representing a paying guest.
 | `name` | text | NOT NULL | Full name |
 | `phone` | text | NOT NULL, UNIQUE | Phone number (Indian format) |
 | `room_number` | text | NOT NULL | Room identifier |
-| `status` | text | NOT NULL, CHECK IN ('pending','active','inactive') | Lifecycle status |
+| `status` | text | NOT NULL, CHECK IN ('pending','active','inactive','deleted') | Lifecycle status |
 | `google_id` | text | UNIQUE, NULLABLE | Google OAuth subject ID |
 | `pin_hash` | text | NULLABLE | bcryptjs hash of 4-digit PIN |
-| `auth_user_id` | uuid | UNIQUE, NULLABLE, FK → auth.users | Supabase Auth user link |
+| `auth_user_id` | uuid | UNIQUE, NULLABLE, FK -> auth.users | Supabase Auth user link |
 | `activated_at` | timestamptz | NULLABLE | When account was activated |
+| `deleted_at` | timestamptz | NULLABLE | When the owner deleted the hosteler |
+| `deleted_from_status` | text | NULLABLE, CHECK IN ('pending','active') | Which live status was deleted |
+| `deletion_effective_date` | date | NULLABLE | IST calendar date used to preserve same-day history and cancel later dates |
 | `created_at` | timestamptz | NOT NULL, default `now()` | Record creation time |
 | `updated_at` | timestamptz | NOT NULL, default `now()` | Last modification time |
 
 **Validation rules**:
-- `phone`: Must match pattern `^[6-9]\d{9}$` (10-digit Indian mobile)
-- `status`: Enum constraint — only 'pending', 'active', 'inactive' allowed
-- `pin_hash`: Present only if hosteler chose PIN activation path
-- `google_id`: Present only if hosteler activated via Google OAuth
-- At least one of `google_id` or `pin_hash` must be set when `status = 'active'`
+- `phone` must match `^[6-9]\d{9}$`.
+- `status = 'active'` requires at least one of `google_id` or `pin_hash`.
+- `status = 'deleted'` requires `deleted_at`, `deleted_from_status`, and `deletion_effective_date`.
+- `deleted_from_status` may only be `pending` or `active` because v1.2 allows delete only from those states.
+- Deleted rows remain owner-visible and are excluded from hosteler-authenticated access.
 
 **State transitions**:
-```
-pending → active    (via invite activation: Google OAuth or PIN setup)
-active → inactive   (owner deactivates)
-inactive → active   (owner reactivates)
+```text
+pending -> active     (invite activation)
+active -> inactive    (owner deactivates)
+inactive -> active    (owner reactivates)
+pending -> deleted    (owner deletes pending hosteler)
+active -> deleted     (owner deletes active hosteler)
 ```
 
 **Indexes**:
-- `idx_hostelers_phone` on `phone` (login lookup)
-- `idx_hostelers_google_id` on `google_id` (OAuth lookup)
-- `idx_hostelers_status` on `status` (owner filtering)
-- `idx_hostelers_auth_user_id` on `auth_user_id` (RLS policy)
+- `idx_hostelers_phone` on `phone`
+- `idx_hostelers_google_id` on `google_id`
+- `idx_hostelers_status` on `status`
+- `idx_hostelers_deleted_at` on `deleted_at`
+- `idx_hostelers_auth_user_id` on `auth_user_id`
 
 ---
 
@@ -133,20 +148,20 @@ Time-limited activation credentials generated by the owner.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, default `gen_random_uuid()` | Unique identifier |
-| `hosteler_id` | uuid | NOT NULL, FK → hostelers(id) | Target hosteler |
+| `hosteler_id` | uuid | NOT NULL, FK -> hostelers(id) | Target hosteler |
 | `token` | text | NOT NULL, UNIQUE | Random UUID token value |
-| `used` | boolean | NOT NULL, default `false` | Whether token has been consumed |
-| `expires_at` | timestamptz | NOT NULL | Expiration (created_at + 7 days) |
+| `used` | boolean | NOT NULL, default `false` | Whether token has been consumed or invalidated |
+| `expires_at` | timestamptz | NOT NULL | Expiration timestamp |
 | `created_at` | timestamptz | NOT NULL, default `now()` | Generation time |
 
 **Validation rules**:
-- `token`: Generated via `crypto.randomUUID()` — never sequential
-- `expires_at`: Automatically set to `created_at + INTERVAL '7 days'`
-- A token is valid only when: `used = false AND expires_at > now()`
-- When a new token is generated for a hosteler, previous unused tokens are invalidated (`used = true`)
+- `token` is generated via `crypto.randomUUID()`.
+- Token is valid only when `used = false` and `expires_at > now()`.
+- Resetting an invite invalidates previous unused tokens.
+- Deleting a pending or active hosteler invalidates every unused token immediately.
 
 **Indexes**:
-- `idx_invite_tokens_token` on `token` (activation lookup)
+- `idx_invite_tokens_token` on `token`
 - `idx_invite_tokens_hosteler_id` on `hosteler_id`
 
 ---
@@ -158,102 +173,98 @@ Daily meal selections submitted by hostelers.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, default `gen_random_uuid()` | Unique identifier |
-| `hosteler_id` | uuid | NOT NULL, FK → hostelers(id) | Submitting hosteler |
-| `date` | date | NOT NULL | The date the meals are for (always "tomorrow") |
-| `breakfast` | boolean | NOT NULL, default `false` | Opted for breakfast |
-| `lunch` | boolean | NOT NULL, default `false` | Opted for lunch |
-| `dinner` | boolean | NOT NULL, default `false` | Opted for dinner |
+| `hosteler_id` | uuid | NOT NULL, FK -> hostelers(id) | Submitting hosteler |
+| `date` | date | NOT NULL | Meal date |
+| `breakfast` | boolean | NOT NULL, default `false` | Breakfast selected |
+| `lunch` | boolean | NOT NULL, default `false` | Lunch selected |
+| `dinner` | boolean | NOT NULL, default `false` | Dinner selected |
 | `submitted_at` | timestamptz | NOT NULL, default `now()` | First submission time |
 | `updated_at` | timestamptz | NOT NULL, default `now()` | Last update time |
+| `canceled_at` | timestamptz | NULLABLE | When the row was canceled by lifecycle action |
+| `cancellation_reason` | text | NULLABLE, CHECK IN ('hosteler_deleted') | Why the row no longer counts operationally |
 
 **Validation rules**:
-- UNIQUE constraint on `(hosteler_id, date)` — one record per hosteler per day
-- Write operations use UPSERT: `INSERT ... ON CONFLICT (hosteler_id, date) DO UPDATE`
-- `date` must be tomorrow (server-validated); same-day or past-date writes rejected
-- Writes rejected if current IST time > `settings.deadline_time`
+- UNIQUE constraint on `(hosteler_id, date)`.
+- Hosteler writes use UPSERT and only target tomorrow's date before the IST deadline.
+- When an active hosteler is deleted, rows where `date > deletion_effective_date` are marked canceled instead of being removed.
+- Default operational queries, billing inputs, and owner history/export views use only rows where `canceled_at IS NULL`.
+- Preserved same-day and past history is defined as `date <= deletion_effective_date` and remains visible to the owner.
+- Rows where `canceled_at IS NOT NULL` are audit-only records retrievable exclusively through the deleted-hosteler detail surface for `hostelers.status = 'deleted'`.
 
 **Indexes**:
-- `idx_food_preferences_hosteler_date` UNIQUE on `(hosteler_id, date)` (upsert + lookup)
-- `idx_food_preferences_date` on `date` (owner dashboard count queries)
+- `idx_food_preferences_hosteler_date` UNIQUE on `(hosteler_id, date)`
+- `idx_food_preferences_date_active` on `date` with application/query filtering for `canceled_at IS NULL`
+- `idx_food_preferences_canceled_at` on `canceled_at`
 
 ---
 
 ### 4. `meal_rates`
 
-Historical per-meal pricing, supporting mid-month rate changes.
+Historical per-meal pricing for billing.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, default `gen_random_uuid()` | Unique identifier |
 | `meal_type` | text | NOT NULL, CHECK IN ('breakfast','lunch','dinner') | Meal category |
-| `rate` | numeric(10,2) | NOT NULL, CHECK > 0 | Price per day (INR) |
-| `effective_from` | date | NOT NULL | First day this rate applies |
+| `rate` | numeric(10,2) | NOT NULL, CHECK > 0 | Price per day |
+| `effective_from` | date | NOT NULL | First day the rate applies |
 | `created_at` | timestamptz | NOT NULL, default `now()` | Record creation time |
 
 **Validation rules**:
-- UNIQUE constraint on `(meal_type, effective_from)` — one rate per meal per effective date
-- `effective_from` for new rates = tomorrow's date (spec: "takes effect from the NEXT calendar day")
-- `rate` must be positive
-- Default rates at launch: breakfast ₹30, lunch ₹50, dinner ₹40
-
-**Rate lookup logic**: For any given day, the applicable rate is the most recent `meal_rates` row where `effective_from <= target_day`, ordered by `effective_from DESC`, limited to 1.
+- UNIQUE on `(meal_type, effective_from)`.
+- New rates take effect from the next calendar day after save.
+- Applicable rate for a day is the latest row where `effective_from <= target_day`.
 
 **Indexes**:
-- `idx_meal_rates_type_effective` on `(meal_type, effective_from DESC)` (rate lookup)
+- `idx_meal_rates_type_effective` on `(meal_type, effective_from DESC)`
 
 ---
 
 ### 5. `monthly_bills`
 
-Computed billing records, generated on demand by the owner.
+Computed billing records generated by the owner.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, default `gen_random_uuid()` | Unique identifier |
-| `hosteler_id` | uuid | NOT NULL, FK → hostelers(id) | Billed hosteler |
+| `hosteler_id` | uuid | NOT NULL, FK -> hostelers(id) | Billed hosteler |
 | `month` | integer | NOT NULL, CHECK 1-12 | Billing month |
 | `year` | integer | NOT NULL, CHECK 2024-2100 | Billing year |
-| `breakfast_count` | integer | NOT NULL, default 0 | Days breakfast was opted |
-| `lunch_count` | integer | NOT NULL, default 0 | Days lunch was opted |
-| `dinner_count` | integer | NOT NULL, default 0 | Days dinner was opted |
-| `breakfast_amount` | numeric(10,2) | NOT NULL, default 0 | Total breakfast charge |
-| `lunch_amount` | numeric(10,2) | NOT NULL, default 0 | Total lunch charge |
-| `dinner_amount` | numeric(10,2) | NOT NULL, default 0 | Total dinner charge |
-| `total_amount` | numeric(10,2) | NOT NULL, default 0 | Sum of all meal amounts |
-| `generated_at` | timestamptz | NOT NULL, default `now()` | When bill was computed |
+| `breakfast_count` | integer | NOT NULL, default 0 | Breakfast days |
+| `lunch_count` | integer | NOT NULL, default 0 | Lunch days |
+| `dinner_count` | integer | NOT NULL, default 0 | Dinner days |
+| `breakfast_amount` | numeric(10,2) | NOT NULL, default 0 | Breakfast total |
+| `lunch_amount` | numeric(10,2) | NOT NULL, default 0 | Lunch total |
+| `dinner_amount` | numeric(10,2) | NOT NULL, default 0 | Dinner total |
+| `total_amount` | numeric(10,2) | NOT NULL, default 0 | Grand total |
+| `generated_at` | timestamptz | NOT NULL, default `now()` | Generation time |
 
 **Validation rules**:
-- UNIQUE constraint on `(hosteler_id, month, year)` — one bill per hosteler per month
-- Regeneration replaces existing bill (UPSERT on conflict)
-- `total_amount = breakfast_amount + lunch_amount + dinner_amount`
-- Amounts computed as sum of (opted_day × applicable_rate_for_that_day) per meal type
+- UNIQUE on `(hosteler_id, month, year)`.
+- Regeneration replaces existing rows.
+- Billing uses only non-canceled `food_preferences` rows.
+- Deleted hostelers remain billable for a month if they still have preserved, non-canceled history in that month.
 
 **Indexes**:
 - `idx_monthly_bills_hosteler_month_year` UNIQUE on `(hosteler_id, month, year)`
-- `idx_monthly_bills_month_year` on `(month, year)` (owner views all bills for a month)
+- `idx_monthly_bills_month_year` on `(month, year)`
 
 ---
 
 ### 6. `pin_login_attempts`
 
-Tracks consecutive failed PIN login attempts for brute-force protection (FR-006a).
+Tracks failed PIN attempts for brute-force protection.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `phone` | text | PK | Phone number being throttled |
-| `attempts` | integer | NOT NULL, default 0 | Consecutive failed attempts since last reset |
-| `locked_until` | timestamptz | NULLABLE | If set and in future, login is blocked |
+| `attempts` | integer | NOT NULL, default 0 | Consecutive failures |
+| `locked_until` | timestamptz | NULLABLE | Cooldown expiry |
 | `updated_at` | timestamptz | NOT NULL, default `now()` | Last attempt time |
 
 **Validation rules**:
-- After 5 consecutive failures (`attempts >= 5`), set `locked_until = now() + INTERVAL '15 minutes'`
-- On successful login: delete the row (reset counter)
-- On any attempt when `locked_until > now()`: reject immediately with HTTP 429
-- After cooldown elapses (`locked_until <= now()`): reset `attempts = 0` and allow login
-- Row is also cleared when the hosteler's account is deactivated
-
-**Indexes**:
-- PK on `phone` (direct lookup during PIN verify)
+- Lock for 15 minutes after 5 consecutive failures.
+- Clear on successful login, deactivation, or deletion.
 
 ---
 
@@ -264,65 +275,67 @@ Key-value store for system configuration.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `key` | text | PK | Setting identifier |
-| `value` | text | NOT NULL | Setting value (stored as text, parsed by application) |
+| `value` | text | NOT NULL | Setting value |
 | `updated_at` | timestamptz | NOT NULL, default `now()` | Last modification time |
 
 **Seed data**:
+
 | Key | Default Value | Description |
 |-----|---------------|-------------|
-| `deadline_time` | `21:00` | Daily submission deadline (HH:MM in IST) |
+| `deadline_time` | `21:00` | Daily submission deadline in IST |
 
 ---
 
 ## Non-Persistent PWA Artifacts
 
-The true PWA requirements do not introduce new Supabase tables or persisted domain entities. They are represented by browser-managed installation state, public static assets, and service worker cache state.
+The true PWA requirements do not add persisted business entities. They are represented by browser-managed install state, public static assets, and runtime cache state.
 
 | Artifact | Owner | Required fields/state | Validation |
 |----------|-------|-----------------------|------------|
-| Web app manifest | `public/manifest.json` | `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, icons including 192x192, 512x512, and maskable support | Automated manifest and icon metadata checks |
-| Launcher icons | `public/icons/` | Android-suitable PNG icons, including maskable variants for safe launcher cropping | Automated metadata checks plus Android app drawer inspection |
-| Service worker cache | Generated service worker/runtime cache | Core app shell assets for layout, navigation, login entry points, hosteler shell, and owner shell | Automated offline app-shell test |
-| Install prompt state | Browser session state in install UI component | Deferred `beforeinstallprompt` event availability, accepted/dismissed outcome, `appinstalled`, and standalone display mode | Automated component/browser behavior where supported; manual Android install validation |
-| Offline UI state | Browser network status and failed data requests | Explicit offline state for data-dependent actions; no blank or broken pages | Automated offline-shell scenario plus manual installed-PWA offline launch |
+| Web app manifest | `public/manifest.json` | `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, Android-ready icons including maskable support | Automated manifest and icon metadata checks |
+| Launcher icons | `public/` assets | 192x192, 512x512, and maskable PNG assets | Automated metadata checks plus Android app-drawer inspection |
+| Service worker cache | Generated service worker/runtime cache | Core app shell, login entry points, owner and hosteler shells | Automated offline-shell validation |
+| Install prompt state | Browser session state | Deferred install event availability, accepted/dismissed outcome, standalone state | Automated browser checks where supported plus manual Android validation |
+| Offline UI state | Browser network state | Explicit offline indicators for data-dependent actions | Automated offline-shell validation plus manual installed-PWA check |
 
-No business data is cached as authoritative offline state in v1. Food submissions, dashboard counts, settings, billing, and history remain server-backed and require connectivity for fresh reads or writes.
+No operational food, billing, or settings data is treated as authoritative offline state in v1.
 
 ---
 
 ## Row Level Security Policies
 
 ### `hostelers`
-- **SELECT**: Authenticated users can read their own row (`auth.uid() = auth_user_id`); owner can read all
-- **INSERT**: Owner only (service role via API)
-- **UPDATE**: Owner only (status changes, reactivation)
+- **SELECT**: Owner can read all rows. Hostelers can read only their own row and never use deleted status to regain access.
+- **INSERT**: Owner/service-role API only.
+- **UPDATE**: Owner/service-role API only for activation, deactivation, reactivation, delete metadata, and audit updates.
 
 ### `invite_tokens`
-- **SELECT**: Public (needed for activation page to validate token)
-- **INSERT**: Owner only
-- **UPDATE**: Authenticated (to mark as used during activation)
+- **SELECT**: Public token validation flow only.
+- **INSERT**: Owner/service-role API only.
+- **UPDATE**: Activation and invalidation flows only.
 
 ### `food_preferences`
-- **SELECT**: Hostelers see own rows; owner sees all
-- **INSERT/UPDATE**: Hosteler can write own rows only (enforced by `hosteler_id = auth.uid()` mapped via `hostelers.auth_user_id`)
-- **DELETE**: None (no deletion, only upsert)
+- **SELECT**: Hostelers read their own rows; owner reads all preserved rows.
+- **INSERT/UPDATE**: Hostelers write only their own pre-deadline row for tomorrow; owner/service-role lifecycle logic may update cancellation fields during active deletion.
+- **DELETE**: None. Cancellation is represented by update, not row removal.
 
 ### `meal_rates`
-- **SELECT**: All authenticated users (hostelers need rates for bill display)
-- **INSERT/UPDATE**: Owner only
+- **SELECT**: Authenticated users.
+- **INSERT/UPDATE**: Owner only.
 
 ### `monthly_bills`
-- **SELECT**: Hostelers see own bills; owner sees all
-- **INSERT/UPDATE**: Owner only (generated via service role API)
+- **SELECT**: Hostelers read their own bill rows; owner reads all.
+- **INSERT/UPDATE**: Owner/service-role billing generation only.
 
 ### `settings`
-- **SELECT**: All authenticated users (deadline time needed by client)
-- **UPDATE**: Owner only
+- **SELECT**: Authenticated users.
+- **UPDATE**: Owner only.
 
 ---
 
 ## Supabase Realtime Configuration
 
-Enable Realtime on `food_preferences` table for the owner dashboard:
+Enable Realtime on `food_preferences` for the owner dashboard with the application-side rule that only non-canceled rows for tomorrow are counted.
 - Publication: `supabase_realtime` includes `food_preferences`
-- Channel filter: `date=eq.{tomorrow_date}` to limit events to relevant submissions
+- Channel filter: `date=eq.{tomorrow_date}`
+- Client aggregation rule: ignore payloads where `canceled_at` is set and only count hostelers whose current lifecycle status is `active`
