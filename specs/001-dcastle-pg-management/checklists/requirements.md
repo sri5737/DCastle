@@ -31,8 +31,8 @@
 
 ## Notes
 
-- All 10 user stories carry acceptance scenarios; 7 edge cases are documented.
-- 52 functional requirements cover provisioning, auth, food submission, owner dashboard, hosteler management, history, billing, settings, PWA, backup, and CI gate.
-- 10 measurable success criteria defined — all technology-agnostic.
+- All 11 user stories carry acceptance scenarios; 14 edge cases are documented.
+- 55 functional requirements (including FR-006a, FR-058a) cover provisioning, auth, food submission, owner dashboard, hosteler management, history, billing, settings, PWA, backup, and CI gate.
+- 12 measurable success criteria defined — all technology-agnostic.
 - Out-of-scope items (payments, notifications, multi-PG, auto-billing, analytics) are explicitly listed in Assumptions.
-- Spec passed all checklist items on first validation pass; no iterations required.
+- Clarification sessions on 2026-07-03 (5 questions) and 2026-07-04 (5 questions) resolved security, session, backup, and billing ambiguities.

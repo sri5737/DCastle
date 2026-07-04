@@ -1,8 +1,10 @@
-# Feature Specification: Deekshana Castle PG Management App (Full Application — v1)
+# Feature Specification: Deekshana Castle PG Management App (Full Application — v1.1)
 
 **Feature Branch**: `001-dcastle-pg-management`
 
 **Created**: 2026-07-03
+
+**Updated**: 2026-07-04
 
 **Status**: Draft
 
@@ -180,6 +182,24 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 
 ---
 
+### User Story 11 — User Installs the App as an Android PWA (Priority: P1)
+
+A hosteler or owner opens the website on Android Chrome, receives an install option when the browser determines the app is installable, installs it, and then sees Deekshana Castle in the Android app drawer alongside normal native apps. When launched from the app drawer, the app opens in a standalone app window and can show the core app shell even if the network is unavailable.
+
+**Why this priority**: Daily food submission is phone-first behavior. Android app drawer presence makes the app feel like a normal daily-use app instead of a link users must remember to reopen in the browser.
+
+**Independent Test**: Can be tested on Android Chrome by opening the website, verifying install eligibility, installing the app, confirming the launcher/app-drawer icon appears, launching from that icon, and verifying standalone display plus offline app shell behavior.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user opens the website on Android Chrome on a supported device, **When** the browser determines the app is installable, **Then** the user is shown an install action that clearly installs Deekshana Castle as an app.
+2. **Given** the user accepts the install action, **When** installation completes, **Then** a Deekshana Castle icon appears in the Android app drawer alongside native apps.
+3. **Given** the app has been installed on Android, **When** the user launches it from the app drawer, **Then** it opens in a standalone app window without the browser address bar.
+4. **Given** the app has been installed and the device is offline, **When** the user launches the app, **Then** the cached app shell loads with navigation and layout visible, while data actions that require connectivity show an offline state instead of a broken page.
+5. **Given** the app is already installed or the browser has not reported install eligibility, **When** the user visits the website, **Then** the app does not show a misleading or non-functional install prompt.
+
+---
+
 ### Edge Cases
 
 - What happens when a hosteler submits preferences exactly at the deadline second? → Submission is rejected server-side; client shows "closed" message.
@@ -190,7 +210,12 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - What happens if the client clock is ahead of or behind the server clock at the deadline boundary? → Server time (IST from API) is authoritative. The API enforces the deadline based on server time and rejects any write that arrives after the deadline regardless of what the client clock shows. Client-side countdowns are display-only and may differ slightly from server time.
 - What happens if the Supabase Realtime subscription drops while the owner is viewing the dashboard? → The client silently attempts auto-reconnect. If reconnection has not succeeded within 10 seconds, a non-blocking banner "Live updates paused — reconnecting…" is shown. Meal counts remain visible but frozen until the connection is restored.
 - What happens if the app is opened while offline? → The app shell loads from the local cache; data operations that require connectivity show an appropriate offline indicator.
+- What happens if Android Chrome does not report install eligibility yet? → The custom install action remains hidden or disabled until install eligibility is available; the app must not present a dead install control.
+- What happens if the app is already installed on Android? → The website does not continue prompting the user to install; launching from the Android app drawer opens the installed standalone app.
 - What happens when a hosteler's invite link expires before they activate? → The owner can generate a fresh invite link via the "Reset" action on the hostelers page.
+- What happens when a deactivated hosteler's device still has an active session cookie? → The next API call returns 401 with "Account deactivated"; the client redirects to the login page.
+- What happens when a hosteler enters a wrong PIN 5 times? → The phone number is locked out for 15 minutes; a message explains the cooldown.
+- What happens if the owner regenerates a bill that a hosteler previously viewed? → The hosteler sees the updated bill on their next view; no notification is sent.
 
 ---
 
@@ -206,8 +231,9 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - **FR-004**: A new hosteler MUST be able to activate their account via the invite link using either a Google account or a 4-digit PIN linked to their phone number.
 - **FR-005**: The system MUST prevent activation of an invite link that has expired or has already been used.
 - **FR-006**: Hostelers MUST be able to log in using their Google account or phone number plus PIN on subsequent visits.
+- **FR-006a**: After 5 consecutive failed PIN attempts for a given phone number, the system MUST lock out PIN login for that phone number for 15 minutes. The lockout resets after the cooldown period elapses.
 - **FR-007**: The system MUST reject sign-in attempts from Google accounts not linked to a provisioned hosteler, displaying a "contact your PG owner" message.
-- **FR-008**: Hosteler sessions MUST remain valid for 30 days without requiring re-authentication.
+- **FR-008**: Hosteler sessions MUST remain valid for 30 days without requiring re-authentication. Multiple concurrent sessions (across different devices) are permitted; each device maintains an independent session.
 - **FR-009**: The owner MUST authenticate via a separate login using email and password.
 - **FR-010**: Owner sessions MUST remain valid for 7 days without requiring re-authentication.
 - **FR-011**: All hosteler-facing pages MUST redirect unauthenticated users to the hosteler login page.
@@ -235,7 +261,7 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 
 - **FR-025**: The owner MUST be able to view all hostelers, filterable by status: active, pending, or inactive.
 - **FR-026**: Each hosteler row MUST display the hosteler's name, room number, phone number, and current status.
-- **FR-027**: The owner MUST be able to deactivate any active hosteler. If the hosteler has food preferences recorded for future dates at the time of deactivation, the owner MUST be shown a confirmation dialog: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Deactivation only proceeds upon explicit owner confirmation.
+- **FR-027**: The owner MUST be able to deactivate any active hosteler. If the hosteler has food preferences recorded for future dates at the time of deactivation, the owner MUST be shown a confirmation dialog: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Deactivation only proceeds upon explicit owner confirmation. Upon deactivation, the hosteler's active sessions MUST be invalidated immediately; any subsequent API call from the deactivated hosteler MUST return HTTP 401 with an "Account deactivated" message.
 - **FR-028**: The owner MUST be able to reactivate any inactive hosteler.
 - **FR-029**: The owner MUST be able to generate a new invite link for any hosteler (invalidating any existing unused link).
 
@@ -254,7 +280,7 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - **FR-037**: If a meal rate changed during the selected month, the system MUST apply the rate that was effective on each individual day.
 - **FR-038**: The owner MUST be able to view a bill summary table showing all hostelers' meal counts and total amounts for the selected month.
 - **FR-039**: The owner MUST be able to view a per-day breakdown for any individual hosteler's bill.
-- **FR-040**: Hostelers MUST be able to view their own bill for any month in which a bill has been generated.
+- **FR-040**: Hostelers MUST be able to view their own bill for any month in which a bill has been generated. If a bill is regenerated by the owner, the hosteler sees the latest version on their next view without notification; no explicit change alert is provided in v1.
 - **FR-041**: Hosteler bill view MUST display a note that the final bill is confirmed by the owner.
 
 **Settings**
@@ -265,25 +291,34 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 
 **Progressive Web App**
 
-- **FR-045**: The app MUST be installable as a standalone PWA on Android Chrome and iOS Safari.
-- **FR-046**: An install prompt MUST be shown on the first mobile visit.
-- **FR-047**: The app shell (navigation and layout) MUST load and display correctly without a network connection.
+- **FR-045**: The website MUST qualify as a true Progressive Web App on Android Chrome, meeting browser installability criteria so users can install it as an app rather than only bookmarking it.
+- **FR-046**: The web app manifest MUST provide a user-facing app name, short name, start URL, scope, standalone display mode, theme color, background color, and sufficient icon metadata for Android installation.
+- **FR-047**: The app MUST provide Android-suitable launcher icons, including at least 192×192 and 512×512 sizes and maskable icon support, so the installed app appears correctly in the Android app drawer.
+- **FR-048**: The installed Android PWA MUST appear in the Android app drawer alongside native apps using the Deekshana Castle app name and icon.
+- **FR-049**: When launched from the Android app drawer, the installed app MUST open in standalone mode without the browser address bar or normal browser chrome.
+- **FR-050**: The app MUST provide an install action on eligible Android Chrome visits when the browser reports installability, and the action MUST trigger the native PWA installation flow.
+- **FR-051**: The app MUST NOT show a misleading install action when installation is unsupported, unavailable, already completed, or temporarily not eligible.
+- **FR-052**: A service worker MUST cache the core app shell required to display the app layout, navigation, login entry points, and primary hosteler/owner shells while offline.
+- **FR-053**: When offline, the cached app shell MUST load without a network connection, and data operations that require connectivity MUST show an offline state instead of failing with a blank or broken page.
+- **FR-054**: PWA validation MUST include automated checks for manifest availability, required manifest fields, service worker registration, offline app shell loading, and install prompt behavior where supported by the test environment.
+- **FR-055**: PWA validation MUST include manual Android device or emulator verification that the app installs successfully, appears in the Android app drawer, launches in standalone mode, and shows the offline app shell after installation.
 
 **Data Backup**
 
-- **FR-048**: A full database backup MUST run automatically every night.
-- **FR-049**: Backups MUST be retained for 90 days, after which they are automatically deleted.
-- **FR-050**: The owner MUST receive an alert notification if a nightly backup fails.
+- **FR-056**: A full database backup MUST run automatically every night.
+- **FR-057**: Backups MUST be retained for 90 days, after which they are automatically deleted.
+- **FR-058**: The owner MUST receive an alert notification if a nightly backup fails.
+- **FR-058a**: Backup restoration is a manual developer/admin process only. No restore UI is provided in v1; restoring from backup requires direct infrastructure access.
 
 **Automated Quality Gate**
 
-- **FR-051**: All automated tests (unit, integration, and E2E) MUST pass before any build or deployment can proceed.
-- **FR-052**: The deployment pipeline MUST be blocked if tests or the build step fail.
-- **FR-053**: Each user story MUST have corresponding E2E tests that verify its acceptance scenarios in a real browser environment.
-- **FR-054**: After completing any phase, all relevant automated tests MUST be executed and pass before the phase is considered done.
-- **FR-055**: Per-story test scripts MUST exist to allow running tests scoped to a specific user story independently.
-- **FR-056**: E2E tests MUST use a global setup that seeds required test data (test owner user, test hosteler user with known credentials) into Supabase before tests run, and a global teardown that cleans up test data after tests complete.
-- **FR-057**: E2E test credentials MUST be stored in environment variables (not hardcoded) and use a dedicated test owner account and test hosteler account that are pre-provisioned in the Supabase project.
+- **FR-059**: All automated tests (unit, integration, and E2E) MUST pass before any build or deployment can proceed.
+- **FR-060**: The deployment pipeline MUST be blocked if tests or the build step fail.
+- **FR-061**: Each user story MUST have corresponding E2E tests that verify its acceptance scenarios in a real browser environment.
+- **FR-062**: After completing any phase, all relevant automated tests MUST be executed and pass before the phase is considered done.
+- **FR-063**: Per-story test scripts MUST exist to allow running tests scoped to a specific user story independently.
+- **FR-064**: E2E tests MUST use a global setup that seeds required test data (test owner user, test hosteler user with known credentials) into Supabase before tests run, and a global teardown that cleans up test data after tests complete.
+- **FR-065**: E2E test credentials MUST be stored in environment variables (not hardcoded) and use a dedicated test owner account and test hosteler account that are pre-provisioned in the Supabase project.
 
 ---
 
@@ -303,7 +338,7 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 ### Measurable Outcomes
 
 - **SC-001**: A hosteler can log in and submit food preferences for the next day in under 30 seconds on a mobile device.
-- **SC-002**: The app installs as a standalone icon on an Android or iOS home screen within 5 seconds of the first mobile visit.
+- **SC-002**: On Android Chrome, an eligible user can install the app within 5 seconds of the install action becoming available, and the installed Deekshana Castle icon appears in the Android app drawer.
 - **SC-003**: The owner's daily food counts update within 3 seconds of a hosteler submitting or changing preferences, without any page refresh.
 - **SC-004**: Monthly bill generation produces verified-accurate meal counts and amounts for all hostelers for any selected month, including months containing mid-month rate changes.
 - **SC-005**: The food preference form is reliably locked for submission after the configured deadline — no late submission is accepted.
@@ -312,6 +347,8 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - **SC-008**: All automated tests pass on every push to the main branch before any deployment proceeds.
 - **SC-009**: The owner can generate a new invite link and onboard a hosteler in under 2 minutes from start to the hosteler's first successful login.
 - **SC-010**: The system supports up to 100 concurrent hostelers without degradation in submission response time.
+- **SC-011**: In an installed Android PWA session with network disabled, the app shell loads in under 3 seconds and shows an offline state for data-dependent actions instead of a blank, browser error, or broken page.
+- **SC-012**: PWA verification produces passing automated evidence for manifest, service worker, offline shell, and install prompt behavior, plus manual Android evidence for app drawer presence and standalone launch.
 
 ---
 
@@ -329,6 +366,7 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - Payment collection and processing are out of scope for v1.
 - Automated notifications (push, SMS, email) to hostelers are out of scope for v1.
 - Analytics dashboards and charts are out of scope for v1.
+- Android Chrome is the primary required installability target; iOS Safari add-to-home-screen support remains desirable where the browser permits it, but Android app drawer appearance is the required validation outcome.
 - The nightly backup runs on a fixed cron schedule (2:00 AM IST) and uses the owner's Cloudflare R2 storage for retention.
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 
@@ -343,3 +381,11 @@ The owner updates the daily food submission deadline time and adjusts per-meal r
 - Q: Is the deadline enforced using server time or client device time? What happens if there is clock skew between client and server? → A: Server time (IST from API) is authoritative for all deadline checks. Client-side countdown is display-only. The API rejects writes based on server time regardless of the client device's local clock.
 - Q: If the Supabase Realtime subscription drops while the owner is viewing the dashboard, should the app show a stale-data warning, auto-reconnect silently, or show an error? → A: Auto-reconnect silently. If reconnection fails after 10 seconds, show a non-blocking banner "Live updates paused — reconnecting…". Counts remain visible but frozen until reconnected.
 - Q: When a hosteler is deactivated mid-month, should the owner be warned that existing food preferences for future dates will still be counted in billing? → A: Yes. Show a confirmation dialog when deactivating a hosteler who has future food preferences recorded: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Owner must confirm before deactivation proceeds.
+
+### Session 2026-07-04
+
+- Q: When the owner deactivates a hosteler, what happens to their active session? → A: Immediate session invalidation. The next API call from the deactivated hosteler returns HTTP 401 with an "Account deactivated" message; they are forced to the login page.
+- Q: What brute-force protection applies to PIN login attempts? → A: After 5 consecutive failed PIN attempts, the account is locked out for 15 minutes. The lockout is per phone number and resets after the cooldown period.
+- Q: Can a hosteler be logged in on multiple devices simultaneously? → A: Yes, unlimited concurrent sessions are allowed. Each device maintains its own independent 30-day session.
+- Q: Who can trigger a database backup restore? → A: Restore is a manual developer/admin process only. No restore UI exists in v1; the owner is notified of backup failures but restoration requires direct infrastructure access.
+- Q: When the owner regenerates a bill that a hosteler may have already viewed, is the hosteler notified of the change? → A: No notification. The hosteler sees the latest bill the next time they open the bill view. Notifications are explicitly out of scope for v1.

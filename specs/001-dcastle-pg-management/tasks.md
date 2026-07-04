@@ -156,12 +156,12 @@
 
 ### Implementation for User Story 5
 
-- [ ] T045 [US5] Implement `GET /api/hostelers` endpoint (list hostelers with optional status filter, return counts per status) in `src/app/api/hostelers/route.ts`
-- [ ] T046 [US5] Implement `PATCH /api/hostelers/[id]` endpoint (deactivate with future-preference confirmation, reactivate) in `src/app/api/hostelers/[id]/route.ts`
-- [ ] T047 [US5] Implement `POST /api/hostelers/[id]/reset-invite` endpoint (invalidate existing tokens, generate new invite token with 7-day expiry; does NOT change hosteler status — only regenerates the link) in `src/app/api/hostelers/[id]/reset-invite/route.ts`
-- [ ] T048 [US5] Create hosteler management page with status tabs (active/pending/inactive), add hosteler form, and per-hosteler action buttons in `src/app/(owner)/hostelers/page.tsx`
-- [ ] T049 [US5] Implement deactivation confirmation dialog (shows future preference count warning) and invite link copy functionality in `src/app/(owner)/hostelers/page.tsx`
-- [ ] T049b [US5] Create E2E test: owner adds hosteler → views in active list → deactivates → appears in inactive tab → reactivates → returns to active tab → resets invite link in `e2e/us5-hosteler-management.spec.ts`
+- [x] T045 [US5] Implement `GET /api/hostelers` endpoint (list hostelers with optional status filter, return counts per status) in `src/app/api/hostelers/route.ts`
+- [x] T046 [US5] Implement `PATCH /api/hostelers/[id]` endpoint (deactivate with future-preference confirmation, reactivate) in `src/app/api/hostelers/[id]/route.ts`
+- [x] T047 [US5] Implement `POST /api/hostelers/[id]/reset-invite` endpoint (invalidate existing tokens, generate new invite token with 7-day expiry; does NOT change hosteler status — only regenerates the link) in `src/app/api/hostelers/[id]/reset-invite/route.ts`
+- [x] T048 [US5] Create hosteler management page with status tabs (active/pending/inactive), add hosteler form, and per-hosteler action buttons in `src/app/(owner)/hostelers/page.tsx`
+- [x] T049 [US5] Implement deactivation confirmation dialog (shows future preference count warning) and invite link copy functionality in `src/app/(owner)/hostelers/page.tsx`
+- [x] T049b [US5] Create E2E test: owner adds hosteler → views in active list → deactivates → appears in inactive tab → reactivates → returns to active tab → resets invite link in `e2e/us5-hosteler-management.spec.ts`
 
 **Checkpoint**: Owner can fully manage hosteler lifecycle
 
@@ -291,16 +291,46 @@
 
 ---
 
-## Phase 14: Polish & Cross-Cutting Concerns
+## Phase 14: User Story 11 — User Installs the App as an Android PWA (Priority: P1)
 
-**Purpose**: PWA configuration, offline handling, and final validation
+**Goal**: Android Chrome users can install Deekshana Castle, see it in the Android app drawer, launch it in standalone mode, and load the cached app shell offline
 
-- [ ] T070a [P] Create PWA manifest with app name, icons, theme color, and standalone display mode in `public/manifest.json`
-- [ ] T070b [P] Create PWA icons (192x192 and 512x512) in `public/icons/`
-- [ ] T070c [P] Implement install prompt handling (capture `beforeinstallprompt` event, show custom install UI on first mobile visit) in `src/components/install-prompt.tsx`
-- [ ] T070d [P] Add offline indicator component (detect network status, show "You're offline" on data screens) in `src/components/offline-indicator.tsx`
-- [ ] T070e Create E2E test: verify PWA manifest loads correctly → verify app installs as standalone → verify offline indicator appears when network disconnected → verify app recovers when network restored in `e2e/pwa-offline.spec.ts`
-- [ ] T071 Validate complete application against quickstart.md scenarios: manually execute all 11 validation scenarios end-to-end on a mobile device (375px viewport). Pass criteria: each scenario completes without errors, correct data persists in DB, deadline enforcement works at configured time, PWA installs successfully. Document pass/fail per scenario.
+**Independent Test**: Open the deployed HTTPS app on Android Chrome → verify install eligibility and install action → install → confirm Android app drawer icon/name → launch standalone → disable network → verify cached app shell and offline states
+
+**Why P1**: Daily food submission is phone-first behavior; app drawer presence and standalone launch make the app behave like a normal daily-use Android app.
+
+### Tests for User Story 11
+
+- [ ] T070 [P] [US11] Add scoped PWA test script `test:us11` for `e2e/us11-pwa.spec.ts` in `package.json`
+- [ ] T071 [P] [US11] Create Playwright automated PWA checks for manifest required fields, 192x192/512x512/maskable icon metadata, service worker registration, offline app shell loading, install UI hidden state, and simulated `beforeinstallprompt` behavior in `e2e/us11-pwa.spec.ts`
+- [ ] T072 [P] [US11] Create component tests for install prompt eligibility, accepted/dismissed prompt handling, `appinstalled` hiding, and standalone-mode hiding in `src/components/install-prompt.test.tsx`
+- [ ] T073 [P] [US11] Create component tests for offline state rendering on disconnected/reconnected network events in `src/components/offline-indicator.test.tsx`
+
+### Implementation for User Story 11
+
+- [ ] T074 [P] [US11] Update web app manifest required fields (`name`, `short_name`, `start_url`, `scope`, `display`, `theme_color`, `background_color`, icons array) in `public/manifest.json`
+- [ ] T075 [P] [US11] Create Android launcher icon assets including 192x192, 512x512, and maskable PNG entries in `public/icons/icon-192x192.png`, `public/icons/icon-512x512.png`, `public/icons/maskable-icon-192x192.png`, and `public/icons/maskable-icon-512x512.png`
+- [ ] T076 [US11] Wire manifest metadata, theme color, viewport-safe mobile metadata, and PWA icon links into the root app shell in `src/app/layout.tsx`
+- [ ] T077 [US11] Configure service worker/app-shell caching for root layout, global styles, hosteler shell, owner shell, login entry points, and static PWA assets in `next.config.js` and `public/sw.js`
+- [ ] T078 [P] [US11] Implement Android Chrome install prompt handling with `beforeinstallprompt`, user-gesture `prompt()`, accepted/dismissed state, `appinstalled`, and standalone detection in `src/components/install-prompt.tsx`
+- [ ] T079 [P] [US11] Implement reusable offline indicator for disconnected data-dependent screens in `src/components/offline-indicator.tsx`
+- [ ] T080 [US11] Integrate install prompt and offline indicator into shared shells without showing misleading install UI when unavailable or already installed in `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
+
+### Manual Validation Evidence for User Story 11
+
+- [ ] T081 [P] [US11] Create Android PWA manual evidence template with fields for device/emulator name, Android version, Chrome version, deployment URL, date, app drawer result, standalone launch result, offline shell result, and pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [ ] T082 [US11] Execute Android Chrome manual validation on a real device or emulator and record evidence for installability, Android app drawer presence, standalone launch, and offline app shell in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [ ] T083 [US11] Run `npm run test:us11`, `npm run test:run`, and `npm run test:e2e`; record pass/fail evidence and unresolved PWA risks in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+
+**Checkpoint**: Android Chrome can install Deekshana Castle as a true PWA; automated and manual evidence cover manifest, icons, service worker, offline shell, install prompt behavior, app drawer presence, and standalone launch
+
+---
+
+## Phase 15: Final Polish & Cross-Cutting Validation
+
+**Purpose**: Full quickstart validation and final readiness checks across all completed stories
+
+- [ ] T084 Validate complete application against quickstart.md scenarios: manually execute all 11 validation scenarios end-to-end on a mobile device (375px viewport) and record pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
 
 ---
 
@@ -320,7 +350,9 @@
 - **US7 Food History (Phase 10)**: Depends on US1 (needs food preference data)
 - **US8 Hosteler Bill View (Phase 11)**: Depends on US6 (needs generated bills)
 - **US9 Owner Food History (Phase 12)**: Depends on US1 (needs food preference data)
-- **Polish (Phase 13)**: Can start after Phase 2; should complete after all user stories
+- **Automation & E2E (Phase 13)**: Existing completed automation foundation for US1–US4; future story E2E tasks remain in each story phase
+- **US11 Android PWA (Phase 14)**: Depends on Foundational; can run in parallel with story work after Phase 2, but must complete before production delivery
+- **Final Polish (Phase 15)**: Depends on desired user stories plus US11 for full quickstart validation
 
 ### User Story Dependencies
 
@@ -337,7 +369,8 @@ Phase 2 (Foundational)
   │     └── Phase 9 (US6: Monthly Bills) — needs US1 + US10
   │           └── Phase 11 (US8: Hosteler Bill View)
   ├── Phase 13 (Automation & E2E) — after US1-US4 complete
-  └── Phase 14 (Polish) — independent of stories
+  ├── Phase 14 (US11: Android PWA) — independent after Foundational, required before production delivery
+  └── Phase 15 (Final Polish) — validates completed story set
 ```
 
 ### Within Each User Story
@@ -358,10 +391,12 @@ Phase 2 (Foundational)
 
 **Phase 6** (US2): T039, T040 can run in parallel (different component files)
 
+**Phase 14** (US11): T070, T071, T072, T073, T074, T075, T078, T079, and T081 can run in parallel where file ownership does not overlap; T076, T077, T080, T082, and T083 depend on the corresponding assets/components/tests existing first
+
 **Cross-story parallelism** (after Foundational):
 - US5 (Hosteler Management) can be worked on in parallel with US3/US4/US1 sequence
 - US10 (Settings) can be worked on in parallel with the US3→US4→US1 sequence
-- Polish (Phase 13) tasks can start after Foundational (T065–T070 are independent of user stories)
+- US11 (Android PWA) can be worked on in parallel with US3/US4/US1/US2 after Foundational because it owns manifest, icons, service worker, install UI, offline UI, and PWA validation evidence
 
 ---
 
@@ -369,12 +404,12 @@ Phase 2 (Foundational)
 
 ### MVP Scope (Recommended First Delivery)
 
-**Phases 1–5** (Setup → Foundational → US3 → US4 → US1) deliver the core value proposition:
+**Phases 1–5** (Setup → Foundational → US3 → US4 → US1) deliver the core daily food submission value:
 - Hostelers can activate accounts and log in
 - Hostelers can submit daily food preferences before the deadline
 - Deadline is enforced server-side
 
-This is the minimum viable product — the daily action the entire system is built around.
+For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** alongside or immediately after the MVP so Android users can install and relaunch the app from the app drawer.
 
 ### Incremental Delivery After MVP
 
@@ -383,4 +418,5 @@ This is the minimum viable product — the daily action the entire system is bui
 3. **US10 (Settings)** — Enables deadline/rate configuration
 4. **US6 (Monthly Bills)** — Monthly billing workflow
 5. **US7, US8, US9** — Transparency and reporting features
-6. **Polish** — PWA, CI/CD, backup (can be done incrementally alongside stories)
+6. **US11 (Android PWA)** — True PWA installability, offline app shell, automated checks, and manual Android evidence if not already completed alongside MVP
+7. **Final Polish** — Full quickstart validation and release readiness checks

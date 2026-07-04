@@ -50,6 +50,7 @@ Generate (or regenerate) monthly bills for all active hostelers.
 **Side effects**:
 - Creates or replaces `monthly_bills` rows for all hostelers with food preferences in the target month
 - Hostelers with zero preferences get a bill with all-zero counts and amounts
+- No notification is sent to hostelers when bills are generated or regenerated; hostelers see the latest bill the next time they open the bill view (FR-040)
 
 ---
 

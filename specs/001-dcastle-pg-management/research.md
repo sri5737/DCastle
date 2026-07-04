@@ -75,24 +75,39 @@ supabase.channel('food-counts')
 
 ---
 
-### 4. PWA with @ducanh2912/next-pwa
+### 4. True PWA on Android Chrome
 
-**Decision**: Use `@ducanh2912/next-pwa` for service worker generation and PWA manifest
+**Decision**: Keep the existing Next.js PWA architecture with `@ducanh2912/next-pwa`, but validate it against Android Chrome installability, app drawer presence, standalone launch, maskable icon, offline app shell, and install-prompt requirements.
 
 **Rationale**:
-- Drop-in Next.js plugin; wraps `next.config.js`
-- Auto-generates service worker for app shell caching
-- Supports `manifest.json` configuration for installability
-- Works with Cloudflare Pages deployment
+- `@ducanh2912/next-pwa` remains the smallest architecture-preserving path for service worker generation in a Next.js App Router app deployed to Cloudflare Pages.
+- Android Chrome installability is controlled by browser criteria, not only by app UI. The app must provide a valid manifest, a registered service worker with fetch handling, suitable icons, and a stable HTTPS deployment.
+- App drawer presence and standalone launch cannot be proven by desktop-only tests; they require manual Android Chrome device or emulator evidence.
+- Offline support is app-shell scope only: layout, navigation, login entry points, and primary owner/hosteler shells must render from cache, while fresh data and writes show offline states.
 
-**Key configuration**:
-- Cache strategy: NetworkFirst for API calls, CacheFirst for static assets
-- Offline: App shell loads from cache; data screens show offline indicator
-- Install prompt: Use `beforeinstallprompt` event to show custom install UI on first visit
+**Required manifest and icon behavior**:
+- `manifest.json` includes `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, and Android-suitable `icons`.
+- Icons include at least 192x192 and 512x512 PNG assets.
+- Maskable icon support is declared with `purpose: "maskable"` or `purpose: "any maskable"` so Android launchers can crop safely.
+
+**Service worker and offline behavior**:
+- Cache static assets and the core app shell needed for root layout, navigation, hosteler shell, owner shell, and login entry points.
+- Use network-first or no-store behavior for API/data requests so stale operational data is not presented as fresh.
+- When offline, render the cached shell and show explicit offline states for data-dependent actions instead of blank pages or browser network errors.
+
+**Install prompt behavior**:
+- Capture `beforeinstallprompt`, store the deferred event, and reveal install UI only while the event is available.
+- Trigger `prompt()` only from a user gesture and record the outcome.
+- Hide or disable install UI when the app is already installed, after `appinstalled`, when `matchMedia('(display-mode: standalone)')` is true, or when Android Chrome has not reported installability.
+
+**Validation approach**:
+- Automated checks: manifest response and required fields, icon metadata including maskable icons, service worker registration, offline shell load under network-disabled conditions, install UI hidden before eligibility, install UI shown after simulated `beforeinstallprompt` where the test environment supports it.
+- Manual checks: Android Chrome device or emulator installs the app, Deekshana Castle appears in the app drawer with the expected icon/name, launch opens standalone without the address bar, and offline launch renders the app shell within the success-criteria window.
 
 **Alternatives considered**:
-- `next-pwa` (original) — abandoned/unmaintained
-- Manual service worker — rejected (unnecessary complexity for standard PWA needs)
+- `next-pwa` (original) — rejected as less maintained than the selected package.
+- Manual service worker only — rejected unless generated service worker behavior cannot satisfy offline app-shell caching; it would increase maintenance with no current architecture need.
+- Treating PWA as only responsive web + manifest — rejected because spec v1.1 and Constitution Principle X require Android app drawer presence, standalone launch, and offline app shell evidence.
 
 ---
 
@@ -183,12 +198,93 @@ WHERE fp.hosteler_id = $1 AND fp.date BETWEEN $2 AND $3
 
 ## Summary of Resolved Items
 
+All technical unknowns resolved. Architecture decisions are finalized:
+
+1. Next.js 14 + Cloudflare Pages via `@cloudflare/next-on-pages`
+2. Supabase Auth (Google OAuth) + custom PIN verify route
+3. Supabase Realtime for live meal counts
+4. True PWA via `@ducanh2912/next-pwa` with Android Chrome installability validation
+5. Per-day rate lookup for mid-month billing
+6. GitHub Actions cron → pg_dump → Cloudflare R2 for backups (restore is manual infrastructure process — no UI in v1)
+7. Server-side IST deadline enforcement via Intl APIs
+8. Three-job CI/CD pipeline (test → build → deploy)
+9. PIN brute-force lockout via `pin_login_attempts` table (5 attempts / 15-minute cooldown)
+10. Session invalidation on deactivation via Supabase Admin API `signOut(userId, 'global')`
+11. Unlimited concurrent sessions — no device limit enforcement
+
+---
+
+## Addendum: Session & Security Clarifications (2026-07-04)
+
+### 9. PIN Brute-Force Lockout Implementation
+
+**Decision**: Track failed attempts in a `pin_login_attempts` table; enforce 5-attempt / 15-minute lockout per phone number
+
+**Rationale**:
+- Edge Runtime cannot rely on in-memory state (workers are stateless)
+- A dedicated Supabase table provides persistence across worker invocations
+- The `pin_login_attempts` table is keyed by `phone` with an `attempts` counter and `locked_until` timestamp
+- On each failed attempt: UPSERT row, increment `attempts`; when `attempts >= 5`, set `locked_until = now() + 15 min`
+- On success or after cooldown: DELETE the row (reset)
+- API returns HTTP 429 when `locked_until > now()`
+
+**Alternatives considered**:
+- KV store (Cloudflare KV) — possible but adds a dependency and free-tier limits; table is simpler
+- In-memory Map — rejected (Edge workers are ephemeral, state lost between requests)
+- Supabase RPC function — viable but unnecessary complexity for a simple counter
+
+---
+
+### 10. Session Invalidation on Deactivation
+
+**Decision**: Use Supabase Admin API `auth.admin.signOut(userId, 'global')` to revoke all sessions immediately upon deactivation
+
+**Rationale**:
+- Supabase Auth provides a server-side global sign-out that invalidates all refresh tokens for a user
+- The deactivation API route (owner-only) calls this after updating `hostelers.status = 'inactive'`
+- Subsequent requests from any device with a stale access token fail at JWT validation → 401
+- The middleware/guard layer additionally checks `hostelers.status` and returns "Account deactivated" for clarity
+
+**Alternatives considered**:
+- Token blacklist table — rejected (unnecessary; Supabase handles this natively)
+- Short-lived access tokens only — rejected (doesn't revoke immediately; waits for expiry)
+
+---
+
+### 11. Unlimited Concurrent Sessions
+
+**Decision**: No session limit enforcement; each device gets an independent 30-day session
+
+**Rationale**:
+- Target user base is ~40–100 hostelers using 1–2 personal devices
+- Enforcing a device cap adds complexity (session registry, eviction logic) with no business value
+- Supabase Auth naturally supports multiple refresh tokens per user without conflict
+- No security concern at this scale — PIN/Google auth already gates access
+
+**Alternatives considered**:
+- Max 3 devices — rejected (unnecessary friction, no spec requirement)
+
+---
+
+### 12. Manual Backup Restore (No UI)
+
+**Decision**: Backup restore remains a manual infrastructure operation in v1; no restore UI is provided
+
+**Rationale**:
+- Restoring a database backup is a destructive, irreversible operation that overwrites current data
+- At the scale of one PG (40–100 users), restore events are extremely rare emergency-only actions
+- Building a restore UI introduces complexity, requires confirmation flows, and creates a security surface with no proportional user value
+- The owner is notified of backup failures; restoration requires direct developer/admin access to R2 + Supabase
+
+**Alternatives considered**:
+- Self-service restore button — rejected (dangerous at this maturity; deferred to future version if needed)
+
 | Item | Resolution |
 |------|-----------|
 | Edge Runtime compatibility | bcryptjs, Web Crypto API, @supabase/supabase-js all Edge-safe |
 | PIN-based auth on Supabase | Custom API route + Supabase Admin API for session creation |
 | Real-time updates | Supabase Realtime (postgres_changes) with 10s reconnection banner |
-| PWA approach | @ducanh2912/next-pwa (auto service worker + manifest) |
+| PWA approach | @ducanh2912/next-pwa with Android Chrome installability, manifest/icon, offline app shell, install prompt, automated PWA, and manual Android validation gates |
 | Mid-month billing | Per-day rate lookup via `effective_from` in meal_rates |
 | Backup strategy | GitHub Actions cron → pg_dump → gzip → Cloudflare R2 |
 | IST deadline enforcement | Intl.DateTimeFormat in Edge Runtime, server-authoritative |

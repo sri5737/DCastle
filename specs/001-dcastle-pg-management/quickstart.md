@@ -213,20 +213,38 @@ pnpm test:run      # Single run (CI mode)
 
 ---
 
-### Scenario 9: PWA Installation
+### Scenario 9: Android PWA Installation, Standalone Launch, and Offline Shell
 
 **Steps**:
-1. Open app on Android Chrome (mobile)
-2. Verify install prompt appears on first visit
-3. Tap "Install" → verify app icon on home screen
-4. Open installed app → verify standalone mode (no browser chrome)
-5. Turn off network → verify app shell loads from cache
-6. Verify data screens show offline indicator
+1. Open the deployed HTTPS app URL on Android Chrome on a real device or emulator.
+2. Wait until the browser reports PWA install eligibility and verify the app shows an install action only after eligibility is available.
+3. Tap the install action and accept the native Android Chrome installation prompt.
+4. Verify the Deekshana Castle icon appears in the Android app drawer alongside native apps.
+5. Launch Deekshana Castle from the Android app drawer and verify standalone mode: no browser address bar or normal Chrome UI.
+6. Disable network connectivity and launch or reload the installed app.
+7. Verify the cached app shell loads with layout, navigation, and login/primary shell UI visible.
+8. Navigate to data-dependent areas and verify they show an offline state instead of a blank page, browser error, or broken UI.
+9. Re-enable network and verify normal data loading recovers.
 
 **Expected**:
-- `manifest.json` serves correct name, icons, theme color
-- Service worker caches app shell assets
-- Offline: layout renders, data areas show "You're offline" indicator
+- `/manifest.json` serves `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, and Android icon metadata.
+- Icons include 192x192, 512x512, and maskable support, and resolve successfully from the deployed app.
+- Service worker registers successfully and caches the core app shell.
+- Install UI does not appear when unsupported, unavailable, already installed, or before Android Chrome reports eligibility.
+- Installed app appears in the Android app drawer with Deekshana Castle name/icon.
+- App drawer launch opens standalone without browser chrome.
+- Offline launch renders the app shell within 3 seconds and shows offline states for data-dependent actions.
+
+**Automated checks**:
+- Manifest required fields and icon metadata.
+- Service worker registration.
+- Offline app shell under disabled network conditions.
+- Install prompt visibility/hidden states where browser automation supports simulation.
+
+**Manual evidence to record**:
+- Device or emulator name, Android version, Chrome version, deployment URL, validation date, app drawer screenshot/notes, standalone launch result, and offline shell result.
+
+**Contracts referenced**: [pwa.md](contracts/pwa.md)
 
 ---
 
@@ -260,6 +278,45 @@ pnpm test:run      # Single run (CI mode)
 - File contains complete database dump
 - Retention policy enforced (90-day max)
 - Failure sends notification to owner
+- Restore is manual only — no restore UI exists in v1
+
+---
+
+### Scenario 12: PIN Brute-Force Lockout
+
+**Steps**:
+1. Log in as a hosteler via PIN to confirm credentials work
+2. Attempt PIN login 5 times with an incorrect PIN for the same phone number
+3. On the 5th failure, verify HTTP 429 response with lockout message
+4. Attempt login with the correct PIN within the 15-minute window → verify still locked
+5. Wait 15 minutes (or adjust `pin_login_attempts.locked_until` in DB) → verify login succeeds
+
+**Expected**:
+- Attempts 1–4: HTTP 401 "Invalid phone number or PIN"
+- Attempt 5: HTTP 429 "Too many failed attempts. Try again in 15 minutes." with `locked_until` timestamp
+- Correct PIN during lockout: still HTTP 429
+- After cooldown: login succeeds normally, counter is cleared
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [data-model.md](data-model.md)
+
+---
+
+### Scenario 13: Session Invalidation on Deactivation
+
+**Steps**:
+1. Log in as a hosteler on two separate browser sessions (simulating two devices)
+2. Verify both sessions can access `/dashboard` and `/submit`
+3. As owner, deactivate the hosteler (with confirmation if future preferences exist)
+4. In both hosteler sessions, attempt any API call (e.g., navigate to `/dashboard`)
+5. Verify both sessions receive HTTP 401 "Account deactivated" and are redirected to login
+
+**Expected**:
+- Before deactivation: both sessions work independently
+- After deactivation: both sessions are invalidated simultaneously
+- No manual logout required on either device
+- Reactivation allows the hosteler to log in fresh but does not restore old sessions
+
+**Contracts referenced**: [hostelers.md](contracts/hostelers.md), [auth.md](contracts/auth.md)
 
 ---
 
@@ -269,9 +326,10 @@ pnpm test:run      # Single run (CI mode)
 |------|-----------|
 | Auth - invite token | Valid/expired/used token handling |
 | Auth - Google OAuth | Link to hosteler, reject unregistered |
-| Auth - PIN verify | Correct/incorrect PIN, inactive account |
+| Auth - PIN verify | Correct/incorrect PIN, inactive account, brute-force lockout (5 attempts → 429) |
+| Auth - sessions | Concurrent multi-device sessions, invalidation on deactivation |
 | Deadline | Before/after/exact boundary, timezone handling |
 | Food upsert | Create new, update existing, no duplicates |
-| Bill calculation | Simple month, mid-month rate change, zero preferences |
+| Bill calculation | Simple month, mid-month rate change, zero preferences, regen without notification |
 | RLS policies | Hosteler isolation, owner access, anon rejection |
 | Realtime | Subscription connect/disconnect/reconnect |

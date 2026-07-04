@@ -141,7 +141,8 @@ Authenticate a returning hosteler via phone + PIN.
 ```
 
 **Response 401**: `{ "error": "Invalid phone number or PIN" }`  
-**Response 403**: `{ "error": "Account is inactive. Contact your PG owner." }`
+**Response 403**: `{ "error": "Account is inactive. Contact your PG owner." }`  
+**Response 429**: `{ "error": "Too many failed attempts. Try again in 15 minutes.", "locked_until": "2026-07-04T21:15:00.000Z" }`
 
 **Validation**:
 - Phone must match `^[6-9]\d{9}$`
@@ -149,4 +150,9 @@ Authenticate a returning hosteler via phone + PIN.
 - Hosteler must have `status = 'active'`
 - Generic error message for invalid credentials (no info leakage about whether phone exists)
 
-**Rate limiting**: 5 attempts per phone per 15 minutes (enforced via in-memory counter or Supabase function)
+**Brute-force protection**: After 5 consecutive failed PIN attempts for a phone number, the account is locked out for 15 minutes. The lockout counter resets on successful login or after the 15-minute cooldown elapses. Tracked via `pin_login_attempts` table.
+
+**Session behavior**:
+- Successful login creates an independent session; multiple concurrent sessions across devices are permitted with no cap
+- Each device maintains its own 30-day session independently
+- If the hosteler's account is deactivated while sessions exist, all active sessions are invalidated; subsequent API calls return HTTP 401 with "Account deactivated" message

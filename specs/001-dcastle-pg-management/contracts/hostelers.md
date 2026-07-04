@@ -159,6 +159,11 @@ Update a hosteler's status (deactivate/reactivate).
 - Reactivation: `inactive → active`. Hosteler can log in again.
 - Pending hostelers cannot be deactivated (they haven't activated yet).
 
+**Side effects (deactivation)**:
+- All active Supabase Auth sessions for the hosteler are invalidated immediately via `auth.admin.signOut(userId, 'global')`
+- Any subsequent API call from the deactivated hosteler's device returns HTTP 401 with `{ "error": "Account deactivated" }` and the client redirects to the login page
+- PIN login attempts counter is cleared
+
 ---
 
 ## POST `/api/hostelers/[id]/reset-invite`

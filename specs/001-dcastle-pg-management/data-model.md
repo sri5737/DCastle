@@ -9,6 +9,7 @@ erDiagram
     hostelers ||--o{ food_preferences : submits
     hostelers ||--o{ monthly_bills : receives
     hostelers ||--o{ invite_tokens : "activated by"
+    hostelers ||--o| pin_login_attempts : "throttled by"
     meal_rates ||--o{ food_preferences : "priced by"
     settings ||--|| settings : "singleton config"
 
@@ -67,6 +68,13 @@ erDiagram
         numeric dinner_amount
         numeric total_amount
         timestamptz generated_at
+    }
+
+    pin_login_attempts {
+        text phone PK
+        integer attempts
+        timestamptz locked_until
+        timestamptz updated_at
     }
 
     settings {
@@ -226,7 +234,30 @@ Computed billing records, generated on demand by the owner.
 
 ---
 
-### 6. `settings`
+### 6. `pin_login_attempts`
+
+Tracks consecutive failed PIN login attempts for brute-force protection (FR-006a).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `phone` | text | PK | Phone number being throttled |
+| `attempts` | integer | NOT NULL, default 0 | Consecutive failed attempts since last reset |
+| `locked_until` | timestamptz | NULLABLE | If set and in future, login is blocked |
+| `updated_at` | timestamptz | NOT NULL, default `now()` | Last attempt time |
+
+**Validation rules**:
+- After 5 consecutive failures (`attempts >= 5`), set `locked_until = now() + INTERVAL '15 minutes'`
+- On successful login: delete the row (reset counter)
+- On any attempt when `locked_until > now()`: reject immediately with HTTP 429
+- After cooldown elapses (`locked_until <= now()`): reset `attempts = 0` and allow login
+- Row is also cleared when the hosteler's account is deactivated
+
+**Indexes**:
+- PK on `phone` (direct lookup during PIN verify)
+
+---
+
+### 7. `settings`
 
 Key-value store for system configuration.
 
@@ -240,6 +271,22 @@ Key-value store for system configuration.
 | Key | Default Value | Description |
 |-----|---------------|-------------|
 | `deadline_time` | `21:00` | Daily submission deadline (HH:MM in IST) |
+
+---
+
+## Non-Persistent PWA Artifacts
+
+The true PWA requirements do not introduce new Supabase tables or persisted domain entities. They are represented by browser-managed installation state, public static assets, and service worker cache state.
+
+| Artifact | Owner | Required fields/state | Validation |
+|----------|-------|-----------------------|------------|
+| Web app manifest | `public/manifest.json` | `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, icons including 192x192, 512x512, and maskable support | Automated manifest and icon metadata checks |
+| Launcher icons | `public/icons/` | Android-suitable PNG icons, including maskable variants for safe launcher cropping | Automated metadata checks plus Android app drawer inspection |
+| Service worker cache | Generated service worker/runtime cache | Core app shell assets for layout, navigation, login entry points, hosteler shell, and owner shell | Automated offline app-shell test |
+| Install prompt state | Browser session state in install UI component | Deferred `beforeinstallprompt` event availability, accepted/dismissed outcome, `appinstalled`, and standalone display mode | Automated component/browser behavior where supported; manual Android install validation |
+| Offline UI state | Browser network status and failed data requests | Explicit offline state for data-dependent actions; no blank or broken pages | Automated offline-shell scenario plus manual installed-PWA offline launch |
+
+No business data is cached as authoritative offline state in v1. Food submissions, dashboard counts, settings, billing, and history remain server-backed and require connectivity for fresh reads or writes.
 
 ---
 
