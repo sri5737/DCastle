@@ -177,10 +177,10 @@
 
 ### Implementation for User Story 10
 
-- [ ] T050 [US10] Implement `PATCH /api/settings` endpoint (update deadline_time immediately, insert new meal_rates row with effective_from = tomorrow) in `src/app/api/settings/route.ts`
-- [ ] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) in `src/app/(owner)/settings/page.tsx`
-- [ ] T052 [US10] Add validation for deadline format (HH:MM, 24-hour) and rate values (positive numbers) with error feedback in `src/app/(owner)/settings/page.tsx`
-- [ ] T052b [US10] Create E2E test: owner changes deadline time → verify new deadline displayed → change meal rate → verify rate shown as "effective from tomorrow" → hosteler form locks at new deadline time in `e2e/us10-settings.spec.ts`
+- [x] T050 [US10] Implement `PATCH /api/settings` endpoint (update deadline_time immediately, insert new meal_rates row with effective_from = tomorrow) in `src/app/api/settings/route.ts`
+- [x] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) in `src/app/(owner)/settings/page.tsx`
+- [x] T052 [US10] Add validation for deadline format (HH:MM, 24-hour) and rate values (positive numbers) with error feedback in `src/app/(owner)/settings/page.tsx`
+- [x] T052b [US10] Create E2E test: owner changes deadline time → verify new deadline displayed → change meal rate → verify rate shown as "effective from tomorrow" → hosteler form locks at new deadline time in `e2e/us10-settings.spec.ts`
 
 **Checkpoint**: Owner can configure deadline and rates; changes apply correctly to submissions and billing
 

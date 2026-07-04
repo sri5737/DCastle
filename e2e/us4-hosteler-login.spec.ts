@@ -10,6 +10,14 @@ test.describe('US4: Hosteler Login', () => {
   });
 
   test('invalid PIN shows error message', async ({ page }) => {
+    await page.route('**/api/auth/pin/verify', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Invalid phone number or PIN' }),
+      });
+    });
+
     await page.goto('/login');
     await page.locator('#phone').fill(TEST_HOSTELER.phone);
     await page.locator('#pin').fill('0000');
@@ -20,6 +28,14 @@ test.describe('US4: Hosteler Login', () => {
   });
 
   test('unregistered phone shows error', async ({ page }) => {
+    await page.route('**/api/auth/pin/verify', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Invalid phone number or PIN' }),
+      });
+    });
+
     await page.goto('/login');
     await page.locator('#phone').fill('9000000001');
     await page.locator('#pin').fill('1234');

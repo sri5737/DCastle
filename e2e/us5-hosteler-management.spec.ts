@@ -86,6 +86,10 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
     await page.getByRole('tab', { name: /Inactive/i }).click();
     await expect(page.getByText(activeName)).toBeVisible({ timeout: 5000 });
 
+    await page.reload();
+    await page.getByRole('tab', { name: /Inactive/i }).click();
+    await expect(page.getByText(activeName)).toBeVisible({ timeout: 5000 });
+
     // Step 6: Reactivate the hosteler
     const inactiveRow = page.locator('tr', { hasText: activeName });
     const reactivateBtn = inactiveRow.getByRole('button', { name: 'Reactivate' });
@@ -96,6 +100,10 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
     await page.waitForTimeout(1000);
 
     // Step 7: Verify hosteler returns to Active tab
+    await page.getByRole('tab', { name: /^Active/i }).click();
+    await expect(page.getByText(activeName)).toBeVisible({ timeout: 5000 });
+
+    await page.reload();
     await page.getByRole('tab', { name: /^Active/i }).click();
     await expect(page.getByText(activeName)).toBeVisible({ timeout: 5000 });
 
