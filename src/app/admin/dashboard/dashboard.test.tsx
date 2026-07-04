@@ -32,6 +32,7 @@ const mockChannel = {
 
 const mockFrom = vi.fn();
 const mockRemoveChannel = vi.fn();
+const mockFetch = vi.fn();
 
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
@@ -44,50 +45,30 @@ vi.mock('@/lib/supabase/client', () => ({
   },
 }));
 
-// Mock data
-const mockSettings = [{ key: 'deadline_time', value: '21:00' }];
-const mockPrefs = [
-  { hosteler_id: 'h-1', breakfast: true, lunch: true, dinner: false },
-  { hosteler_id: 'h-2', breakfast: true, lunch: false, dinner: true },
-  { hosteler_id: 'h-3', breakfast: true, lunch: true, dinner: true },
-];
-const mockHostelers = [
+const defaultDashboardData = {
+  date: '2026-07-04',
+  deadlineTime: '21:00',
+  serverTime: '19:30:00',
+  counts: { breakfast: 2, lunch: 1, dinner: 1 },
+  submittedHostelers: [
+    { id: 'h-1', name: 'Alice', room_number: '101' },
+    { id: 'h-2', name: 'Bob', room_number: '102' },
+  ],
+  pendingHostelers: [{ id: 'h-3', name: 'Charlie', room_number: '103' }],
+};
+
+const allHostelers = [
   { id: 'h-1', name: 'Alice', room_number: '101' },
   { id: 'h-2', name: 'Bob', room_number: '102' },
   { id: 'h-3', name: 'Charlie', room_number: '103' },
 ];
 
-function setupMockFrom() {
-  mockFrom.mockImplementation((table: string) => {
-    if (table === 'settings') {
-      return {
-        select: () => ({
-          in: () => Promise.resolve({ data: mockSettings, error: null }),
-        }),
-      };
-    }
-    if (table === 'food_preferences') {
-      return {
-        select: () => ({
-          eq: () => ({
-            is: (_column: string, value: unknown) =>
-              Promise.resolve({
-                data: value === null ? mockPrefs.slice(0, 2) : mockPrefs,
-                error: null,
-              }),
-          }),
-        }),
-      };
-    }
-    if (table === 'hostelers') {
-      return {
-        select: () => ({
-          eq: () => Promise.resolve({ data: mockHostelers, error: null }),
-        }),
-      };
-    }
-    return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+function setupDashboardFetch(data = defaultDashboardData) {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve(data),
   });
+  vi.stubGlobal('fetch', mockFetch);
 }
 
 describe('Owner Dashboard - Food Counts Aggregation', () => {
@@ -95,7 +76,7 @@ describe('Owner Dashboard - Food Counts Aggregation', () => {
     vi.clearAllMocks();
     realtimeCallback = null;
     subscribeCallback = null;
-    setupMockFrom();
+    setupDashboardFetch();
   });
 
   it('should correctly aggregate meal counts from preferences', async () => {
@@ -128,31 +109,11 @@ describe('Owner Dashboard - Food Counts Aggregation', () => {
   });
 
   it('should show zero counts when no preferences exist', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'settings') {
-        return {
-          select: () => ({
-            in: () => Promise.resolve({ data: mockSettings, error: null }),
-          }),
-        };
-      }
-      if (table === 'food_preferences') {
-        return {
-          select: () => ({
-            eq: () => ({
-              is: () => Promise.resolve({ data: [], error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === 'hostelers') {
-        return {
-          select: () => ({
-            eq: () => Promise.resolve({ data: mockHostelers, error: null }),
-          }),
-        };
-      }
-      return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+    setupDashboardFetch({
+      ...defaultDashboardData,
+      counts: { breakfast: 0, lunch: 0, dinner: 0 },
+      submittedHostelers: [],
+      pendingHostelers: allHostelers,
     });
 
     const OwnerDashboardPage = (await import('./page')).default;
@@ -171,10 +132,9 @@ describe('Owner Dashboard - Food Counts Aggregation', () => {
 describe('Owner Dashboard - Realtime Reconnection Banner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     realtimeCallback = null;
     subscribeCallback = null;
-    setupMockFrom();
+    setupDashboardFetch();
   });
 
   afterEach(() => {
@@ -207,6 +167,7 @@ describe('Owner Dashboard - Realtime Reconnection Banner', () => {
     });
 
     // Simulate channel error
+    vi.useFakeTimers();
     act(() => {
       if (subscribeCallback) subscribeCallback('CHANNEL_ERROR');
     });
@@ -234,6 +195,7 @@ describe('Owner Dashboard - Realtime Reconnection Banner', () => {
     });
 
     // Simulate disconnect
+    vi.useFakeTimers();
     act(() => {
       if (subscribeCallback) subscribeCallback('CHANNEL_ERROR');
     });
@@ -262,9 +224,8 @@ describe('Owner Dashboard - Realtime Reconnection Banner', () => {
       expect(screen.queryByText('Loading dashboard…')).not.toBeInTheDocument();
     });
 
-    // Clear to track new calls
-    mockFrom.mockClear();
-    setupMockFrom();
+    // Clear to track new fetches
+    mockFetch.mockClear();
 
     // Simulate a realtime event
     await act(async () => {
@@ -272,7 +233,7 @@ describe('Owner Dashboard - Realtime Reconnection Banner', () => {
     });
 
     // Should have re-fetched data
-    expect(mockFrom).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith('/api/owner/dashboard', { cache: 'no-store' });
   });
 
   it('should exclude canceled future preferences from counts', async () => {

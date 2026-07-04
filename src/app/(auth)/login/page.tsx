@@ -51,22 +51,12 @@ function LoginForm() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || 'Login failed');
+      if (res.ok) {
+        window.location.href = data.redirectTo || '/dashboard';
         return;
       }
 
-      // Set cookies for middleware auth (session JWT from server-side Supabase sign-in)
-      document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-      document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-
-      // Set session in Supabase client so client-side auth checks work
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-
-      window.location.href = '/dashboard';
+      setError(data.error || 'Login failed');
     } catch {
       setError('Network error. Please try again.');
     } finally {

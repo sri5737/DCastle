@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 
 export default function HostelerLayout({
   children,
@@ -11,33 +9,10 @@ export default function HostelerLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace('/login');
-        return;
-      }
-      setLoading(false);
-    }
-    checkAuth();
-  }, [router]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    document.cookie = 'sb-access-token=; path=/; max-age=0';
-    document.cookie = 'sb-refresh-token=; path=/; max-age=0';
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
   }
 
   return (

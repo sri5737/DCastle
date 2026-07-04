@@ -6,9 +6,13 @@ const mockSingle = vi.fn();
 const mockEq = vi.fn().mockReturnValue({ single: mockSingle });
 const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
 const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+const mockSignInWithPassword = vi.fn();
 
 const mockSupabase = {
   from: mockFrom,
+  auth: {
+    signInWithPassword: mockSignInWithPassword,
+  },
 };
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,14 +20,17 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerClient: vi.fn(),
 }));
 
-// Mock @supabase/supabase-js createClient for signInWithPassword
-const mockSignInWithPassword = vi.fn();
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({
-    auth: {
-      signInWithPassword: mockSignInWithPassword,
-    },
-  }),
+// Mock @supabase/supabase-js for AuthError export
+vi.mock('@supabase/supabase-js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@supabase/supabase-js')>();
+	return {
+		...actual,
+	};
+});
+
+// Mock retry logic to pass through
+vi.mock('@/lib/auth/retry', () => ({
+	withRetry: vi.fn((fn) => fn()),
 }));
 
 function createRequest(body: Record<string, unknown>) {
@@ -53,7 +60,6 @@ describe('POST /api/auth/pin/verify', () => {
 
   it('should authenticate with correct phone and PIN', async () => {
     const pin = '1234';
-    const pinHash = await bcrypt.hash(pin, 10);
 
     mockSingle.mockResolvedValue({
       data: {
@@ -61,9 +67,19 @@ describe('POST /api/auth/pin/verify', () => {
         name: 'John Doe',
         room_number: '101',
         phone: '9876543210',
-        pin_hash: pinHash,
         status: 'active',
         auth_user_id: 'auth-user-1',
+      },
+      error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'real-jwt-token',
+          refresh_token: 'real-refresh-token',
+        },
+        user: { id: 'auth-user-1' },
       },
       error: null,
     });
@@ -72,35 +88,38 @@ describe('POST /api/auth/pin/verify', () => {
     const request = createRequest({ phone: '9876543210', pin: '1234' });
     const response = await POST(request as any);
     const data = await response.json();
+    const setCookie = response.headers.get('set-cookie') || '';
 
     expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.redirectTo).toBe('/dashboard');
     expect(data.hosteler.id).toBe('hosteler-1');
     expect(data.hosteler.name).toBe('John Doe');
     expect(data.hosteler.room_number).toBe('101');
-    expect(data.session.access_token).toBe('real-jwt-token');
-    expect(data.session.refresh_token).toBe('real-refresh-token');
-    expect(data.session.expires_in).toBe(2592000);
     expect(mockSignInWithPassword).toHaveBeenCalledWith({
       email: '9876543210@hosteler.dcastle.local',
       password: '1234',
     });
+    expect(setCookie).toContain('sb-access-token=real-jwt-token');
+    expect(setCookie).toContain('sb-refresh-token=real-refresh-token');
   });
 
   it('should reject incorrect PIN', async () => {
-    const correctPin = '1234';
-    const pinHash = await bcrypt.hash(correctPin, 10);
-
     mockSingle.mockResolvedValue({
       data: {
         id: 'hosteler-1',
         name: 'John Doe',
         room_number: '101',
         phone: '9876543210',
-        pin_hash: pinHash,
         status: 'active',
         auth_user_id: 'auth-user-1',
       },
       error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValue({
+      data: {},
+      error: { message: 'Invalid credentials', status: 401 },
     });
 
     const { POST } = await import('./route');
@@ -191,6 +210,11 @@ describe('POST /api/auth/pin/verify', () => {
         auth_user_id: 'auth-user-1',
       },
       error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValue({
+      data: {},
+      error: { message: 'Invalid credentials', status: 401 },
     });
 
     const { POST } = await import('./route');

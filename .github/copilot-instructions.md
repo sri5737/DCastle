@@ -159,6 +159,33 @@ Rules:
 
 If an E2E test cannot be written (e.g., pure infrastructure), document the reason in the task completion notes.
 
+## Honest E2E Validation Guardrails
+
+E2E tests are acceptance evidence and MUST prove the actual independent-test behavior documented in `spec.md` and `tasks.md`.
+
+Never mark an E2E task complete when the test only proves:
+- a route was reached,
+- a heading/card/button rendered,
+- a page did not crash,
+- a broad placeholder string such as `pending|submitted|hosteler` appeared,
+- a mocked response or manually injected cookie/localStorage session made the UI look authenticated.
+
+For every E2E test:
+- Assert at least one exact, falsifiable business outcome from the user story.
+- Exercise the real UI and real Next.js API routes for the behavior under test.
+- Use direct database writes only for deterministic setup/teardown, never as a replacement for the core user action.
+- Do not use route mocks for the feature under test unless the task explicitly documents that the external system is out of scope.
+- Do not use conditional branches that silently skip the core path; if state/time prevents the core path, create deterministic setup or mark the task blocked.
+- After login or auth-sensitive navigation, wait for client effects and reload once when the story depends on persisted authentication, so redirect loops are caught.
+
+Cross-role workflows require producer-to-consumer proof in the same E2E test or an explicitly linked sequence. For example:
+- Hosteler submits exact meal preferences through the UI.
+- Owner dashboard is opened as owner.
+- Dashboard shows the exact breakfast/lunch/dinner counts caused by that hosteler submission.
+- The hosteler appears in Submitted and is absent from Pending.
+
+Dashboard, realtime, history, billing, and export stories MUST assert both the write path and the read/consumer surface. An E2E test that would still pass while the core workflow is broken is invalid and MUST be rewritten before the task is marked complete.
+
 ## Completion Checklist
 
 Before declaring a task complete:

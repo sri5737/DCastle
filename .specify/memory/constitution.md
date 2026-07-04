@@ -1,18 +1,18 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.4.0 -> 1.4.1
-Modified principles: None
-Added sections: None
+Version change: 1.4.1 -> 1.5.0
+Modified principles:
+  - VII. Unit Testing Coverage expanded to include honest E2E validation expectations.
+Added sections:
+  - XI. Honest End-to-End Validation (NON-NEGOTIABLE)
 Removed sections: None
 Clarifications:
-  - Clarified that /speckit.implement prerequisite, check, build, test, and validation commands run via pwsh do not require user confirmation.
-  - Added explicit /speckit.implement execution rules for autonomous task implementation.
-  - Added explicit Validation Rule for build, unit, integration, and E2E test execution.
-  - Clarified that iterative fixes, testing, and refactoring do not require human approval.
-  - Clarified that commit and push operations always require explicit user instruction.
+  - E2E tests must prove the actual independent-test behavior from the spec, not merely navigation, rendering, or mocked success.
+  - Cross-role workflows must assert the producer action becomes visible to the consumer surface.
+  - E2E tests must not bypass core flows with direct cookies, localStorage sessions, route mocks, or conditional skips unless explicitly documented as non-core setup.
 Templates requiring updates:
-  - .github/copilot-instructions.md updated with matching Validation Rule and Autonomous Implementation Mode.
+  - .github/copilot-instructions.md updated with matching Honest E2E Validation Guardrails.
 Follow-up TODOs: None
 -->
 
@@ -118,6 +118,41 @@ considered complete. Tests are a delivery requirement, not an afterthought.
 - Test files live alongside source: `*.test.ts` / `*.test.tsx` co-located with
   the file they test.
 - All tests MUST pass before any feature is marked done.
+
+### XI. Honest End-to-End Validation (NON-NEGOTIABLE)
+
+E2E tests are acceptance evidence. They MUST prove the user-story independent
+test stated in `spec.md`/`tasks.md`; they MUST NOT only prove that a page loads,
+a URL changes, or a heading is visible.
+
+- Every E2E test for a story MUST include at least one falsifiable assertion on
+  the core business outcome of that story.
+- Cross-role flows MUST exercise the full producer-to-consumer behavior in one
+  test or an explicitly linked test sequence. Example: a hosteler submits food
+  preferences, then the owner dashboard MUST show the exact meal counts and the
+  hosteler MUST move from Pending to Submitted.
+- Login/auth E2E tests MUST verify post-login stability after client effects run
+  and after a reload, so redirect loops and stale client session checks are
+  caught.
+- E2E tests MUST use the real app UI and real Next.js API routes for the feature
+  under test. Route mocks, direct localStorage/session injection, manual cookie
+  injection, or direct database writes are allowed only for global test setup or
+  teardown and MUST NOT replace the core action being validated.
+- Conditional skips such as "if closed, return", broad regex checks such as
+  `pending|submitted|hosteler`, and shell-only assertions such as URL/heading
+  checks are forbidden as completion evidence unless paired with the exact
+  business assertion required by the story.
+- When a feature depends on persisted or realtime data, the E2E test MUST assert
+  both the write path and the read path. For dashboard/realtime behavior, the
+  test MUST verify the initial fetch and at least one update caused by a real
+  submitted record.
+- If the current app state or time makes the core path untestable, the test MUST
+  set up deterministic state through documented setup helpers, or the task is
+  blocked. It MUST NOT silently pass on a weaker assertion.
+
+Any E2E test that can pass while the documented core workflow is broken is a
+constitution violation and MUST be fixed before the task or phase is marked
+complete.
 
 ### VIII. CI/CD Pipeline with Isolated Test Job (NON-NEGOTIABLE)
 
@@ -229,7 +264,7 @@ Amendments require:
 - MINOR: new principle or section added; materially expanded guidance.
 - PATCH: clarifications, wording fixes, typo corrections.
 
-All PRs MUST verify compliance with the ten Core Principles above before merge.
+All PRs MUST verify compliance with the Core Principles above before merge.
 Complexity MUST be justified; if a simpler approach exists, it MUST be preferred.
 
 ### Validation Rule
@@ -277,4 +312,4 @@ autonomously through the documented task scope:
     requested.
 12. Provide a final summary after all validation passes.
 
-**Version**: 1.4.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
+**Version**: 1.5.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04

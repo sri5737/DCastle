@@ -352,12 +352,14 @@
 
 ### Implementation for User Story 12
 
-- [ ] T085 [US12] Create `POST /api/auth/login` endpoint (accept `{ email, password }`, call `supabase.auth.signInWithPassword()` server-side with retry logic, set `sb-access-token` and `sb-refresh-token` cookies, return success/error response) in `src/app/api/auth/login/route.ts`
-- [ ] T086 [US12] Update admin login page to call `POST /api/auth/login` instead of direct `supabase.auth.signInWithPassword()`, handle API response (redirect on success, show error on failure), and remove unused direct Supabase client auth imports in `src/app/(auth)/admin/login/page.tsx`
-- [ ] T087 [US12] Update hosteler login page to ensure PIN login path uses only `POST /api/auth/pin/verify` with no direct Supabase auth calls remaining (Google OAuth path unchanged — already uses server callback) in `src/app/(auth)/login/page.tsx`
-- [ ] T088 [P] [US12] Add retry/TLS error handling utility for server-side Supabase auth calls (1 retry with 500ms exponential backoff on transient network/5xx errors, no retry on 4xx) in `src/lib/auth/retry.ts` and integrate into `/api/auth/login` and `/api/auth/pin/verify` routes
-- [ ] T089 [P] [US12] Write unit tests for `POST /api/auth/login` route (successful login sets cookies, invalid credentials return 401, transient error triggers retry, retry exhaustion returns 500) in `src/app/api/auth/login/route.test.ts`
-- [ ] T090 [US12] Create E2E test verifying login still works through proxy routes: owner logs in via `/api/auth/login` → reaches admin dashboard → hosteler logs in via `/api/auth/pin/verify` → reaches hosteler dashboard → sessions persist correctly in `e2e/us12-auth-proxy.spec.ts`
+- [x] T085 [US12] Create `POST /api/auth/login` endpoint (accept `{ email, password }`, call `supabase.auth.signInWithPassword()` server-side with retry logic, set `sb-access-token` and `sb-refresh-token` cookies, return success/error response) in `src/app/api/auth/login/route.ts`
+- [x] T086 [US12] Update admin login page to call `POST /api/auth/login` instead of direct `supabase.auth.signInWithPassword()`, handle API response (redirect on success, show error on failure), and remove unused direct Supabase client auth imports in `src/app/(auth)/admin/login/page.tsx`
+- [x] T087 [US12] Update hosteler login page to ensure PIN login path uses only `POST /api/auth/pin/verify` with no direct Supabase auth calls remaining (Google OAuth path unchanged — already uses server callback) in `src/app/(auth)/login/page.tsx`
+- [x] T088 [P] [US12] Add retry/TLS error handling utility for server-side Supabase auth calls (1 retry with 500ms exponential backoff on transient network/5xx errors, no retry on 4xx) in `src/lib/auth/retry.ts` and integrate into `/api/auth/login` and `/api/auth/pin/verify` routes
+- [x] T089 [P] [US12] Write unit tests for `POST /api/auth/login` route (successful login sets cookies, invalid credentials return 401, transient error triggers retry, retry exhaustion returns 500) in `src/app/api/auth/login/route.test.ts`
+- [x] T090 [US12] Create E2E test verifying login still works through proxy routes: owner logs in via `/api/auth/login` → reaches admin dashboard → hosteler logs in via `/api/auth/pin/verify` → reaches hosteler dashboard → sessions persist correctly in `e2e/us12-auth-proxy.spec.ts`
+
+**Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
 
 **Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
 

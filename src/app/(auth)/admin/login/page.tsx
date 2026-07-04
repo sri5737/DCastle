@@ -1,42 +1,39 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
+	const [error, setError] = useState('');
+	const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+	async function handleSubmit(e: React.FormEvent) {
+		e.preventDefault();
+		setError('');
+		setLoading(true);
 
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+		try {
+			const response = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email, password }),
+			});
 
-      if (authError) {
-        setError(authError.message);
-        return;
-      }
+      const data = await response.json();
 
-      if (data.session) {
-        // Store tokens in cookies for middleware access
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        window.location.href = '/admin/dashboard';
-      }
-    } catch {
-      setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }
+      if (response.ok) {
+        window.location.href = data.redirectTo || '/admin/dashboard';
+				return;
+			}
+
+      setError(data.error || 'Login failed. Please check your credentials.');
+		} catch {
+			setError('An unexpected network error occurred. Please try again.');
+		} finally {
+			setLoading(false);
+		}
+	}
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
