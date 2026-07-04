@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const OWNER_EMAIL = process.env.OWNER_EMAIL || '';
+import { getEnvVar } from '@/lib/env';
 
 // Decode JWT payload without network call (for routing decisions only)
 function decodeJwtPayload(token: string): { email?: string; exp?: number; sub?: string } | null {
@@ -70,7 +69,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const isOwner = payload.email === OWNER_EMAIL;
+  const isOwner = payload.email === getEnvVar('OWNER_EMAIL');
 
   // Protect owner routes
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/hostelers') || pathname.startsWith('/history') || pathname.startsWith('/billing') || pathname.startsWith('/settings')) {
