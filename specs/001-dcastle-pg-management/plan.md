@@ -6,7 +6,7 @@
 
 ## Summary
 
-A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, and Android installability. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The post-clarification planning delta aligns the implementation plan with Constitution v1.5.1 and FR-066 through FR-069 by requiring an honest E2E audit and correction pass for completed and future stories before any story or phase can be considered accepted.
+A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, Android installability, and an Android mobile app experience as the primary layout target. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The honest-E2E planning delta preserves Constitution XI and FR-066 through FR-069 by requiring an audit and correction pass for completed and future stories before any story or phase can be considered accepted. The Constitution v1.6.0 Android mobile app experience delta adds FR-071 through FR-079 and makes Android Chrome at 375 px the primary design baseline for every completed owner, hosteler, and auth screen, with no page-level horizontal overflow, touch-friendly controls, reachable app-like navigation, stable browser/standalone viewport behavior, and installed/standalone PWA validation for applicable owner and hosteler flows.
 
 ## Technical Context
 
@@ -26,17 +26,19 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 - Auth E2E evidence must log owner and hosteler users in through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated surface, and verify the user remains on the correct role page. US12 proxy coverage must prove `/api/auth/login` and `/api/auth/pin/verify` are used without injected-session shortcuts.
 - E2E tests cover each documented story flow, including PIN lockout, pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, exclusion of those canceled rows from normal owner history/export, dashboards, and billing inputs, and scoped performance evidence for SC-001 and SC-010.
 - PWA checks validate manifest metadata, icon metadata, service worker registration, offline app-shell behavior, and install-prompt gating.
-- Manual Android validation remains required for installability, app-drawer presence, standalone launch, and installed offline-shell behavior.
+- Android mobile layout checks validate completed owner, hosteler, and auth screens at the 375 px Android Chrome baseline for no page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, unreadable text, unstable viewport jumps, desktop-only navigation, hover-only actions, or unsafe touch spacing.
+- Standalone PWA checks validate applicable installed-app flows for owner and hosteler navigation, viewport height, safe-area/keyboard/modal behavior, offline/online layout states, and primary action reachability.
+- Manual Android validation remains required for installability, app-drawer presence, standalone launch, installed offline-shell behavior, and any mobile app experience evidence that cannot be proven by desktop browser automation.
 - Per-story scripts must cover every documented story, including `npm run test:us12` for the server-side auth proxy. `/speckit.tasks` should refresh any missing scripts and ensure each story command runs the honest E2E evidence for that story in addition to relevant unit coverage.
 - CI quality gate remains `npm run test:run` and `npm run test:e2e` before build/deploy, and deployment readiness must also run `npm run build:cloudflare` so strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures are caught before production deployment.
 
-**Target Platform**: Mobile-first true PWA (375 px baseline), Android Chrome installability target, Edge Runtime deployment on Cloudflare Pages
+**Target Platform**: Android mobile-first true PWA (375 px baseline as the primary experience), Android Chrome installability target, installed standalone PWA usage, Edge Runtime deployment on Cloudflare Pages
 
 **Project Type**: Full-stack Next.js monolith with App Router and co-located API routes
 
 **Performance Goals**: Food submission interaction completes in under 30 seconds using scoped browser or manual acceptance evidence for the documented login-and-submit flow, owner count updates propagate in under 3 seconds, owner can find a deleted record inside the deleted tab in under 30 seconds, and the system supports up to 100 hostelers with scoped seeded-data evidence and representative submission/dashboard checks rather than full load-testing infrastructure
 
-**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell, honest E2E acceptance evidence for every completed story, no injected-session shortcut as core auth proof, real UI/API execution for feature evidence, and scoped SC-001/SC-010 performance evidence without adding load-test infrastructure unless a future spec requires it
+**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell, Android mobile app-like navigation/layout as the primary user experience, no page-level horizontal overflow at 375 px, touch-friendly controls, stable viewport behavior in browser and standalone PWA contexts, honest E2E acceptance evidence for every completed story, no injected-session shortcut as core auth proof, real UI/API execution for feature evidence, and scoped SC-001/SC-010 performance evidence without adding load-test infrastructure unless a future spec requires it
 
 **Scale/Scope**: Single-property deployment, about 40 active hostelers at launch and up to 100, owner and hosteler web surfaces in the current Next.js app, plus Supabase-backed API and data model changes for lifecycle and billing history
 
@@ -46,7 +48,7 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 
 | # | Principle | Status | Evidence |
 |---|-----------|--------|----------|
-| I | Mobile-First | PASS | 375 px baseline, shadcn/ui-first component strategy, owner deleted-tab and confirmation flows remain mobile-first and touch-sized |
+| I | Mobile-First | PASS | Constitution v1.6.0 makes Android Chrome at 375 px the primary baseline; FR-071 through FR-079 require app-like mobile navigation, touch-friendly controls, no page-level horizontal overflow, no clipped/overlapping/unreachable primary UI, stable browser and standalone PWA viewport behavior, and validation evidence before user-facing screens are accepted |
 | II | Edge Runtime Compatibility | PASS | Route handlers remain Edge-only, lifecycle changes rely on Supabase APIs and SQL state changes rather than Node-only packages |
 | III | Security & Data Isolation | PASS | RLS remains mandatory, owner-only deleted-record visibility is preserved, inactive/deleted access is revoked server-side, invite invalidation and PIN/session revocation happen server-side only |
 | IV | Server-Side Deadline Enforcement | PASS | Food writes still use server-side IST deadline checks, and active-delete flow cancels future dated rows through server-side lifecycle logic |
@@ -58,7 +60,7 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 | X | True Progressive Web App | PASS | PWA scope is unchanged and remains validated independently of the lifecycle additions |
 | XI | Honest End-to-End Validation | PASS | FR-066 through FR-069 require audit/correction of completed and future E2E tests for exact business outcomes, cross-role producer-to-consumer proof, dashboard initial/live/reload-stable evidence, and auth reload stability through real login UI/server routes |
 
-**Gate Result**: ALL PASS. The v1.2 deletion/archive behavior and honest E2E clarification fit the constitution through additive schema/contract updates and stricter acceptance evidence inside the existing Next.js 15.3.3 plus Supabase architecture.
+**Gate Result**: ALL PASS. The v1.2 deletion/archive behavior, honest E2E clarification, and Constitution v1.6.0 Android mobile app experience requirements fit the constitution through additive schema/contract updates, stricter acceptance evidence, and mobile-first validation inside the existing Next.js 15.3.3 plus Supabase architecture.
 
 ## Project Structure
 
@@ -281,3 +283,33 @@ supabase/
 5. Run `npm run test:run`, the affected `npm run test:usN` command, `npm run test:e2e`, and `npm run build:cloudflare` before declaring the audited or deployment-ready scope complete.
 
 **Checkpoint**: Existing and future E2E suites satisfy Constitution XI and FR-066 through FR-069; weak tests are corrected, story-scoped scripts include US12, and acceptance evidence covers exact business outcomes, cross-role proof, dashboard reload stability, auth reload stability, PIN lockout, and scoped SC-001/SC-010 performance evidence.
+
+---
+
+## Phase 18: Android Mobile App Experience Remediation & Validation (Cross-Cutting)
+
+**Goal**: Treat Android mobile as the primary experience for completed user-facing screens, correcting any layout that behaves like a broken desktop shrink-down and validating applicable screens in installed/standalone PWA context.
+
+**Scope**:
+
+| Evidence Area | Required Proof |
+|---------------|----------------|
+| Android primary layout | Completed owner, hosteler, and auth screens are validated at the 375 px Android mobile baseline |
+| No horizontal overflow | Pages do not create page-level horizontal scrolling, clipped primary content, overlapping controls, or hidden primary actions |
+| Mobile app navigation | Owner and hosteler role destinations remain reachable without desktop-only sidebars, hover interactions, or off-screen controls |
+| Touch and readability | Controls are touch-friendly, text is readable without pinch zoom, and dense data reflows or wraps without breaking the viewport |
+| Stable viewport behavior | Android Chrome browser chrome, standalone PWA mode, virtual keyboard, modal positioning, offline/online states, and safe-area spacing do not obstruct core tasks or trigger layout jumps that hide primary actions |
+| Core hosteler flow | Login, dashboard review, food preference submission, confirmation, and dashboard return complete at 375 px and in standalone PWA context where applicable |
+| Core owner flow | Login, dashboard count review, pending/submitted review, hosteler management actions, and settings updates complete at 375 px and in standalone PWA context where applicable |
+
+**Phase Planning Rules**:
+
+1. Inventory completed user-facing screens before remediation so validation scope is explicit.
+2. Correct shared role navigation shells before screen-specific layout fixes, because shell behavior controls most mobile reachability failures.
+3. Add automated mobile viewport evidence for page-level overflow, clipped content, overlapping controls, touch target reachability, and primary-action reachability where the browser test environment can prove it.
+4. Record manual Android Chrome and installed/standalone PWA evidence for flows that cannot be fully proven by automated browser tests, including owner and hosteler core workflows launched from the installed app where applicable.
+5. Keep the existing Honest E2E and Cloudflare build parity gates intact: run the relevant story/mobile E2E commands, `npm run test:run`, `npm run test:e2e`, and `npm run build:cloudflare` before declaring the mobile experience accepted.
+
+**Phase 18 consistency note**: Phase 18 / US13 is a planning and validation gate for completed user-facing screens, not permission to change business behavior. Any mobile remediation must preserve the existing story contracts in `spec.md`, the task order in `tasks.md`, and the honest E2E/Cloudflare parity evidence requirements from Phase 17.
+
+**Checkpoint**: Android mobile validation passes for completed user-facing screens, applicable standalone PWA validation passes, and the app can be used as a stable mobile app for the documented owner and hosteler core flows.

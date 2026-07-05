@@ -1,7 +1,16 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { LayoutDashboard, Users, Receipt, Settings, LogOut } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const OWNER_NAV = [
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/hostelers', label: 'Hostelers', icon: Users },
+  { href: '/admin/billing', label: 'Billing', icon: Receipt },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
+];
 
 export default function OwnerLayout({
   children,
@@ -9,42 +18,82 @@ export default function OwnerLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   async function handleSignOut() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/admin/login');
   }
 
+  function isActive(href: string) {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <nav className="border-b bg-card">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/admin/dashboard" className="font-bold text-lg">
+      {/* Top app bar */}
+      <header className="sticky top-0 z-40 border-b bg-card pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3">
+          <Link href="/admin/dashboard" className="truncate text-lg font-bold">
             Deekshana Castle
           </Link>
-          <div className="flex items-center gap-4 text-sm">
-            <Link href="/admin/dashboard" className="hover:text-primary">
-              Dashboard
-            </Link>
-            <Link href="/admin/hostelers" className="hover:text-primary">
-              Hostelers
-            </Link>
-            <Link href="/admin/billing" className="hover:text-primary">
-              Billing
-            </Link>
-            <Link href="/admin/settings" className="hover:text-primary">
-              Settings
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Sign Out
-            </button>
-          </div>
+
+          {/* Inline nav on larger screens */}
+          <nav className="hidden items-center gap-4 text-sm md:flex">
+            {OWNER_NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'hover:text-primary',
+                  isActive(item.href) ? 'font-semibold text-primary' : 'text-foreground'
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <button
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Content: extra bottom padding on mobile to clear the bottom tab bar */}
+      <main className="mx-auto max-w-5xl px-4 py-6 pb-24 md:pb-6">{children}</main>
+
+      {/* Bottom tab bar on mobile (app-like navigation) */}
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
+        <div className="mx-auto flex max-w-5xl items-stretch justify-around">
+          {OWNER_NAV.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-xs',
+                  active ? 'font-semibold text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
-      <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
     </div>
   );
 }

@@ -48,6 +48,11 @@ export async function loginAsAdmin(page: Page, email?: string, password?: string
 }
 
 /**
+ * Backwards-compatible alias for owner login used by existing specs.
+ */
+export const loginAsOwner = loginAsAdmin;
+
+/**
  * Login as a hosteler via phone + PIN on /login.
  * Uses E2E_TEST_HOSTELER_PHONE and E2E_TEST_HOSTELER_PIN from env.
  * This tests the server-side /api/auth/pin/verify proxy route.

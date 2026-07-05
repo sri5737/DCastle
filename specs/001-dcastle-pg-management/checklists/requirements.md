@@ -31,8 +31,8 @@
 
 ## Notes
 
-- All 11 user stories carry acceptance scenarios; 16 edge cases are documented.
-- 58 functional requirements (including FR-006a, FR-029a, FR-029b, FR-029c, and FR-058a) cover provisioning, auth, food submission, owner dashboard, hosteler management, deletion auditability, history, billing, settings, PWA, backup, and CI gate.
-- 13 measurable success criteria defined — all technology-agnostic.
+- All 13 user stories carry acceptance scenarios; 21 edge cases are documented.
+- 79 functional requirements (including FR-006a, FR-029a, FR-029b, FR-029c, FR-058a, and FR-071 through FR-079) cover provisioning, auth, food submission, owner dashboard, hosteler management, deletion auditability, history, billing, settings, PWA, Android mobile app experience, backup, and CI gate.
+- 15 measurable success criteria defined — all technology-agnostic.
 - Out-of-scope items (payments, notifications, multi-PG, auto-billing, analytics) are explicitly listed in Assumptions.
-- Clarification sessions on 2026-07-03 (5 questions) and 2026-07-04 (6 questions) resolved security, session, backup, billing, and hosteler deletion auditability ambiguities.
+- Clarification sessions on 2026-07-03 and 2026-07-04 resolved security, session, backup, billing, hosteler deletion auditability, honest E2E, Cloudflare parity, and Android mobile app experience ambiguities.

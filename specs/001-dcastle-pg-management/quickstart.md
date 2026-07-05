@@ -64,6 +64,8 @@ npm run test:e2e
 
 Story-scoped validation commands must exist for every user story and include the honest E2E evidence for that story, including `npm run test:us12` for the server-side auth proxy flow. Existing completed-story suites must be audited before acceptance so they prove exact business outcomes through the real UI and real Next.js API routes.
 
+For user-facing stories, acceptance evidence must also include Android Chrome validation at the 375 px baseline. Screens used from the installed app require standalone PWA validation where applicable. Passing desktop E2E or broad responsive checks is not sufficient when a completed owner, hosteler, or auth screen has page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, hover-only navigation, or unsafe touch spacing on Android mobile.
+
 ---
 
 ## Validation Scenarios
@@ -253,7 +255,7 @@ Expected:
 
 ---
 
-### Scenario 11: Nightly Backup
+### Scenario 12: Nightly Backup
 
 **Steps**:
 1. Manually trigger the backup workflow (or wait for cron schedule)
@@ -270,7 +272,7 @@ Expected:
 
 ---
 
-### Scenario 12: PIN Brute-Force Lockout
+### Scenario 13: PIN Brute-Force Lockout
 
 **Steps**:
 1. Log in as a hosteler via PIN to confirm credentials work
@@ -289,7 +291,7 @@ Expected:
 
 ---
 
-### Scenario 13: Session Invalidation on Deactivation
+### Scenario 14: Session Invalidation on Deactivation
 
 **Steps**:
 1. Log in as a hosteler on two separate browser sessions (simulating two devices)
@@ -308,7 +310,7 @@ Expected:
 
 ---
 
-### Scenario 14: Honest E2E Evidence Audit
+### Scenario 15: Honest E2E Evidence Audit
 
 **Steps**:
 1. Run each story-scoped command from US1 through US12, including `npm run test:us12` once added.
@@ -328,6 +330,27 @@ Expected:
 
 ---
 
+### Scenario 16: Android Mobile App Experience Validation
+
+**Steps**:
+1. Inventory every completed auth, hosteler, and owner screen and record whether it is used in Android Chrome only, installed standalone PWA mode, or both.
+2. Open each completed user-facing screen at a 375 px Android mobile viewport and verify there is no page-level horizontal overflow.
+3. Complete the core hosteler flow: login, dashboard review, food preference submission, confirmation, and return to dashboard.
+4. Complete the core owner flow: login, dashboard count review, pending/submitted review, hosteler management action, and settings update.
+5. For screens used from the installed app, launch in standalone PWA context and repeat the applicable owner or hosteler flow.
+6. Record device/emulator name, Android version, Chrome version, viewport, browser or standalone context, pass/fail notes, and any screenshots or observations in `pwa-android-validation.md`.
+
+**Expected**:
+- All completed owner, hosteler, and auth screens remain readable and usable at 375 px width.
+- Primary navigation and actions are reachable without desktop-only sidebars, hover interactions, off-screen menus, hidden controls, or precision mouse interactions.
+- Controls are touch-friendly, with primary controls at least 44 px in their smallest touch dimension unless the component standard is stricter.
+- Tables, dashboards, lists, cards, dialogs, forms, tabs, toggles, and settings surfaces adapt without page-level horizontal scrolling, clipped primary content, overlapping controls, or unreachable save/delete/submit actions.
+- Browser chrome, standalone PWA viewport height, virtual keyboard, safe-area spacing, modal positioning, and offline/online states do not hide primary actions or create unstable viewport jumps.
+
+**Contracts referenced**: [pwa.md](contracts/pwa.md)
+
+---
+
 ## Test Coverage Checklist
 
 | Area | Key Tests |
@@ -341,3 +364,4 @@ Expected:
 | Bill calculation | Simple month, mid-month rate change, zero preferences, regen without notification |
 | RLS policies | Hosteler isolation, owner access, anon rejection |
 | Realtime | Subscription connect/disconnect/reconnect |
+| Android mobile app experience | 375 px viewport overflow checks, primary-action reachability, app-like navigation, touch target checks, standalone PWA flow validation |

@@ -223,6 +223,24 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 
 ---
 
+### User Story 13 — Users Operate the App as a Mobile Android App Experience (Priority: P1)
+
+An owner or hosteler uses Deekshana Castle primarily on Android mobile, either in Android Chrome or as an installed standalone PWA. The app layout behaves like a purpose-built mobile app: navigation is reachable without desktop assumptions, controls are touch-friendly, text remains readable, no screen creates horizontal overflow, and core owner and hosteler workflows remain usable at a 375 px viewport width.
+
+**Why this priority**: The app is already a PWA, but daily use happens on Android phones. If the layout breaks on Android mobile, users cannot reliably submit meals, review counts, manage hostelers, or use the installed app as intended.
+
+**Independent Test**: Can be tested by opening each completed user-facing screen at a 375 px Android mobile viewport and, where installability applies, from an installed/standalone PWA context, then completing the core owner and hosteler flows without horizontal scrolling, clipped text, unreachable actions, unstable viewport jumps, or controls that are too small for touch.
+
+**Acceptance Scenarios**:
+
+1. **Given** a completed hosteler-facing screen is opened on Android Chrome at 375 px width, **When** the user views and interacts with the screen, **Then** all content fits within the viewport with no horizontal scrolling, clipped primary content, or overlapping controls.
+2. **Given** a completed owner-facing screen is opened on Android Chrome at 375 px width, **When** the owner reviews dashboards, tables, forms, dialogs, and action controls, **Then** the layout remains usable without desktop-only columns, off-screen actions, or horizontal overflow.
+3. **Given** the app is installed and launched in Android PWA standalone mode, **When** a hosteler opens the dashboard, submits food preferences, and returns to the dashboard, **Then** navigation, viewport height, touch controls, confirmation state, and offline/online layout states behave like a mobile app and remain stable without browser-chrome-dependent spacing.
+4. **Given** the app is installed and launched in Android PWA standalone mode, **When** the owner logs in, opens the dashboard, manages hostelers, and updates settings, **Then** primary navigation and actions remain reachable, touch-friendly, readable, and not obscured by viewport, safe-area, keyboard, or modal positioning issues.
+5. **Given** any user-facing screen is marked complete, **When** acceptance evidence is recorded for that screen, **Then** the evidence includes validation at the 375 px mobile baseline and, where the screen participates in installed PWA usage, validation in standalone PWA context.
+
+---
+
 ### Edge Cases
 
 - What happens when a hosteler submits preferences exactly at the deadline second? → Submission is rejected server-side; client shows "closed" message.
@@ -235,6 +253,9 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - What happens if the app is opened while offline? → The app shell loads from the local cache; data operations that require connectivity show an appropriate offline indicator.
 - What happens if Android Chrome does not report install eligibility yet? → The custom install action remains hidden or disabled until install eligibility is available; the app must not present a dead install control.
 - What happens if the app is already installed on Android? → The website does not continue prompting the user to install; launching from the Android app drawer opens the installed standalone app.
+- What happens if an Android mobile viewport has less usable height because of browser chrome, the virtual keyboard, or standalone PWA window differences? → User-facing screens must keep primary navigation and current task actions reachable without relying on fixed desktop-height assumptions; form fields and dialogs must remain visible or scroll naturally within the vertical viewport.
+- What happens if owner tables, dashboards, or hosteler history/billing views contain wide data on a 375 px Android viewport? → The screen must adapt the information into a mobile-usable layout without page-level horizontal overflow; any intentionally scrollable sub-region must be clearly bounded and must not hide primary actions off-screen.
+- What happens if a completed screen passes desktop or broad responsive tests but fails in installed Android standalone mode? → The screen is not accepted as complete until standalone PWA validation passes for the applicable user flow.
 - What happens when a hosteler's invite link expires before they activate? → The owner can generate a fresh invite link via the "Reset" action on the hostelers page.
 - What happens when a deactivated hosteler's device still has an active session cookie? → The next API call returns 401 with "Account deactivated"; the client redirects to the login page.
 - What happens when a hosteler enters a wrong PIN 5 times? → The phone number is locked out for 15 minutes; a message explains the cooldown.
@@ -359,6 +380,18 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **FR-069**: Authentication E2E validation MUST log in owner and hosteler users through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated page, and verify the user remains on the correct role surface. Direct cookie or localStorage injection is allowed only for documented setup helpers, never as the core proof that login works.
 - **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit tests or E2E tests may not exercise.
 
+**Android Mobile App Experience**
+
+- **FR-071**: Android mobile MUST be treated as the primary user experience for all completed user-facing screens, not as a desktop layout merely reduced to a smaller viewport.
+- **FR-072**: Every completed hosteler-facing and owner-facing screen MUST be usable at a 375 px wide Android mobile viewport with no page-level horizontal overflow, clipped primary content, overlapping interactive elements, or unreachable primary actions.
+- **FR-073**: Navigation on Android mobile MUST behave like a mobile app experience: primary owner and hosteler destinations must be reachable from the current role shell without relying on desktop-width sidebars, hover interactions, or off-screen menus.
+- **FR-074**: Interactive controls on Android mobile MUST be touch-friendly, with enough target size and spacing to avoid accidental activation in normal one-handed use.
+- **FR-075**: Text, labels, form fields, table/card content, dialog content, and status messages on Android mobile MUST remain readable without requiring pinch zoom, and long values MUST wrap, truncate with accessible context, or reflow without breaking the screen.
+- **FR-076**: Android mobile viewport behavior MUST remain stable across normal browser mode and installed PWA standalone mode, including safe spacing around the top and bottom viewport edges, modal/dialog positioning, virtual-keyboard interactions, and offline/online state changes.
+- **FR-077**: Core hosteler flows on Android mobile at 375 px width and in installed PWA standalone mode MUST support login, dashboard review, food preference submission, submission confirmation, and navigation back to the dashboard without layout breakage.
+- **FR-078**: Core owner flows on Android mobile at 375 px width and in installed PWA standalone mode MUST support login, dashboard count review, pending/submitted review, hosteler management actions, and settings updates without layout breakage.
+- **FR-079**: Completion evidence for any user-facing screen MUST include validation at the 375 px Android mobile baseline; if the screen participates in installed app usage, evidence MUST also include installed or standalone PWA context validation where applicable.
+
 ---
 
 ### Key Entities
@@ -370,6 +403,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **Meal Rate**: The price per meal type (breakfast, lunch, dinner) as configured by the owner. Each rate record has an effective start date, allowing historical rate lookup for accurate billing.
 - **Monthly Bill**: A computed record of a hosteler's total meals and charges for a given calendar month. Produced by manual owner action.
 - **Settings**: System-wide configuration values. Includes the daily submission deadline time, which is owner-configurable.
+- **Android Mobile App Experience**: The primary presentation and interaction mode for Deekshana Castle on Android phones, covering Android Chrome and installed standalone PWA usage. It includes mobile navigation, viewport-safe layout, touch-friendly controls, readable content, and validation at the 375 px mobile baseline.
 
 ---
 
@@ -390,6 +424,8 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **SC-011**: In an installed Android PWA session with network disabled, the app shell loads in under 3 seconds and shows an offline state for data-dependent actions instead of a blank, browser error, or broken page.
 - **SC-012**: PWA verification produces passing automated evidence for manifest, service worker, offline shell, and install prompt behavior, plus manual Android evidence for app drawer presence and standalone launch.
 - **SC-013**: The owner can delete an active or pending hosteler and later locate that deleted record, with its retained audit context, in under 30 seconds; for active deletions, the deleted record keeps past and same-day history, exposes canceled future-dated food preferences only in the deleted/audit view, and ensures those canceled records never appear in normal owner history/export, dashboard counts, or bill inputs.
+- **SC-014**: At 375 px Android mobile viewport width, 100% of completed user-facing screens complete mobile layout validation with no page-level horizontal scrolling, no clipped primary content, no overlapping controls, and no unreachable primary action.
+- **SC-015**: In installed Android PWA standalone mode, the core hosteler flow and core owner flow can each be completed without viewport jumps, keyboard/modal obstruction, unsafe spacing, unreadable text, or navigation dead ends.
 
 ---
 
@@ -409,6 +445,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Automated notifications (push, SMS, email) to hostelers are out of scope for v1.
 - Analytics dashboards and charts are out of scope for v1.
 - Android Chrome is the primary required installability target; iOS Safari add-to-home-screen support remains desirable where the browser permits it, but Android app drawer appearance is the required validation outcome.
+- Android mobile is the primary product experience for v1. Desktop and larger tablet layouts may exist, but they must not drive design decisions that break Android Chrome or installed Android PWA usage.
 - The nightly backup runs on a fixed cron schedule (2:00 AM IST) and uses the owner's Cloudflare R2 storage for retention.
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 - The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.
@@ -442,3 +479,4 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Q: What must auth E2E evidence prove after the server-side auth proxy work? → A: Owner and hosteler login must use the real login UI and server-side auth routes, survive post-login client effects plus reload, and must not use direct cookie or localStorage injection as the core authentication proof.
 - Q: How is the Next.js version conflict resolved for this feature? → A: The actual repository stack, Next.js 15.3.3, is intended; planning and constitution artifacts must align to that baseline rather than downgrading the implementation.
 - Q: How should SC-001 and SC-010 be validated for v1 acceptance? → A: Treat them as scoped acceptance evidence tasks using representative browser/manual timing and seeded 100-hosteler scenarios; full load-testing infrastructure is not required unless explicitly documented later.
+- Q: How should Android mobile layout breakage be handled now that the app is already a PWA? → A: Treat Android mobile as the primary product experience. Completed user-facing screens must pass 375 px mobile baseline validation, and screens used from the installed app must also pass standalone PWA validation where applicable.

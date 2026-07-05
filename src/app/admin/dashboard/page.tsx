@@ -117,7 +117,7 @@ export default function OwnerDashboardPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
       <p className="text-sm text-muted-foreground">
         Food counts for tomorrow ({tomorrowDate})
@@ -136,7 +136,7 @@ export default function OwnerDashboardPage() {
       )}
 
       {/* Meal count cards (T039/T041) */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <MealCountCard mealType="breakfast" count={counts.breakfast} label="Breakfast" />
         <MealCountCard mealType="lunch" count={counts.lunch} label="Lunch" />
         <MealCountCard mealType="dinner" count={counts.dinner} label="Dinner" />

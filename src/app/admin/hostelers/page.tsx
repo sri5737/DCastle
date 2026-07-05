@@ -439,18 +439,18 @@ export default function HostelerManagementPage() {
 
       {/* Status Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="active">Active ({counts.active})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
-          <TabsTrigger value="inactive">Inactive ({counts.inactive})</TabsTrigger>
-          <TabsTrigger value="deleted">Deleted ({counts.deleted})</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+          <TabsTrigger value="active" className="w-full">Active ({counts.active})</TabsTrigger>
+          <TabsTrigger value="pending" className="w-full">Pending ({counts.pending})</TabsTrigger>
+          <TabsTrigger value="inactive" className="w-full">Inactive ({counts.inactive})</TabsTrigger>
+          <TabsTrigger value="deleted" className="w-full">Deleted ({counts.deleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active">
           <HostelerTable
             hostelers={filteredHostelers}
             actions={(h) => (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -484,7 +484,7 @@ export default function HostelerManagementPage() {
           <HostelerTable
             hostelers={filteredHostelers}
             actions={(h) => (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -510,7 +510,7 @@ export default function HostelerManagementPage() {
           <HostelerTable
             hostelers={filteredHostelers}
             actions={(h) => (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -707,6 +707,13 @@ function formatMeals(preference: Pick<AuditResponse['audit']['canceled_future_pr
   return meals.length > 0 ? meals.join(', ') : 'None';
 }
 
+function statusBadgeVariant(status: HostelerItem['status']) {
+  if (status === 'active') return 'default';
+  if (status === 'pending') return 'secondary';
+  if (status === 'deleted') return 'destructive';
+  return 'outline';
+}
+
 function HostelerTable({
   hostelers,
   actions,
@@ -723,15 +730,19 @@ function HostelerTable({
   }
 
   return (
-    <div className="border rounded-md">
+    // Single table inside a horizontally contained region: readable on desktop
+    // and, at the 375px Android baseline, scrolls within this region instead of
+    // creating page-level horizontal overflow (SC-014). Rendered once so a
+    // hosteler name never appears twice in the DOM.
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full">
         <thead>
           <tr className="border-b bg-muted/50">
-            <th className="text-left p-3 font-medium">Name</th>
-            <th className="text-left p-3 font-medium">Phone</th>
-            <th className="text-left p-3 font-medium">Room</th>
-            <th className="text-left p-3 font-medium">Status</th>
-            <th className="text-left p-3 font-medium">Actions</th>
+            <th className="p-3 text-left font-medium">Name</th>
+            <th className="p-3 text-left font-medium">Phone</th>
+            <th className="p-3 text-left font-medium">Room</th>
+            <th className="p-3 text-left font-medium">Status</th>
+            <th className="p-3 text-left font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -741,19 +752,7 @@ function HostelerTable({
               <td className="p-3">{h.phone}</td>
               <td className="p-3">{h.room_number}</td>
               <td className="p-3">
-                <Badge
-                  variant={
-                    h.status === 'active'
-                      ? 'default'
-                      : h.status === 'pending'
-                      ? 'secondary'
-                      : h.status === 'deleted'
-                      ? 'destructive'
-                      : 'outline'
-                  }
-                >
-                  {h.status}
-                </Badge>
+                <Badge variant={statusBadgeVariant(h.status)}>{h.status}</Badge>
                 {h.status === 'deleted' ? (
                   <div className="mt-1 text-xs text-muted-foreground">
                     From {h.deleted_from_status} on {h.deletion_effective_date}

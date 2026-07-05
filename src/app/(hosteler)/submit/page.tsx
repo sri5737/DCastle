@@ -82,7 +82,7 @@ export default function SubmitFoodPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-6 space-y-4">
+    <div className="space-y-4">
       {serverTime && (
         <CountdownBanner deadlineTime={deadlineTime} serverTimeIST={serverTime} />
       )}

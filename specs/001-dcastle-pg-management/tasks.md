@@ -180,16 +180,16 @@
 
 **Goal**: Owner updates the daily submission deadline time and per-meal rates; rate changes apply from next calendar day
 
-**Independent Test**: Change deadline → verify form locks at new time; change rate → verify next billing uses updated rate from tomorrow
+**Independent Test**: Change deadline → verify form locks at new time; change rate → verify next billing uses updated rate from tomorrow; validate the owner settings surface at the 375 px Android baseline with no horizontal overflow, reachable save actions, touch-friendly controls, and standalone PWA behavior where the settings flow is used from the installed app
 
 **Why before US6**: Billing (US6) requires rate history infrastructure that this story completes
 
 ### Implementation for User Story 10
 
 - [x] T050 [US10] Implement `PATCH /api/settings` endpoint (update deadline_time immediately, insert new meal_rates row with effective_from = tomorrow) in `src/app/api/settings/route.ts`
-- [x] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) in `src/app/(owner)/settings/page.tsx`
+- [x] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) using a 375 px Android mobile-first layout with reachable save actions, no page-level horizontal overflow, and installed PWA-safe spacing where applicable in `src/app/(owner)/settings/page.tsx`
 - [x] T052 [US10] Add validation for deadline format (HH:MM, 24-hour) and rate values (positive numbers) with error feedback in `src/app/(owner)/settings/page.tsx`
-- [x] T052b [US10] Create E2E test: owner changes deadline time → verify new deadline displayed → change meal rate → verify rate shown as "effective from tomorrow" → hosteler form locks at new deadline time in `e2e/us10-settings.spec.ts`
+- [x] T052b [US10] Create E2E test: owner changes deadline time → verify new deadline displayed → change meal rate → verify rate shown as "effective from tomorrow" → hosteler form locks at new deadline time → validate owner settings at 375 px Android width with no overflow and reachable primary actions in `e2e/us10-settings.spec.ts`
 
 **Checkpoint**: Owner can configure deadline and rates; changes apply correctly to submissions and billing
 
@@ -199,7 +199,7 @@
 
 **Goal**: Owner selects month/year, triggers bill generation with per-day rate lookup (handles mid-month rate changes), views summary and per-hosteler detail
 
-**Independent Test**: Seed food data for a month with a mid-month rate change → generate bills → verify days before/after use correct rates
+**Independent Test**: Seed food data for a month with a mid-month rate change → generate bills → verify days before/after use correct rates; validate the owner billing UI at 375 px Android width with mobile-appropriate dense data layout, no page-level horizontal overflow, reachable generate/detail actions, and standalone PWA behavior where applicable
 
 ### Implementation for User Story 6
 
@@ -207,9 +207,9 @@
 - [ ] T054 [US6] Implement `POST /api/billing/generate` endpoint (compute bills from preserved non-canceled history for active, inactive, and deleted-from-active hostelers in the target month, then upsert into `monthly_bills`) in `src/app/api/billing/generate/route.ts`
 - [ ] T055 [US6] Implement `GET /api/billing` endpoint (return month summary for owners, including deleted-hosteler rows, or a single authenticated hosteler bill) in `src/app/api/billing/route.ts`
 - [ ] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day preserved-history breakdown with applicable rates, excluding canceled future rows) in `src/app/api/billing/detail/route.ts`
-- [ ] T057 [US6] Create owner billing page with month/year selector, generate button, bill summary table (name, room, meal counts, total), and per-hosteler detail drill-down in `src/app/(owner)/billing/page.tsx`
+- [ ] T057 [US6] Create owner billing page with month/year selector, generate button, mobile-appropriate bill summary layout (name, room, meal counts, total), and per-hosteler detail drill-down that works at the 375 px Android baseline with no page-level horizontal overflow and reachable primary actions in `src/app/(owner)/billing/page.tsx`
 - [ ] T057b [US6] Write unit tests for billing calculation covering single-rate months, mid-month rate changes, zero-preference months, inactive-hosteler inclusion, deleted-from-active preserved-history inclusion, and canceled-future-row exclusion in `src/lib/billing.test.ts`
-- [ ] T057c [US6] Create E2E test: seed preserved and canceled food preferences for a month → owner generates bills → verify deleted-from-active history is billed, canceled future rows are excluded, and per-day detail matches retained history in `e2e/us6-monthly-bills.spec.ts`
+- [ ] T057c [US6] Create E2E test: seed preserved and canceled food preferences for a month → owner generates bills → verify deleted-from-active history is billed, canceled future rows are excluded, per-day detail matches retained history, and the billing flow passes 375 px Android mobile validation plus standalone PWA validation where applicable in `e2e/us6-monthly-bills.spec.ts`
 
 **Checkpoint**: Owner can generate and review accurate monthly bills accounting for mid-month rate changes
 
@@ -219,13 +219,13 @@
 
 **Goal**: Hosteler selects a month and sees day-by-day meal history with monthly totals per meal type
 
-**Independent Test**: Submit preferences over several days → open history → verify per-day and monthly summary accuracy
+**Independent Test**: Submit preferences over several days → open history → verify per-day and monthly summary accuracy; validate the hosteler history UI at 375 px Android width with readable day rows, reachable month controls, no horizontal overflow, and standalone PWA behavior where applicable
 
 ### Implementation for User Story 7
 
 - [ ] T058 [US7] Implement `GET /api/food/history` endpoint (return the authenticated hosteler's preserved per-day food preferences and summary counts for the selected month, excluding canceled rows) in `src/app/api/food/history/route.ts`
-- [ ] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) in `src/app/(hosteler)/history/page.tsx`
-- [ ] T059b [US7] Create E2E test: hosteler submits food preferences for multiple days → navigates to history page → selects current month → verifies day-by-day list matches submissions → verifies monthly totals are correct in `e2e/us7-food-history.spec.ts`
+- [ ] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly month controls in `src/app/(hosteler)/history/page.tsx`
+- [ ] T059b [US7] Create E2E test: hosteler submits food preferences for multiple days → navigates to history page → selects current month → verifies day-by-day list matches submissions → verifies monthly totals are correct → validates the history flow at 375 px Android width and standalone PWA context where applicable in `e2e/us7-food-history.spec.ts`
 
 **Checkpoint**: Hostelers can review their own food preference history by month
 
@@ -235,13 +235,13 @@
 
 **Goal**: Hosteler sees their monthly bill breakdown (meal counts, rates, subtotals, total) with owner confirmation note
 
-**Independent Test**: After owner generates bills → hosteler views that month → sees accurate figures matching owner view
+**Independent Test**: After owner generates bills → hosteler views that month → sees accurate figures matching owner view; validate the hosteler bill UI at 375 px Android width with readable totals, no horizontal overflow, reachable month controls, and standalone PWA behavior where applicable
 
 ### Implementation for User Story 8
 
-- [ ] T060 [US8] Create hosteler bill view page with month selector, meal count/rate/subtotal breakdown, highlighted total, and "confirmed by owner" note in `src/app/(hosteler)/bill/page.tsx`
+- [ ] T060 [US8] Create hosteler bill view page with month selector, meal count/rate/subtotal breakdown, highlighted total, and "confirmed by owner" note using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly controls in `src/app/(hosteler)/bill/page.tsx`
 - [ ] T061 [US8] Add "bill not yet available" empty state when no bill has been generated for the selected month in `src/app/(hosteler)/bill/page.tsx`
-- [ ] T061b [US8] Create E2E test: hosteler navigates to bill page with no bills → sees "not available" state → owner generates bill → hosteler refreshes → sees meal breakdown with correct counts, rates, and total in `e2e/us8-hosteler-bill.spec.ts`
+- [ ] T061b [US8] Create E2E test: hosteler navigates to bill page with no bills → sees "not available" state → owner generates bill → hosteler refreshes → sees meal breakdown with correct counts, rates, and total → validates the bill flow at 375 px Android width and standalone PWA context where applicable in `e2e/us8-hosteler-bill.spec.ts`
 
 **Checkpoint**: Hostelers can independently view and understand their monthly charges
 
@@ -251,14 +251,14 @@
 
 **Goal**: Owner filters preserved food history by hosteler and/or date range, views results in a table, and exports the same preserved dataset as CSV
 
-**Independent Test**: Filter by specific hosteler and date range → verify table shows only preserved rows → export CSV → verify the file matches the table and excludes audit-only canceled future rows
+**Independent Test**: Filter by specific hosteler and date range → verify table shows only preserved rows → export CSV → verify the file matches the table and excludes audit-only canceled future rows; validate the owner history/export UI at 375 px Android width with bounded dense data, reachable filters/export actions, no page-level horizontal overflow, and standalone PWA behavior where applicable
 
 ### Implementation for User Story 9
 
 - [ ] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id`, deleted-hosteler preserved-history filtering, date range params, and `format=csv`, while excluding audit-only canceled future rows from all normal history/export results in `src/app/api/food/history/route.ts`
-- [ ] T063 [US9] Create owner food history page with hosteler dropdown filter (including deleted records for preserved history only), date range picker, preserved-history results table, and `Export CSV` download button in `src/app/(owner)/history/page.tsx`
+- [ ] T063 [US9] Create owner food history page with hosteler dropdown filter (including deleted records for preserved history only), date range picker, mobile-appropriate preserved-history results layout, and reachable `Export CSV` action at the 375 px Android baseline without page-level horizontal overflow in `src/app/(owner)/history/page.tsx`
 - [ ] T064 [US9] Implement CSV generation (build CSV string from filtered data, trigger browser download) in `src/app/(owner)/history/page.tsx`
-- [ ] T064b [US9] Create E2E test: owner filters food history for an active and a deleted hosteler → verifies deleted-hosteler preserved rows appear, canceled future rows remain unavailable in normal history/export and visible only from the deleted-hosteler audit view, and exported CSV matches the filtered on-screen data in `e2e/us9-owner-food-history.spec.ts`
+- [ ] T064b [US9] Create E2E test: owner filters food history for an active and a deleted hosteler → verifies deleted-hosteler preserved rows appear, canceled future rows remain unavailable in normal history/export and visible only from the deleted-hosteler audit view, exported CSV matches the filtered on-screen data, and the history/export flow passes 375 px Android mobile validation plus standalone PWA validation where applicable in `e2e/us9-owner-food-history.spec.ts`
 
 **Checkpoint**: Owner can review and export food history for record-keeping and dispute resolution
 
@@ -306,14 +306,14 @@
 
 **Goal**: Android Chrome users can install Deekshana Castle, see it in the Android app drawer, launch it in standalone mode, and load the cached app shell offline
 
-**Independent Test**: Open the deployed HTTPS app on Android Chrome → verify install eligibility and install action → install → confirm Android app drawer icon/name → launch standalone → disable network → verify cached app shell and offline states
+**Independent Test**: Open the deployed HTTPS app on Android Chrome at the 375 px baseline → verify install eligibility and install action → install → confirm Android app drawer icon/name → launch standalone → disable network → verify cached app shell, offline states, no page-level horizontal overflow, and reachable app shell navigation/actions
 
 **Why P1**: Daily food submission is phone-first behavior; app drawer presence and standalone launch make the app behave like a normal daily-use Android app.
 
 ### Tests for User Story 11
 
 - [ ] T070 [P] [US11] Add scoped PWA test script `test:us11` for `e2e/us11-pwa.spec.ts` in `package.json`
-- [ ] T071 [P] [US11] Create Playwright automated PWA checks for manifest required fields, 192x192/512x512/maskable icon metadata, service worker registration, offline app shell loading, install UI hidden state, and simulated `beforeinstallprompt` behavior in `e2e/us11-pwa.spec.ts`
+- [ ] T071 [P] [US11] Create Playwright automated PWA checks for manifest required fields, 192x192/512x512/maskable icon metadata, service worker registration, offline app shell loading, install UI hidden state, simulated `beforeinstallprompt` behavior, and 375 px Android viewport app-shell overflow/action reachability in `e2e/us11-pwa.spec.ts`
 - [ ] T072 [P] [US11] Create component tests for install prompt eligibility, accepted/dismissed prompt handling, `appinstalled` hiding, and standalone-mode hiding in `src/components/install-prompt.test.tsx`
 - [ ] T073 [P] [US11] Create component tests for offline state rendering on disconnected/reconnected network events in `src/components/offline-indicator.test.tsx`
 
@@ -325,13 +325,13 @@
 - [ ] T077 [US11] Configure service worker/app-shell caching for root layout, global styles, hosteler shell, owner shell, login entry points, and static PWA assets in `next.config.js` and `public/sw.js`
 - [ ] T078 [P] [US11] Implement Android Chrome install prompt handling with `beforeinstallprompt`, user-gesture `prompt()`, accepted/dismissed state, `appinstalled`, and standalone detection in `src/components/install-prompt.tsx`
 - [ ] T079 [P] [US11] Implement reusable offline indicator for disconnected data-dependent screens in `src/components/offline-indicator.tsx`
-- [ ] T080 [US11] Integrate install prompt and offline indicator into shared shells without showing misleading install UI when unavailable or already installed in `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
+- [ ] T080 [US11] Integrate install prompt and offline indicator into shared shells without showing misleading install UI when unavailable or already installed, preserving 375 px Android mobile-first navigation/action reachability and standalone PWA-safe spacing in `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
 
 ### Manual Validation Evidence for User Story 11
 
 - [ ] T081 [P] [US11] Create Android PWA manual evidence template with fields for device/emulator name, Android version, Chrome version, deployment URL, date, app drawer result, standalone launch result, offline shell result, and pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
-- [ ] T082 [US11] Execute Android Chrome manual validation on a real device or emulator and record evidence for installability, Android app drawer presence, standalone launch, and offline app shell in `specs/001-dcastle-pg-management/pwa-android-validation.md`
-- [ ] T083 [US11] Run `npm run test:us11`, `npm run test:run`, and `npm run test:e2e`; record pass/fail evidence and unresolved PWA risks in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [ ] T082 [US11] Execute Android Chrome manual validation on a real device or emulator and record evidence for installability, Android app drawer presence, standalone launch, offline app shell, 375 px viewport fit, and reachable app-shell actions in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [ ] T083 [US11] Run `npm run test:us11`, `npm run test:run`, `npm run test:e2e`, and `npm run build:cloudflare`; record pass/fail evidence and unresolved PWA, mobile layout, or Cloudflare build parity risks in `specs/001-dcastle-pg-management/pwa-android-validation.md`
 
 **Checkpoint**: Android Chrome can install Deekshana Castle as a true PWA; automated and manual evidence cover manifest, icons, service worker, offline shell, install prompt behavior, app drawer presence, and standalone launch
 
@@ -341,7 +341,7 @@
 
 **Purpose**: Full quickstart validation and final readiness checks across all completed stories
 
-- [ ] T084 Validate complete application against quickstart.md scenarios: manually execute all 11 validation scenarios end-to-end on a mobile device (375px viewport) and record pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [ ] T084 Validate complete application against quickstart.md scenarios: manually execute all documented validation scenarios end-to-end on a mobile device (375px viewport) and record pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
 
 ---
 
@@ -393,6 +393,29 @@
 
 ---
 
+## Phase 18: Android Mobile App Experience Remediation Gate for Completed Screens (Cross-Cutting P1)
+
+**Goal**: Remediate and validate already-built/current user-facing owner, hosteler, and auth screens so Android mobile is treated as the primary experience, not a desktop layout reduced to phone width, and validate the installed Android PWA standalone context where applicable.
+
+**Independent Test**: Open each already-built/current owner, hosteler, and auth screen at a 375 px Android mobile viewport and complete the core owner and hosteler flows in Android Chrome and installed/standalone PWA context where applicable. Evidence must show no page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, unsafe spacing, unreadable text, or viewport instability.
+
+**Blocking Rule**: Phase 18 blocks acceptance of already-built/current user-facing screens until their 375 px Android mobile validation passes. Screens used from the installed app also require standalone PWA validation where applicable. Phase 18 is not a deferral bucket for future user-facing phases: US6 through US11 must include mobile-first layout, 375 px Android validation, and standalone PWA validation where applicable in their own story tasks before those phases can be marked complete.
+
+### Mobile App Experience Remediation for FR-071 through FR-079, SC-014, and SC-015
+
+- [x] T103 [P] [US13] Inventory every already-built/current user-facing owner, hosteler, and auth screen and record whether it requires Android Chrome validation, standalone PWA validation, or both in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [x] T104 [P] [US13] Add or update mobile viewport E2E coverage so already-built/current user-facing screens are exercised at 375 px width with assertions against page-level horizontal overflow and unreachable primary actions in `e2e/`
+- [x] T105 [US13] Remediate shared owner and hosteler navigation shells so primary role destinations are reachable on Android mobile without desktop-only sidebars, hover interactions, off-screen menus, or hidden actions in `src/app/(owner)/layout.tsx`, `src/app/admin/layout.tsx`, and `src/app/(hosteler)/layout.tsx`
+- [x] T106 [US13] Remediate completed hosteler-facing screens for readable text, touch-friendly controls, safe spacing, stable viewport behavior, no horizontal overflow, and successful core login/dashboard/submission/dashboard return flow at 375 px and standalone PWA context in `src/app/(auth)/login/page.tsx`, `src/app/(hosteler)/dashboard/page.tsx`, and `src/app/(hosteler)/submit/page.tsx`
+- [x] T107 [US13] Remediate completed owner-facing screens for mobile-usable dashboards, lists/tables, dialogs, forms, settings, safe spacing, stable viewport behavior, no horizontal overflow, and successful dashboard/hosteler-management/settings core flows at 375 px and standalone PWA context in `src/app/admin/dashboard/page.tsx`, `src/app/admin/hostelers/page.tsx`, and `src/app/(owner)/settings/page.tsx`
+- [x] T108 [P] [US13] Add component or visual-regression-oriented checks for shared UI primitives most likely to break mobile layout, including dialogs, tables, tabs, toggles, cards, and buttons in `src/components/ui/` and related tests
+- [x] T109 [US13] Execute Android Chrome manual validation for already-built/current screens at the 375 px baseline and installed/standalone PWA behavior, recording device/emulator, Android version, Chrome version, viewport, pass/fail notes, and screenshots or observations in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [x] T110 [US13] Run `npm run test:run`, all relevant story-scoped mobile/E2E commands, `npm run test:e2e`, and `npm run build:cloudflare`; record any blocked command, environment issue, layout failure, or Cloudflare build issue in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+
+**Checkpoint**: Android mobile is validated as the primary app experience for already-built/current owner, hosteler, and auth screens; applicable standalone PWA checks pass; Cloudflare build parity plus honest E2E guardrails remain intact; future user-facing phases still carry their own mobile/PWA implementation and validation obligations.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -413,7 +436,12 @@
 - **US11 Android PWA (Phase 14)**: Depends on Foundational; can run in parallel with story work after Phase 2, but must complete before production delivery
 - **US12 Auth Proxy (Phase 16)**: Depends on Foundational + US4 (PIN verify route must exist); can run in parallel with Phases 9–12
 - **Honest E2E Remediation Gate (Phase 17)**: Depends on completed US1, US2, US3, US4, US5, US10, and US12 surfaces; blocks acceptance of completed stories under FR-066 through FR-069 and blocks marking any future story phase complete
-- **Final Polish (Phase 15)**: Depends on desired user stories, US11, and Phase 17 for full quickstart validation
+- **Android Mobile App Experience Remediation Gate (Phase 18)**: Depends on already-built/current user-facing screens and US11 standalone PWA capability for installed-context validation; blocks acceptance of those completed screens under FR-071 through FR-079, but does not defer future US6 through US11 mobile/PWA work out of their own story tasks
+- **Final Polish (Phase 15)**: Depends on desired user stories, US11, Phase 17, and Phase 18 for full quickstart validation
+
+### Mobile/PWA Acceptance Rule for Future User-Facing Work
+
+Future user-facing phases US6 through US11 must be designed, implemented, and validated mobile-first inside their own story phases. Each applicable story must include 375 px Android Chrome validation for no page-level horizontal overflow, reachable primary actions, readable/touch-friendly controls, stable viewport behavior, and standalone PWA validation where that screen is used from the installed app. Passing Phase 18 for already-built/current screens does not satisfy acceptance for future billing, history, settings, or PWA screens.
 
 ### User Story Dependencies
 
@@ -435,7 +463,8 @@ Phase 2 (Foundational)
   ├── Phase 14 (US11: Android PWA) — independent after Foundational, required before production delivery
   ├── Phase 16 (US12: Auth Proxy) — depends on Foundational + US4; parallel with Phases 9–12
   ├── Phase 17 (Honest E2E Remediation Gate) — depends on completed story surfaces US1/US2/US3/US4/US5/US10/US12; blocks acceptance and future phase completion
-  └── Phase 15 (Final Polish) — validates completed story set after Phase 17
+  ├── Phase 18 (US13: Android Mobile App Experience) — remediates already-built/current user-facing screens and validates US11 standalone PWA context where applicable
+  └── Phase 15 (Final Polish) — validates completed story set after Phase 17 and Phase 18
 ```
 
 ### Within Each User Story
@@ -444,6 +473,7 @@ Phase 2 (Foundational)
 - Services/lib before API routes
 - API routes before UI pages
 - Core implementation before integration/polish
+- For user-facing stories, mobile-first layout and 375 px Android validation are part of the story's own implementation and E2E/manual evidence, with standalone PWA validation where applicable
 - Story complete before moving to next priority
 
 ### Parallel Opportunities
@@ -462,11 +492,14 @@ Phase 2 (Foundational)
 
 **Phase 17** (Honest E2E Remediation): T091, T092, T095, T096, and T101 can begin in parallel because they touch distinct files; T093 depends on T092, T094 depends on T093, T100 depends on T093 and T095, T097 depends on deterministic test data/helpers from T091, T098/T099 depend on T091 and the existing US12 auth proxy, and T102 depends on T091 through T101
 
+**Phase 18** (Android Mobile App Experience Remediation Gate): T103, T104, and T108 can begin in parallel for already-built/current screens. T105 should land before screen-specific remediation in T106 and T107. T109 depends on the relevant remediation work and US11 installed PWA capability. T110 depends on T103 through T109. Future US6 through US11 screens are not queued into Phase 18; their mobile/PWA validation belongs to their own story tasks.
+
 **Cross-story parallelism** (after Foundational):
 - US5 (Hosteler Management) can be worked on in parallel with US3/US4/US1 sequence
 - US10 (Settings) can be worked on in parallel with the US3→US4→US1 sequence
 - US11 (Android PWA) can be worked on in parallel with US3/US4/US1/US2 after Foundational because it owns manifest, icons, service worker, install UI, offline UI, and PWA validation evidence
 - Phase 17 remediation can start now because the target completed story surfaces already exist, but future story completion remains blocked until Phase 17 passes
+- Phase 18 Android mobile app experience remediation can start for any already-built/current user-facing screen, but installed standalone validation depends on US11 PWA capability; future user-facing story work must carry its own Android mobile/PWA acceptance evidence before completion
 
 ---
 
@@ -479,7 +512,7 @@ Phase 2 (Foundational)
 - Hostelers can submit daily food preferences before the deadline
 - Deadline is enforced server-side
 
-For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** alongside or immediately after the MVP so Android users can install and relaunch the app from the app drawer.
+For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** and **Phase 18 (Android Mobile App Experience)** alongside or immediately after the MVP so Android users can install, relaunch, and actually use the app as a stable mobile app.
 
 ### Incremental Delivery After MVP
 
@@ -487,7 +520,8 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 2. **US5 (Hosteler Management)** — Enables ongoing hosteler lifecycle management
 3. **US10 (Settings)** — Enables deadline/rate configuration
 4. **Phase 17 (Honest E2E Remediation Gate)** — Required before accepting completed stories under FR-066 through FR-069 or marking future stories complete
-5. **US6 (Monthly Bills)** — Monthly billing workflow
-6. **US7, US8, US9** — Transparency and reporting features
-7. **US11 (Android PWA)** — True PWA installability, offline app shell, automated checks, and manual Android evidence if not already completed alongside MVP
-8. **Final Polish** — Full quickstart validation and release readiness checks
+5. **US6 (Monthly Bills)** — Monthly billing workflow, including 375 px Android mobile-first owner billing layout and applicable standalone PWA validation inside the story phase
+6. **US7, US8, US9** — Transparency and reporting features, each including 375 px Android mobile-first layouts and applicable standalone PWA validation inside the story phase
+7. **US11 (Android PWA)** — True PWA installability, offline app shell, 375 px app-shell validation, automated checks, Cloudflare build parity, and manual Android evidence if not already completed alongside MVP
+8. **Phase 18 (Android Mobile App Experience Remediation Gate)** — Mobile app-like layout, navigation, touch, overflow, and standalone viewport validation for already-built/current user-facing screens only; it does not replace mobile/PWA tasks in future US6 through US11 phases
+9. **Final Polish** — Full quickstart validation and release readiness checks

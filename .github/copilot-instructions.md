@@ -113,10 +113,26 @@ Implementation agents must perform:
 - unit tests
 - integration tests
 - E2E tests
+- Android mobile layout validation for affected user-facing screens
+- installed/standalone PWA validation for affected installed-app screens
 
 Any failures must be fixed automatically and retested.
 
 `npm run test:run`, per-story tests, and Playwright E2E are necessary but not sufficient deployment evidence without `npm run build:cloudflare`. Cloudflare Pages production builds execute `npx @cloudflare/next-on-pages`, so local validation must run the same gate where available. On Windows without Bash, the repository wrapper may fall back to `next build` for local strict TypeScript and production build validation, while CI/Linux must still execute the full adapter path.
+
+## Android Mobile App Experience Guardrails
+
+Android Chrome at 375 px width is the primary design baseline for all owner, hosteler, and auth screens. Desktop and tablet layouts are progressive enhancements only after the mobile experience is complete.
+
+For every user-facing UI change:
+- Design and inspect the affected screen at 375 px mobile width first.
+- Preserve a mobile app experience: primary navigation and actions must be reachable without desktop-only sidebars, hover-only controls, off-screen menus, hidden actions, or precision mouse interactions.
+- Ensure no page-level horizontal overflow, clipped primary content, overlapping controls, unreachable submit/save/delete actions, unstable viewport jumps, or unreadable text.
+- Use touch-friendly controls with safe spacing; primary controls should be at least 44 px in their smallest touch dimension unless the design system imposes a stricter standard.
+- Convert data-dense owner surfaces into mobile-appropriate layouts such as stacked cards, segmented views, contained tables, or horizontally contained regions that do not create page-level overflow.
+- Validate affected screens in Android Chrome/mobile viewport E2E where practical, and validate installed/standalone PWA behavior where the screen is used from the installed app.
+
+Do not mark user-facing tasks complete if the affected screen breaks at the 375 px Android baseline, even when unit tests, E2E tests, or Cloudflare build pass.
 
 Human approval is not required for iterative fixes, testing, or refactoring.
 

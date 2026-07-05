@@ -2,7 +2,7 @@
 
 **Phase**: 1 — Design & Contracts | **Date**: 2026-07-04
 
-This contract defines the browser-facing requirements for Deekshana Castle's true PWA behavior. It is not an HTTP API contract; it describes the manifest, service worker, install UI, offline shell, and validation evidence required by spec v1.1.
+This contract defines the browser-facing requirements for Deekshana Castle's true PWA behavior and Android mobile app experience. It is not an HTTP API contract; it describes the manifest, service worker, install UI, offline shell, standalone context, and validation evidence required by the current feature specification and Constitution v1.6.0.
 
 ---
 
@@ -58,6 +58,29 @@ This contract defines the browser-facing requirements for Deekshana Castle's tru
 
 ---
 
+## Android Mobile App Experience
+
+**Baseline**: Android Chrome at 375 px viewport width is the primary design and validation target for every completed owner, hosteler, and auth screen. Wider layouts are progressive enhancements.
+
+**Layout rules**:
+- No completed user-facing screen may create page-level horizontal overflow.
+- Primary content, submit/save/delete actions, role navigation, dialogs, tabs, toggles, tables/lists, and settings controls must remain visible, readable, and reachable.
+- Touch controls should be at least 44 px in their smallest touch dimension unless the component standard is stricter.
+- Owner dashboards, hosteler lists, history, billing, export, and settings surfaces must adapt dense information into stacked cards, segmented views, contained tables, or other bounded regions that do not create page-level overflow.
+- Hover-only affordances, desktop-only sidebars, off-screen menus, hidden primary actions, clipped text, overlapping controls, and unstable viewport jumps are acceptance blockers.
+
+**Standalone PWA rules**:
+- Screens used from the installed app must work in standalone display mode without relying on browser chrome spacing.
+- Core hosteler standalone flow covers login, dashboard, food submission, confirmation, and dashboard return.
+- Core owner standalone flow covers login, dashboard counts, pending/submitted review, hosteler management, and settings update.
+- Virtual keyboard, safe-area spacing, modal positioning, offline/online indicators, and viewport height changes must not hide primary actions.
+
+**Acceptance**:
+- Automated mobile viewport checks prove no page-level overflow and primary-action reachability where Playwright can observe it.
+- Manual Android Chrome or emulator evidence covers installed standalone flows where desktop automation cannot prove app-drawer launch, browser-address-bar absence, or device-specific viewport behavior.
+
+---
+
 ## Install Prompt UI
 
 **Eligibility source**: Android Chrome `beforeinstallprompt` event.
@@ -85,11 +108,13 @@ This contract defines the browser-facing requirements for Deekshana Castle's tru
 - Offline app shell loads under network-disabled conditions.
 - Install UI is hidden before browser eligibility.
 - Install UI appears and calls native prompt behavior when `beforeinstallprompt` can be simulated by the test environment.
+- Completed user-facing screens at 375 px width do not create page-level horizontal overflow and keep primary actions reachable where this can be proven in Playwright.
 
 **Manual Android checks**:
 - Install from Android Chrome on a real device or emulator.
 - Confirm Deekshana Castle appears in the Android app drawer with the expected name and icon.
 - Launch from the app drawer and confirm standalone display without the browser address bar.
 - Disable network and confirm the installed app loads the cached app shell and shows offline states for data-dependent areas.
+- Complete applicable owner and hosteler core flows in Android Chrome and installed standalone PWA context without clipped primary content, overlapping controls, unreachable actions, or unstable viewport jumps.
 
-Manual validation evidence should record device/emulator name, Android version, Chrome version, deployment URL, date, and pass/fail notes for the four checks above.
+Manual validation evidence should record device/emulator name, Android version, Chrome version, deployment URL, date, viewport, browser or standalone context, and pass/fail notes for the checks above.

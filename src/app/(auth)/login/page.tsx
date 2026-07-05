@@ -165,11 +165,13 @@ function LoginForm() {
             <Input
               id="phone"
               type="tel"
+              inputMode="numeric"
               placeholder="9876543210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               maxLength={10}
               disabled={loading || !hydrated}
+              className="h-12 text-base"
             />
           </div>
 
@@ -186,6 +188,7 @@ function LoginForm() {
               maxLength={4}
               inputMode="numeric"
               disabled={loading || !hydrated}
+              className="h-12 text-base"
             />
           </div>
 

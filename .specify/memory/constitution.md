@@ -1,16 +1,17 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.5.1 -> 1.5.2
+Version change: 1.5.2 -> 1.6.0
 Modified principles:
-  - VIII. CI/CD Pipeline with Isolated Test Job: build gate now explicitly requires Cloudflare adapter parity.
+  - I. Mobile-First: expanded from responsive baseline guidance into strict Android mobile app experience governance.
 Modified sections:
-  - Governance: validation evidence must include Cloudflare build parity before deployment or phase-complete claims.
+  - Governance: phase completion now requires mobile validation evidence for user-facing work.
 Added sections: None
 Removed sections: None
 Clarifications:
-  - `npm run build:cloudflare` is required because unit tests and E2E can pass while strict TypeScript or Cloudflare adapter/runtime builds fail.
-  - On Windows without Bash, the local wrapper may run `next build` as a parity fallback; CI/Linux must still execute the full `@cloudflare/next-on-pages` adapter.
+  - Android Chrome at 375 px width is the primary design baseline, not an afterthought.
+  - Installed/standalone PWA validation is required for screens used from the installed app.
+  - Page-level horizontal overflow, clipped primary actions, overlapping controls, desktop-only navigation, and hover-only interactions are completion blockers.
 Templates requiring updates:
   - .specify/templates/plan-template.md checked; no update required.
   - .specify/templates/spec-template.md checked; no update required.
@@ -38,6 +39,27 @@ not a trade-off.
 - Horizontal scrolling on mobile is forbidden.
 - shadcn/ui components MUST be used as the primary UI building block; custom
   components are only permitted when shadcn/ui cannot satisfy the requirement.
+- Android Chrome at 375 px width is the required design baseline for every
+  user-facing owner, hosteler, and auth screen. Wider layouts are enhancements
+  only after the 375 px experience is complete.
+- The app MUST feel and behave like a mobile app in Android PWA usage: primary
+  navigation and primary actions must be reachable without desktop sidebars,
+  hover-only affordances, off-screen menus, hidden controls, or precision mouse
+  interactions.
+- Primary controls, form fields, dialogs, tabs, toggles, tables/lists, and
+  bottom/top navigation MUST remain readable, touch-friendly, and reachable with
+  safe spacing. Controls should be at least 44 px in their smallest touch
+  dimension unless a stricter component standard applies.
+- Page-level horizontal overflow, clipped content, overlapping controls,
+  unreachable submit/save/delete actions, unstable viewport jumps, and text that
+  cannot fit its container are release-blocking defects on Android mobile.
+- Data-dense owner surfaces such as dashboards, hosteler lists, history,
+  billing, exports, and settings MUST use mobile-appropriate layouts such as
+  stacked cards, segmented views, contained tables, or horizontally contained
+  regions that do not create page-level overflow.
+- User-facing work is not complete until the relevant screens are validated at
+  375 px Android mobile width. Screens used from the installed app also require
+  installed/standalone PWA validation where applicable.
 
 ### II. Edge Runtime Compatibility (NON-NEGOTIABLE)
 
@@ -263,6 +285,9 @@ Before declaring deployment readiness or phase completion, validation evidence
 MUST include unit/integration tests, applicable E2E tests, and
 `npm run build:cloudflare` unless the task is explicitly documented as
 non-deployable documentation-only work.
+For user-facing changes, validation evidence MUST also include Android mobile
+layout checks for the affected screens at the 375 px baseline, and
+installed/standalone PWA checks where the screen is used from the installed app.
 Amendments require:
 
 1. A written proposal describing the change, its rationale, and a migration plan
@@ -289,6 +314,8 @@ complete:
 - Unit tests.
 - Integration tests.
 - E2E tests.
+- Android mobile layout validation for affected user-facing screens.
+- Installed/standalone PWA validation for affected installed-app screens.
 
 Any validation failure MUST be fixed automatically and retested until the
 completed scope passes or a genuine blocker is identified. Human approval is NOT
@@ -325,4 +352,4 @@ autonomously through the documented task scope:
     requested.
 12. Provide a final summary after all validation passes.
 
-**Version**: 1.5.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04
+**Version**: 1.6.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-04

@@ -107,7 +107,7 @@ supabase.channel('food-counts')
 **Alternatives considered**:
 - `next-pwa` (original) — rejected as less maintained than the selected package.
 - Manual service worker only — rejected unless generated service worker behavior cannot satisfy offline app-shell caching; it would increase maintenance with no current architecture need.
-- Treating PWA as only responsive web + manifest — rejected because spec v1.1 and Constitution Principle X require Android app drawer presence, standalone launch, and offline app shell evidence.
+- Treating PWA as only responsive web + manifest — rejected because the current feature specification and Constitution Principle X require Android app drawer presence, standalone launch, and offline app shell evidence.
 
 ---
 
@@ -230,6 +230,28 @@ All technical unknowns resolved. Architecture decisions are finalized:
 - Keeping existing E2E tests unchanged after the clarification — rejected because FR-066 through FR-069 explicitly require audit and correction.
 - Using direct database writes or injected sessions as the primary proof — rejected because those shortcuts bypass the behavior users rely on.
 - Adding full performance/load-test infrastructure for SC-001/SC-010 — rejected because the clarified success criteria require scoped acceptance evidence only.
+
+---
+
+### 14. Android Mobile App Experience Governance
+
+**Decision**: Treat Constitution v1.6.0 Android mobile requirements as a cross-cutting planning and validation gate for all completed user-facing screens, represented by Phase 18 / US13 rather than a new feature folder.
+
+**Rationale**:
+- The feature spec already defines US13, FR-071 through FR-079, SC-014, and SC-015 for Android mobile app experience. Keeping the work in `specs/001-dcastle-pg-management` preserves the existing source of truth and avoids splitting one product into competing feature folders.
+- Android Chrome at 375 px is the primary baseline because daily owner and hosteler usage happens on phones. Desktop and tablet layouts remain enhancements only after mobile is accepted.
+- Installed standalone PWA behavior must be validated separately where applicable because browser chrome, app-window height, virtual keyboard, safe-area spacing, modal positioning, and offline/online layout states can differ from regular browser mode.
+- Phase 18 must preserve the Phase 17 honest E2E gate and Cloudflare build parity. Mobile fixes are accepted only when they keep exact story behavior intact and still pass `npm run test:run`, relevant story/mobile E2E commands, `npm run test:e2e`, and `npm run build:cloudflare`.
+
+**Validation approach**:
+- Automated Playwright mobile viewport checks should assert no page-level horizontal overflow and primary-action reachability for completed auth, owner, and hosteler screens where possible.
+- Manual Android evidence should record device/emulator, Android version, Chrome version, viewport, browser or standalone context, and pass/fail notes for installed-app flows that automation cannot fully prove.
+- Data-dense owner surfaces should use mobile-appropriate layouts such as stacked cards, segmented views, contained tables, or bounded horizontal regions that do not create page-level overflow.
+
+**Alternatives considered**:
+- Treating mobile remediation as final polish only — rejected because Constitution v1.6.0 makes mobile acceptance a release blocker for user-facing work.
+- Validating only desktop responsive mode — rejected because installed standalone Android PWA behavior can differ from desktop emulation.
+- Creating a separate SpecKit feature folder — rejected because US13 and the related requirements are already part of the existing feature specification and tasks.
 
 ## Addendum: Session & Security Clarifications (2026-07-04)
 
