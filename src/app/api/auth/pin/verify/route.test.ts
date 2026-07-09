@@ -60,6 +60,7 @@ describe('POST /api/auth/pin/verify', () => {
 
   it('should authenticate with correct phone and PIN', async () => {
     const pin = '1234';
+    const pinHash = await bcrypt.hash(pin, 10);
 
     mockSingle.mockResolvedValue({
       data: {
@@ -67,6 +68,7 @@ describe('POST /api/auth/pin/verify', () => {
         name: 'John Doe',
         room_number: '101',
         phone: '9876543210',
+        pin_hash: pinHash,
         status: 'active',
         auth_user_id: 'auth-user-1',
       },
@@ -98,10 +100,91 @@ describe('POST /api/auth/pin/verify', () => {
     expect(data.hosteler.room_number).toBe('101');
     expect(mockSignInWithPassword).toHaveBeenCalledWith({
       email: '9876543210@hosteler.dcastle.local',
-      password: '1234',
+      password: 'pin:9876543210:1234',
     });
     expect(setCookie).toContain('sb-access-token=real-jwt-token');
     expect(setCookie).toContain('sb-refresh-token=real-refresh-token');
+  });
+
+  it('should fall back to legacy raw PIN auth password for existing accounts', async () => {
+    const pin = '1234';
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'hosteler-1',
+        name: 'John Doe',
+        room_number: '101',
+        phone: '9876543210',
+        pin_hash: pinHash,
+        status: 'active',
+        auth_user_id: 'auth-user-1',
+      },
+      error: null,
+    });
+
+    mockSignInWithPassword
+      .mockResolvedValueOnce({ data: {}, error: { message: 'Invalid credentials', status: 401 } })
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'legacy-jwt-token',
+            refresh_token: 'legacy-refresh-token',
+          },
+          user: { id: 'auth-user-1' },
+        },
+        error: null,
+      });
+
+    const { POST } = await import('./route');
+    const response = await POST(createRequest({ phone: '9876543210', pin }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockSignInWithPassword).toHaveBeenNthCalledWith(1, {
+      email: '9876543210@hosteler.dcastle.local',
+      password: 'pin:9876543210:1234',
+    });
+    expect(mockSignInWithPassword).toHaveBeenNthCalledWith(2, {
+      email: '9876543210@hosteler.dcastle.local',
+      password: '1234',
+    });
+  });
+
+  it('should reject old PIN and accept new PIN after reset updates pin_hash', async () => {
+    const newPinHash = await bcrypt.hash('5678', 10);
+
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'hosteler-1',
+        name: 'John Doe',
+        room_number: '101',
+        phone: '9876543210',
+        pin_hash: newPinHash,
+        status: 'active',
+        auth_user_id: 'auth-user-1',
+      },
+      error: null,
+    });
+
+    const { POST } = await import('./route');
+    const oldPinResponse = await POST(createRequest({ phone: '9876543210', pin: '1234' }) as any);
+    const oldPinData = await oldPinResponse.json();
+
+    expect(oldPinResponse.status).toBe(401);
+    expect(oldPinData.error).toBe('Invalid phone number or PIN');
+    expect(mockSignInWithPassword).not.toHaveBeenCalled();
+
+    const newPinResponse = await POST(createRequest({ phone: '9876543210', pin: '5678' }) as any);
+    const newPinData = await newPinResponse.json();
+
+    expect(newPinResponse.status).toBe(200);
+    expect(newPinData.success).toBe(true);
+    expect(mockSignInWithPassword).toHaveBeenCalledWith({
+      email: '9876543210@hosteler.dcastle.local',
+      password: 'pin:9876543210:5678',
+    });
   });
 
   it('should reject incorrect PIN', async () => {

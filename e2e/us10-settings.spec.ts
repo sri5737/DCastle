@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { loginAsHosteler, loginAsOwner } from './helpers';
+import { createActivePinHosteler, snapshotSettings } from './factories';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -51,8 +52,16 @@ function getCurrentISTTime() {
 test.describe('US10: Owner Configures Deadline and Meal Rates', () => {
   const tomorrow = getTomorrowIST();
   let preservedBreakfastRates: MealRateRow[] = [];
+  let restoreSettings: (() => Promise<void>) | null = null;
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({}, testInfo) => {
+    const settingsSnapshot = await snapshotSettings({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us10-settings-snapshot',
+    });
+    restoreSettings = settingsSnapshot.restore;
+
     const supabase = createServiceRoleClient();
     const { data } = await supabase
       .from('meal_rates')
@@ -72,9 +81,10 @@ test.describe('US10: Owner Configures Deadline and Meal Rates', () => {
 
   test.afterEach(async () => {
     const supabase = createServiceRoleClient();
-    await supabase
-      .from('settings')
-      .upsert({ key: 'deadline_time', value: '23:59' }, { onConflict: 'key' });
+    if (restoreSettings) {
+      await restoreSettings();
+      restoreSettings = null;
+    }
 
     await supabase
       .from('meal_rates')
@@ -87,8 +97,14 @@ test.describe('US10: Owner Configures Deadline and Meal Rates', () => {
     }
   });
 
-  test('owner changes deadline and meal rate, then hosteler form locks at the new deadline', async ({ page }) => {
+  test('owner changes deadline and meal rate, then hosteler form locks at the new deadline', async ({ page }, testInfo) => {
     test.setTimeout(90000);
+    const hosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us10-hosteler-lock-check',
+    });
+
     await loginAsOwner(page);
 
     await page.goto('/admin/settings');
@@ -111,7 +127,7 @@ test.describe('US10: Owner Configures Deadline and Meal Rates', () => {
     await expect(page.getByRole('status')).toContainText(`effective from tomorrow (${tomorrow})`);
 
     await page.context().clearCookies();
-    await loginAsHosteler(page);
+    await loginAsHosteler(page, hosteler.phone, hosteler.pin);
     await page.goto('/submit');
 
     await expect(page.getByText(`Deadline was ${lockedDeadline}.`)).toBeVisible({ timeout: 15000 });

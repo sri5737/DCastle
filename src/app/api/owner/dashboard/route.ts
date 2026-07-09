@@ -5,6 +5,7 @@ import { requireOwner } from '@/lib/auth/guards';
 import { getCurrentISTTime } from '@/lib/deadline';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTomorrowDate } from '@/lib/utils';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 interface FoodPreferenceRow {
 	hosteler_id: string;
@@ -19,7 +20,7 @@ interface HostelerRow {
 	room_number: string;
 }
 
-export async function GET() {
+async function handleGet() {
 	const authResult = await requireOwner();
 	if ('response' in authResult) return authResult.response;
 
@@ -75,4 +76,11 @@ export async function GET() {
 		submittedHostelers,
 		pendingHostelers,
 	});
+}
+
+export async function GET() {
+	return withApiDiagnostic(
+		{ route: '/api/owner/dashboard', method: 'GET', action: 'owner.dashboard' },
+		() => handleGet(),
+	);
 }

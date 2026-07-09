@@ -5,8 +5,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireHosteler } from '@/lib/auth/guards';
 import { isPastDeadline, getCurrentISTTime } from '@/lib/deadline';
 import { getTomorrowDate } from '@/lib/utils';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
-export async function GET() {
+async function handleGet() {
   const authResult = await requireHosteler();
   if ('response' in authResult) return authResult.response;
 
@@ -48,4 +49,11 @@ export async function GET() {
     deadline_passed: deadlinePassed,
     server_time_ist: serverTime,
   });
+}
+
+export async function GET() {
+  return withApiDiagnostic(
+    { route: '/api/food/today-status', method: 'GET', action: 'food.today-status' },
+    () => handleGet(),
+  );
 }

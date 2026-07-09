@@ -1,56 +1,62 @@
 import { test, expect } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
-import { loginAsAdmin, loginAsHosteler } from './helpers';
-import { TEST_HOSTELER, TEST_OWNER } from './test-data';
+import { loginAsAdmin, loginAsHostelerViaPinApi, registerFailureArtifacts, waitForApiResponse } from './helpers';
+import { TEST_OWNER } from './test-data';
+import { createActivePinHosteler, snapshotSettings } from './factories';
+import { createSupabaseTestClient } from './supabase-test-client';
 
 test.describe('US2: Owner Dashboard', () => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
 
-  test.afterEach(async () => {
-    await deleteE2EFoodPreference();
-  });
-
-  test('hosteler submission updates owner counts and submitted list without owner refresh', async ({ browser }) => {
-    await deleteE2EFoodPreference();
-
-    const ownerContext = await browser.newContext();
-    const ownerPage = await ownerContext.newPage();
-    await loginAsAdmin(ownerPage, TEST_OWNER.email, TEST_OWNER.password);
-
-    await expect(ownerPage.getByTestId('breakfast-count')).toBeVisible({ timeout: 10000 });
-    await expect(ownerPage.getByTestId('pending-hostelers')).toContainText(TEST_HOSTELER.name, {
-      timeout: 10000,
-    });
-
-    const baseline = await readMealCounts(ownerPage);
+  test('hosteler submission updates owner counts and submitted list without owner refresh', async ({ browser }, testInfo) => {
+    await openSubmissionDeadline(testInfo.file, testInfo.title);
+    const hosteler = await createActivePinHosteler({ specPath: testInfo.file, testTitle: testInfo.title, markerScope: 'us2-dashboard-submit' });
 
     const hostelerContext = await browser.newContext();
     const hostelerPage = await hostelerContext.newPage();
-    await loginAsHosteler(hostelerPage, TEST_HOSTELER.phone, TEST_HOSTELER.pin);
-    await hostelerPage.goto('/submit');
+    const flushHostelerArtifacts = registerFailureArtifacts(hostelerPage, testInfo);
+    await loginAsHostelerViaPinApi(hostelerPage, hosteler.phone, hosteler.pin);
+    const statusResponsePromise = waitForApiResponse(hostelerPage, '/api/food/today-status', 'GET', 200);
+    await hostelerPage.goto('/submit', { waitUntil: 'domcontentloaded' });
+    await statusResponsePromise;
     await expect(hostelerPage.locator('button[aria-pressed]').first()).toBeVisible({ timeout: 10000 });
 
     await setMealToggle(hostelerPage, 0, true);
     await setMealToggle(hostelerPage, 1, false);
     await setMealToggle(hostelerPage, 2, true);
 
+    const ownerContext = await browser.newContext();
+    const ownerPage = await ownerContext.newPage();
+    const flushOwnerArtifacts = registerFailureArtifacts(ownerPage, testInfo);
+    await loginAsAdmin(ownerPage, TEST_OWNER.email, TEST_OWNER.password);
+    await waitForApiResponse(ownerPage, '/api/owner/dashboard', 'GET', 200);
+
+    await expect(ownerPage.getByTestId('breakfast-count')).toBeVisible({ timeout: 30000 });
+    await expect(ownerPage.getByTestId('pending-hostelers')).toContainText(hosteler.name, {
+      timeout: 10000,
+    });
+
+    const baseline = await readMealCounts(ownerPage);
+
+    const submitResponsePromise = waitForApiResponse(hostelerPage, '/api/food/submit', 'POST', 200, 60000);
     await hostelerPage.getByRole('button', { name: /submit preferences|update preferences/i }).click();
-    await hostelerPage.waitForURL('**/dashboard', { timeout: 15000 });
+    await submitResponsePromise;
 
     await expect(ownerPage.getByTestId('breakfast-count')).toHaveText(String(baseline.breakfast + 1), {
-      timeout: 5000,
+      timeout: 15000,
     });
     await expect(ownerPage.getByTestId('lunch-count')).toHaveText(String(baseline.lunch), {
-      timeout: 5000,
+      timeout: 15000,
     });
     await expect(ownerPage.getByTestId('dinner-count')).toHaveText(String(baseline.dinner + 1), {
-      timeout: 5000,
+      timeout: 15000,
     });
 
-    await expect(ownerPage.getByTestId('pending-hostelers')).not.toContainText(TEST_HOSTELER.name);
+    await expect(ownerPage.getByTestId('pending-hostelers')).not.toContainText(hosteler.name);
     await ownerPage.getByTestId('submitted-hostelers').getByText(/show/i).click();
-    await expect(ownerPage.getByTestId('submitted-hostelers')).toContainText(TEST_HOSTELER.name);
+    await expect(ownerPage.getByTestId('submitted-hostelers')).toContainText(hosteler.name);
 
+    await flushHostelerArtifacts();
+    await flushOwnerArtifacts();
     await hostelerContext.close();
     await ownerContext.close();
   });
@@ -74,41 +80,11 @@ async function setMealToggle(page: import('@playwright/test').Page, index: numbe
   }
 }
 
-async function deleteE2EFoodPreference() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Supabase E2E credentials are required for owner dashboard setup');
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: hosteler, error: hostelerError } = await supabase
-    .from('hostelers')
-    .select('id')
-    .eq('phone', TEST_HOSTELER.phone)
-    .single();
-
-  if (hostelerError || !hosteler) return;
-
-  await supabase
-    .from('food_preferences')
-    .delete()
-    .eq('hosteler_id', hosteler.id)
-    .eq('date', getTomorrowDateIST());
-}
-
-function getTomorrowDateIST() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(tomorrow);
+async function openSubmissionDeadline(specPath: string, testTitle: string) {
+  await snapshotSettings({ specPath, testTitle, markerScope: 'us2-settings-open-deadline' });
+  const supabase = createSupabaseTestClient();
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key: 'deadline_time', value: '23:59', updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  expect(error).toBeNull();
 }

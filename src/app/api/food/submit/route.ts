@@ -5,8 +5,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireHosteler } from '@/lib/auth/guards';
 import { isPastDeadline, getCurrentISTTime } from '@/lib/deadline';
 import { getTomorrowDate } from '@/lib/utils';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   const authResult = await requireHosteler();
   if ('response' in authResult) return authResult.response;
 
@@ -106,4 +107,11 @@ export async function POST(request: NextRequest) {
     submitted_at: data.submitted_at,
     updated_at: data.updated_at,
   });
+}
+
+export async function POST(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/food/submit', method: 'POST', action: 'food.submit' },
+    () => handlePost(request),
+  );
 }

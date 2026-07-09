@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { requireAuth, requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 import type { SettingsResponse, MealType } from '@/types';
 import { getTodayIST, getTomorrowDate } from '@/lib/utils';
 
@@ -15,7 +16,7 @@ type SettingsPatchBody = {
   rates?: Partial<Record<MealType, unknown>>;
 };
 
-export async function GET() {
+async function handleGet() {
   const authResult = await requireAuth();
   if ('response' in authResult) return authResult.response;
 
@@ -69,7 +70,7 @@ export async function GET() {
   return NextResponse.json(response);
 }
 
-export async function PATCH(request: NextRequest) {
+async function handlePatch(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
@@ -151,4 +152,18 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json(response);
+}
+
+export async function GET() {
+  return withApiDiagnostic(
+    { route: '/api/settings', method: 'GET', action: 'settings.read' },
+    () => handleGet(),
+  );
+}
+
+export async function PATCH(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/settings', method: 'PATCH', action: 'settings.save' },
+    () => handlePatch(request),
+  );
 }

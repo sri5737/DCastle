@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 import type { DeletedFromStatus, HostelerStatus } from '@/types';
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
@@ -25,7 +26,7 @@ type HostelerListResponseRow = HostelerListRow & {
   canceled_future_preference_count?: number;
 };
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ hostelers: responseHostelers, counts });
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
@@ -178,5 +179,19 @@ export async function POST(request: NextRequest) {
       },
     },
     { status: 201 }
+  );
+}
+
+export async function GET(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/hostelers', method: 'GET', action: 'hosteler.list' },
+    () => handleGet(request),
+  );
+}
+
+export async function POST(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/hostelers', method: 'POST', action: 'hosteler.create' },
+    () => handlePost(request),
   );
 }

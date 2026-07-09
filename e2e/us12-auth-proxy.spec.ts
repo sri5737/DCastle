@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { TEST_OWNER, TEST_HOSTELER } from './test-data';
+import { TEST_OWNER } from './test-data';
 import {
 	loginAsAdmin,
 	loginAsHosteler,
 	logout,
 	verifyAdminDashboard,
 	verifyHostelerDashboard,
+	assertReloadKeepsRoute,
 } from './helpers';
+import { createActivePinHosteler } from './factories';
 
 test.describe('US12: Server-Side Auth Proxy', () => {
 	test.setTimeout(60_000);
@@ -14,26 +16,27 @@ test.describe('US12: Server-Side Auth Proxy', () => {
 	test('Owner can log in via server-side proxy', async ({ page }) => {
 		await loginAsAdmin(page, TEST_OWNER.email, TEST_OWNER.password);
 		await verifyAdminDashboard(page);
-		
-		// Wait a bit longer to catch any redirect loops
-		await page.waitForTimeout(2000);
-		
-		// Verify we're still on the dashboard (no redirect loop)
-		await expect(page).toHaveURL(/\/admin\/dashboard/);
+		await assertReloadKeepsRoute(page, /\/admin\/dashboard/);
 	});
 
-	test('Hosteler can log in with PIN via server-side proxy', async ({ page }) => {
-		await loginAsHosteler(page, TEST_HOSTELER.phone, TEST_HOSTELER.pin);
+	test('Hosteler can log in with PIN via server-side proxy', async ({ page }, testInfo) => {
+		const hosteler = await createActivePinHosteler({
+			specPath: testInfo.file,
+			testTitle: testInfo.title,
+			markerScope: 'us12-hosteler-proxy-login',
+		});
+		await loginAsHosteler(page, hosteler.phone, hosteler.pin);
 		await verifyHostelerDashboard(page);
-		
-		// Wait a bit longer to catch any redirect loops
-		await page.waitForTimeout(2000);
-		
-		// Verify we're still on the dashboard (no redirect loop)
-		await expect(page).toHaveURL(/\/dashboard/);
+		await assertReloadKeepsRoute(page, /\/dashboard/);
 	});
 
-	test('Sessions persist correctly after proxy login', async ({ page }) => {
+	test('Sessions persist correctly after proxy login', async ({ page }, testInfo) => {
+		const hosteler = await createActivePinHosteler({
+			specPath: testInfo.file,
+			testTitle: testInfo.title,
+			markerScope: 'us12-session-persistence',
+		});
+
 		// Login as admin
 		await loginAsAdmin(page, TEST_OWNER.email, TEST_OWNER.password);
 		await verifyAdminDashboard(page);
@@ -42,7 +45,7 @@ test.describe('US12: Server-Side Auth Proxy', () => {
 		await logout(page);
 
 		// Login as hosteler  
-		await loginAsHosteler(page, TEST_HOSTELER.phone, TEST_HOSTELER.pin);
+		await loginAsHosteler(page, hosteler.phone, hosteler.pin);
 		await verifyHostelerDashboard(page);
 		
 		// Logout

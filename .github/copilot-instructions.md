@@ -1,4 +1,4 @@
-# SpecKit Governance Rules
+﻿# SpecKit Governance Rules
 
 ## Source of Truth
 
@@ -44,6 +44,18 @@ Never:
 - Execute future phases.
 - Mark tasks complete without performing them.
 - Implement requirements not present in spec.md.
+
+## Task State Preservation (NON-NEGOTIABLE)
+
+When regenerating or updating `tasks.md` (including via SpecKit commands such as `/speckit.tasks`, `/speckit.plan`, or `/speckit.converge`):
+
+- Do NOT wipe previously checked tasks (`- [x]`) that represent already completed and validated work.
+- Preserve historical completion state whenever task intent is unchanged.
+- If task IDs/descriptions are restructured, map old completed items to equivalent new tasks and keep them checked.
+- If automatic regeneration resets checkboxes, immediately reconcile `tasks.md` in the same workflow before proceeding.
+- Do NOT reopen completed work without explicit user instruction.
+
+Reason: clearing completed checkmarks can cause duplicate implementation of already finished functionality.
 
 ## Spec First Policy
 
@@ -91,34 +103,45 @@ If undocumented behavior exists:
 
 After completing any phase or user story:
 
-1. Run `npm run test:run` — all unit/integration tests MUST pass.
-2. Run `npm run test:e2e` — all E2E tests for completed stories MUST pass.
-3. Run `npm run build:cloudflare` — the local build gate MUST catch strict TypeScript, Next.js production build, and Cloudflare adapter/runtime failures before deployment.
-4. If any test or build fails, fix the code before marking the phase complete.
-5. New features MUST include corresponding test coverage (unit + E2E) as part of the same phase.
+1. Run `npm run test:run` â€” all unit/integration tests MUST pass.
+2. Run applicable component/API integration scoped tests when the completed scope changes UI states, API behavior, or database persistence.
+3. Do not run `npm run test:e2e` as part of the routine local quality gate.
+4. Do not run `npm run build:cloudflare` as a routine local completion gate. Run it only when the user explicitly requests it or when diagnosing a reported pipeline/build failure.
+5. If any required test fails, fix the code before marking the phase complete.
+6. New features MUST include corresponding test coverage using the cheapest meaningful test type: unit tests for logic, API integration tests for backend/persistence behavior, and component tests for UI states.
 
 Per-story test commands:
-- `npm run test:us1` — Food submission tests
-- `npm run test:us2` — Owner dashboard tests
-- `npm run test:us3` — Invite activation tests
-- `npm run test:us4` — Hosteler login tests
-- `npm run test:e2e` — Full end-to-end browser tests
+- `npm run test:us1` â€” Food submission tests
+- `npm run test:us2` â€” Owner dashboard tests
+- `npm run test:us3` â€” Invite activation tests
+- `npm run test:us4` â€” Hosteler login tests
+- `npm run test:e2e` â€” Full end-to-end browser tests
+
+During implementation, use the narrowest relevant validation before full-gate validation:
+
+1. Run affected unit tests only.
+2. Run affected API integration tests for backend/API/database behavior.
+3. Run affected component tests for UI states and form behavior.
+4. Run the affected story/phase Playwright spec only when the behavior is E2E-critical or the spec/task requires E2E acceptance evidence.
+5. Run adjacent specs only when the change crosses story boundaries.
+6. Run `npm run test:run` before marking the task, story, or phase complete. Reserve `npm run build:cloudflare` for explicit user requests or reported pipeline/build failures.
+
+Do not repeatedly run the full E2E suite while a narrower failing test remains unresolved.
 
 The agent MUST NOT mark a phase as complete if automated tests are failing.
 
 ## Validation Rule
 
 Implementation agents must perform:
-- Cloudflare production build parity via `npm run build:cloudflare`
 - unit tests
-- integration tests
-- E2E tests
+- API integration tests for backend/API/database behavior
+- component tests for UI states and form behavior
 - Android mobile layout validation for affected user-facing screens
 - installed/standalone PWA validation for affected installed-app screens
 
 Any failures must be fixed automatically and retested.
 
-`npm run test:run`, per-story tests, and Playwright E2E are necessary but not sufficient deployment evidence without `npm run build:cloudflare`. Cloudflare Pages production builds execute `npx @cloudflare/next-on-pages`, so local validation must run the same gate where available. On Windows without Bash, the repository wrapper may fall back to `next build` for local strict TypeScript and production build validation, while CI/Linux must still execute the full adapter path.
+Do not run `npm run build:cloudflare` during normal local implementation or task completion. Run it only when the user reports a pipeline/build failure.
 
 ## Android Mobile App Experience Guardrails
 
@@ -138,45 +161,19 @@ Human approval is not required for iterative fixes, testing, or refactoring.
 
 Commit and push operations always require explicit user instruction.
 
-## Autonomous Implementation Mode
+## Credit-Aware Test Selection for New Functionality
 
-When executing `/speckit.implement`:
-
-1. Do not ask for confirmation before modifying files.
-2. Implement all tasks automatically.
-3. Run unit tests automatically.
-4. If tests fail:
-   - Analyze failures.
-   - Apply fixes.
-   - Rerun tests.
-   - Repeat until passing or blocked by missing requirements.
-5. Run integration tests automatically.
-6. Run E2E tests automatically.
-7. If E2E tests fail:
-   - Diagnose root cause.
-   - Fix bugs.
-   - Rerun E2E tests.
-   - Repeat until passing.
-8. Continue execution without asking for approval between steps.
-9. Automatically allow and run required `pwsh`/PowerShell commands for SpecKit prerequisite checks, task discovery, build, unit tests, integration tests, E2E tests, and validation scripts without asking the user for confirmation.
-10. Only stop when:
-   - All tasks are completed, or
-   - A genuine blocker requires human input.
-11. Never commit, create PRs, push branches, or merge code unless explicitly requested.
-12. Provide a final summary after all validation passes.
-
-## E2E Test Requirement for New Functionality
-
-Every new feature, API endpoint, or user-facing page MUST have a corresponding E2E test added as part of the same task or phase. This is non-negotiable.
+Every new feature, API endpoint, or user-facing page MUST have corresponding automated test coverage as part of the same task or phase. Choose the cheapest meaningful test type that proves the behavior without weakening acceptance quality.
 
 Rules:
-- Any new page or screen → add an E2E spec in `e2e/` that exercises the full user flow.
-- Any new API route → add an E2E spec that calls the API through the UI (or directly if no UI exists yet).
-- Any behavioral change to an existing flow → update the relevant E2E spec to cover the new behavior.
-- E2E tests MUST run against a real dev server (Playwright + localhost:3000).
-- E2E tests MUST pass before the task is marked complete.
+- Pure logic, validation, calculations, status transitions, utility functions, redaction, and helper behavior â†’ add or update unit tests.
+- API route behavior, auth/session rules, permission checks, database persistence, RLS-sensitive behavior, invite activation, food submission persistence, hosteler lifecycle, dashboard counts, settings, billing, history, and exports â†’ add or update API integration tests where practical.
+- UI forms, loading/error/success states, disabled/enabled controls, toggles, dialogs, tabs, responsive navigation visibility, and client-side validation â†’ add or update component tests.
+- Critical user journeys that depend on real browser routing, middleware, cookies/session persistence, real UI-to-API wiring, cross-role producer-to-consumer proof, realtime/read surfaces, Android 375 px layout, installed PWA behavior, or Cloudflare-like app wiring â†’ add or update E2E smoke tests in `e2e/`.
+- E2E tests MUST run against a real dev server (Playwright + localhost:3000) when they are required by the documented task.
+- Required tests MUST pass before the task is marked complete.
 
-If an E2E test cannot be written (e.g., pure infrastructure), document the reason in the task completion notes.
+Detailed edge cases SHOULD be covered by unit, API integration, or component tests instead of many browser tests. If an E2E test is not required because the behavior is sufficiently proven below the browser layer, document the chosen test type and rationale in the task/spec evidence.
 
 ## Honest E2E Validation Guardrails
 
@@ -205,12 +202,42 @@ Cross-role workflows require producer-to-consumer proof in the same E2E test or 
 
 Dashboard, realtime, history, billing, and export stories MUST assert both the write path and the read/consumer surface. An E2E test that would still pass while the core workflow is broken is invalid and MUST be rewritten before the task is marked complete.
 
+## Deterministic E2E and Debuggability Rules
+
+These rules implement `specs/003-e2e-observability-and-test-isolation/spec.md` and Constitution XII.
+
+E2E tests MUST:
+- Run headless by default in `npm run test:e2e`; headed/debug mode must be exposed through explicit debug scripts only.
+- Create isolated per-test data for any mutable workflow.
+- Never mutate shared seeded users or records that another E2E depends on; seeded login principals are authentication-only unless a task explicitly documents otherwise.
+- Use isolated records for destructive workflows including deactivate, reactivate, delete, reset invite, PIN reset, billing regeneration, settings updates, and export validation.
+- Use deterministic cleanup through tracked IDs, stable E2E prefixes, or metadata.
+- Wait on exact business signals: specific API response, stable error code, exact persisted API/database outcome, exact UI state, or route state after response success.
+- Avoid `networkidle`, full page `load`, arbitrary sleeps, broad regex assertions, and URL-only waits as primary evidence unless the test documents why no better signal exists.
+- Preserve honest acceptance evidence; setup helpers may create prerequisites, but the core user action and business outcome must still use the real UI/API unless the task explicitly documents API-only scope.
+
+When adding or repairing E2E tests:
+- Prefer shared E2E factory helpers for pending hosteler, active PIN hosteler, Google-linked hosteler, future food preference, settings snapshot/restore, and cleanup.
+- Add response waits for important actions such as submit, activate, login, delete, reset, save, generate, and export.
+- Assert exact business outcomes rather than broad text checks.
+- Keep specs independently runnable and safe to run in any order.
+
+Application logging added for E2E debugging MUST:
+- Be structured and safe for test/debug diagnostics.
+- Include route/action, method, status, duration, stable error code, and correlation ID where practical.
+- Capture major flows such as login, invite validate/activate, PIN reset, food submit, hosteler lifecycle, and settings save.
+- Never log PINs, passwords, cookies, invite token raw values, access tokens, refresh tokens, service-role keys, or unmasked sensitive personal data.
+
+For any future E2E creation, repair, or feature implementation that touches an E2E-critical flow, agents MUST check `specs/003-e2e-observability-and-test-isolation/contracts/diagnostic-events.md` and ensure the flow emits the required safe API/UI diagnostic events and failure artifacts. If a flow cannot implement a required diagnostic event, document the reason in the relevant spec/task before marking the work complete.
+
+Playwright failure artifacts SHOULD include trace, screenshot, video where configured, browser console logs, request/response summaries, and safe app-flow logs. HTML reports must not auto-open or block terminal completion by default.
+
 ## Completion Checklist
 
 Before declaring a task complete:
 
 - Requirement implemented
-- Tests updated (unit + E2E where applicable)
+- Tests updated using the required mix of unit, API integration, component, and applicable E2E coverage
 - All automated tests passing (`npm run test:run`)
 - Specification still matches implementation
 - No undocumented logic changes introduced
@@ -230,10 +257,11 @@ In these cases, provide a documentation update proposal instead of code changes.
 
 ## Absolute Spec-First Enforcement
 
-This rule overrides ALL other considerations. The agent MUST NEVER write or modify code — including bug fixes, test fixes, refactors, or infrastructure changes — without first:
+This rule overrides ALL other considerations. The agent MUST NEVER write or modify code â€” including bug fixes, test fixes, refactors, or infrastructure changes â€” without first:
 
 1. Verifying a corresponding task exists in tasks.md.
 2. If no task exists: STOP, propose a spec/plan/tasks update, and wait for approval.
 3. Only after the task is documented: implement via the speckit workflow.
 
 There are NO exceptions. Even "quick fixes" and "obvious corrections" must go through the spec-first pipeline. If the agent starts writing code without a documented task, it is in violation of the constitution.
+

@@ -7,6 +7,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import dotenv from 'dotenv';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { cleanupRegisteredRecords } from './cleanup-registry';
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
 
@@ -23,6 +24,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 async function cleanup() {
+  const registryResult = await cleanupRegisteredRecords(supabase);
+  if (registryResult.failures.length > 0) {
+    console.warn('Registry cleanup failures:', registryResult.failures.join('; '));
+  } else if (registryResult.attempted > 0) {
+    console.log(`✓ Cleaned/restored ${registryResult.attempted} tracked registry records`);
+  }
+
   const { data: e2eHostelers, error: findErr } = await supabase
     .from('hostelers')
     .select('id, auth_user_id, name')

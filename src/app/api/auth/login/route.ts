@@ -2,11 +2,12 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { withRetry } from '@/lib/auth/retry';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 import { AuthError } from '@supabase/supabase-js';
 
 export const runtime = 'edge';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
 	const { email, password } = await request.json();
 	const supabase = createServiceClient();
 
@@ -63,4 +64,11 @@ export async function POST(request: Request) {
 		console.error('Login endpoint error:', error);
 		return NextResponse.json({ error: message }, { status });
 	}
+}
+
+export async function POST(request: Request) {
+	return withApiDiagnostic(
+		{ route: '/api/auth/login', method: 'POST', action: 'auth.owner.login' },
+		() => handlePost(request),
+	);
 }

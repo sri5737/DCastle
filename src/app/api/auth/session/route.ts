@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 export const runtime = 'edge';
 
-export async function GET() {
+async function handleGet() {
 	const session = await getSession();
 
 	if (!session) {
@@ -14,4 +15,11 @@ export async function GET() {
 		authenticated: true,
 		role: session.role,
 	});
+}
+
+export async function GET() {
+	return withApiDiagnostic(
+		{ route: '/api/auth/session', method: 'GET', action: 'auth.session.read' },
+		() => handleGet(),
+	);
 }

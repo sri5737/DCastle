@@ -1,12 +1,12 @@
 # Implementation Plan: Deekshana Castle PG Management App (v1.2)
 
-**Branch**: `001-dcastle-pg-management` | **Date**: 2026-07-04 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-dcastle-pg-management` | **Date**: 2026-07-05 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-dcastle-pg-management/spec.md`
 
 ## Summary
 
-A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, Android installability, and an Android mobile app experience as the primary layout target. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The honest-E2E planning delta preserves Constitution XI and FR-066 through FR-069 by requiring an audit and correction pass for completed and future stories before any story or phase can be considered accepted. The Constitution v1.6.0 Android mobile app experience delta adds FR-071 through FR-079 and makes Android Chrome at 375 px the primary design baseline for every completed owner, hosteler, and auth screen, with no page-level horizontal overflow, touch-friendly controls, reachable app-like navigation, stable browser/standalone viewport behavior, and installed/standalone PWA validation for applicable owner and hosteler flows.
+A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, Android installability, and an Android mobile app experience as the primary layout target. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The updated 2026-07-05 auth/invite delta captures owner-assisted PIN reset via regenerated invites for active PIN-linked hostelers, structured invite/reset error taxonomy, and deterministic superseded-token rejection for stale invite pages. The honest-E2E planning delta preserves Constitution XI and FR-066 through FR-069 by requiring an audit and correction pass for completed and future stories before any story or phase can be considered accepted. The Constitution v1.6.0 Android mobile app experience delta adds FR-071 through FR-079 and makes Android Chrome at 375 px the primary design baseline for every completed owner, hosteler, and auth screen, with no page-level horizontal overflow, touch-friendly controls, reachable app-like navigation, stable browser/standalone viewport behavior, and installed/standalone PWA validation for applicable owner and hosteler flows.
 
 ## Technical Context
 
@@ -166,6 +166,24 @@ supabase/
 ```
 
 **Structure Decision**: Keep the existing single Next.js monolith and extend the current hosteler lifecycle model in place. Deleted hostelers are represented as owner-visible lifecycle records in the same domain model, and future-dated food preferences are canceled through database state so existing dashboard, normal owner history/export, and billing queries can exclude them without introducing a second backend or archival service. The only surface allowed to reveal canceled future rows is the deleted-hosteler audit detail inside the owner deleted view.
+
+## Post-Design Constitution Re-Check
+
+| # | Principle | Status | Evidence |
+|---|-----------|--------|----------|
+| I | Mobile-First | PASS | Phase 18 planning and US13 validation gates remain explicit for 375 px Android baseline and standalone PWA usage for applicable flows |
+| II | Edge Runtime Compatibility | PASS | Planned auth/invite and lifecycle work remains in Edge route handlers with no Node-only package introduction |
+| III | Security & Data Isolation | PASS | Invite/reset errors remain structured and deterministic; owner-assisted reset remains active-hosteler scoped with server-side enforcement |
+| IV | Server-Side Deadline Enforcement | PASS | Deadline enforcement remains server-authoritative and unchanged by the 2026-07-05 planning refresh |
+| V | Zero-Cost Infrastructure | PASS | No new paid services introduced by updated reset semantics or mobile validation requirements |
+| VI | TypeScript Strict Mode & Simplicity | PASS | Data-model updates stay additive (`created_at` aliasing for `generated_at`) without architecture expansion |
+| VII | Unit Testing Coverage | PASS | Plan retains lockout, invite/reset taxonomy, lifecycle, and billing-eligibility test expectations |
+| VIII | CI/CD Pipeline with Isolated Test Job | PASS | Validation gate still requires `npm run test:run`, `npm run test:e2e`, and `npm run build:cloudflare` |
+| IX | Idempotent Database Migrations | PASS | No non-idempotent migration strategy introduced in refreshed artifacts |
+| X | True Progressive Web App | PASS | PWA and Android standalone requirements remain explicit in quickstart/contracts |
+| XI | Honest End-to-End Validation | PASS | Superseded-link and owner-assisted reset evidence is now explicit in quickstart scenario coverage |
+
+**Post-Design Gate Result**: ALL PASS. The refreshed 2026-07-05 planning artifacts remain constitution-compliant with no new violations.
 
 ## Complexity Tracking
 

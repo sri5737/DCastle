@@ -1,15 +1,17 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { withRetry } from '@/lib/auth/retry';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getHostelerAuthPassword } from '@/lib/auth/pin-password';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 import { AuthError } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 export const runtime = 'edge';
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const PIN_REGEX = /^\d{4}$/;
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
 	const body = await request.json();
 	const { phone, pin } = body;
 
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
 		// 1. Look up hosteler to ensure they are active before attempting to sign in
 		const { data: hosteler, error: hostelerError } = await supabase
 			.from('hostelers')
-			.select('id, name, room_number, status')
+			.select('id, name, room_number, status, pin_hash')
 			.eq('phone', phone)
 			.single();
 
@@ -38,15 +40,36 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// 2. Attempt to sign in using the server-side proxy with retry logic
-		const { data: signInData, error: signInError } = await withRetry(() =>
-			supabase.auth.signInWithPassword({
-				email: `${phone}@hosteler.dcastle.local`,
-				password: pin,
-			}),
-		);
+		if (!hosteler.pin_hash || !bcrypt.compareSync(pin, hosteler.pin_hash)) {
+			return NextResponse.json({ error: 'Invalid phone number or PIN' }, { status: 401 });
+		}
 
-		if (signInError || !signInData.session) {
+
+		// 2. Attempt to sign in using the server-side proxy with retry logic.
+		// Existing PIN accounts may still use the legacy raw 4-digit auth password.
+		let signInData = null;
+		let signInError = null;
+		const email = `${phone}@hosteler.dcastle.local`;
+		const passwordCandidates = [getHostelerAuthPassword(phone, pin), pin];
+
+		for (const password of passwordCandidates) {
+			const result = await withRetry(() =>
+				supabase.auth.signInWithPassword({
+					email,
+					password,
+				}),
+			);
+
+			signInData = result.data;
+			signInError = result.error;
+
+			if (!signInError && signInData?.session) break;
+			if (!signInError || !signInError.status || signInError.status >= 500) break;
+		}
+
+		const session = signInData?.session;
+
+		if (signInError || !session) {
 			const status = signInError?.status || 500;
 			// Use a generic error for auth failures to avoid leaking info
 			const message =
@@ -65,14 +88,14 @@ export async function POST(request: NextRequest) {
 			},
 		});
 
-		response.cookies.set('sb-access-token', signInData.session.access_token, {
+		response.cookies.set('sb-access-token', session.access_token, {
 			path: '/',
 			maxAge: 60 * 60 * 24 * 30, // 30 days for hostelers
 			sameSite: 'lax',
 			secure: process.env.NODE_ENV === 'production',
 			httpOnly: true,
 		});
-		response.cookies.set('sb-refresh-token', signInData.session.refresh_token, {
+		response.cookies.set('sb-refresh-token', session.refresh_token, {
 			path: '/',
 			maxAge: 60 * 60 * 24 * 30, // 30 days for hostelers
 			sameSite: 'lax',
@@ -95,5 +118,12 @@ export async function POST(request: NextRequest) {
 		console.error('PIN Verify endpoint error:', error);
 		return NextResponse.json({ error: message }, { status });
 	}
+}
+
+export async function POST(request: NextRequest) {
+	return withApiDiagnostic(
+		{ route: '/api/auth/pin/verify', method: 'POST', action: 'auth.pin.verify' },
+		() => handlePost(request),
+	);
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 export default function AdminLoginPage() {
 	const [email, setEmail] = useState('');
@@ -17,6 +18,7 @@ export default function AdminLoginPage() {
 		e.preventDefault();
 		setError('');
 		setLoading(true);
+    emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-start', metadata: { email } });
 
 		try {
 			const response = await fetch('/api/auth/login', {
@@ -28,12 +30,15 @@ export default function AdminLoginPage() {
       const data = await response.json();
 
       if (response.ok) {
+        emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'navigation-intent', metadata: { redirectTo: data.redirectTo } });
         window.location.href = data.redirectTo || '/admin/dashboard';
 				return;
 			}
 
+      emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-failure', metadata: { status: response.status } });
       setError(data.error || 'Login failed. Please check your credentials.');
 		} catch {
+			emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-failure', metadata: { reason: 'network' } });
 			setError('An unexpected network error occurred. Please try again.');
 		} finally {
 			setLoading(false);

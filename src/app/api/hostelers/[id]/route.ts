@@ -4,12 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTodayIST } from '@/lib/utils';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 function buildActiveDeleteMessage(futurePreferenceCount: number, effectiveDate: string) {
   return `Deleting this hosteler will revoke login access immediately, preserve past and same-day history, and cancel ${futurePreferenceCount} future-dated food preference row${futurePreferenceCount === 1 ? '' : 's'} after ${effectiveDate}. Delete anyway?`;
 }
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -69,7 +70,7 @@ export async function GET(
   });
 }
 
-export async function PATCH(
+async function handlePatch(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -314,4 +315,24 @@ export async function PATCH(
     },
     canceled_future_preferences: canceledRows?.length ?? 0,
   });
+}
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  return withApiDiagnostic(
+    { route: '/api/hostelers/[id]', method: 'GET', action: 'hosteler.read' },
+    () => handleGet(request, context),
+  );
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  return withApiDiagnostic(
+    { route: '/api/hostelers/[id]', method: 'PATCH', action: 'hosteler.lifecycle' },
+    () => handlePatch(request, context),
+  );
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 export default function LoginPage() {
   return (
@@ -46,6 +47,7 @@ function LoginForm() {
     }
 
     setLoading(true);
+  emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-start', metadata: { phone } });
     try {
       const res = await fetch('/api/auth/pin/verify', {
         method: 'POST',
@@ -56,12 +58,15 @@ function LoginForm() {
       const data = await res.json();
 
       if (res.ok) {
+        emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'navigation-intent', metadata: { redirectTo: data.redirectTo } });
         window.location.href = data.redirectTo || '/dashboard';
         return;
       }
 
+      emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-failure', metadata: { status: res.status } });
       setError(data.error || 'Login failed');
     } catch {
+      emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-failure', metadata: { reason: 'network' } });
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
@@ -71,6 +76,7 @@ function LoginForm() {
   async function handleGoogleSignIn() {
     setError('');
     setLoading(true);
+    emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'click' });
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -85,11 +91,13 @@ function LoginForm() {
       });
 
       if (oauthError) {
+        emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'submit-failure' });
         setError('Failed to initiate Google sign-in');
         setLoading(false);
       }
       // Redirects to Google — loading stays true
     } catch {
+      emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'submit-failure', metadata: { reason: 'network' } });
       setError('Network error. Please try again.');
       setLoading(false);
     }

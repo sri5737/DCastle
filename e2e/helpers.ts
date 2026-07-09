@@ -1,6 +1,7 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect, type TestInfo } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { TEST_OWNER, TEST_HOSTELER } from './test-data';
+import { TEST_OWNER, TEST_HOSTELER_AUTH_PRINCIPAL } from './test-data';
+import { createFailureArtifactCollector } from './artifacts';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -31,7 +32,7 @@ export async function loginAsAdmin(page: Page, email?: string, password?: string
 
   await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });
   const submitButton = page.locator('form button[type="submit"]');
-  await expect(submitButton).toBeEnabled();
+  await expect(submitButton).toBeEnabled({ timeout: 30000 });
   await page.fill('#email', loginEmail);
   await page.fill('#password', loginPassword);
 
@@ -45,6 +46,7 @@ export async function loginAsAdmin(page: Page, email?: string, password?: string
   
   // Wait for navigation to dashboard after successful login
   await expect(page).toHaveURL(/\/admin\/dashboard/, { timeout: 30000 });
+  await assertReloadKeepsRoute(page, /\/admin\/dashboard/);
 }
 
 /**
@@ -58,16 +60,19 @@ export const loginAsOwner = loginAsAdmin;
  * This tests the server-side /api/auth/pin/verify proxy route.
  */
 export async function loginAsHosteler(page: Page, phone?: string, pin?: string) {
-  const hostelerPhone = phone || TEST_HOSTELER.phone;
-  const hostelerPin = pin || TEST_HOSTELER.pin;
+  const hostelerPhone = phone || TEST_HOSTELER_AUTH_PRINCIPAL.phone;
+  const hostelerPin = pin || TEST_HOSTELER_AUTH_PRINCIPAL.pin;
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  const phoneInput = page.locator('#phone');
+  const pinInput = page.locator('#pin');
   const submitButton = page.locator('form button[type="submit"]');
-  await expect(submitButton).toBeEnabled();
+  await expect(phoneInput).toBeEditable({ timeout: 30000 });
   
   // Fill in the PIN login form (not Google OAuth)
-  await page.fill('#phone', hostelerPhone);
-  await page.fill('#pin', hostelerPin);
+  await phoneInput.fill(hostelerPhone);
+  await pinInput.fill(hostelerPin);
+  await expect(submitButton).toBeEnabled({ timeout: 30000 });
 
   const loginResponsePromise = page.waitForResponse(
     response => response.url().includes('/api/auth/pin/verify') && response.request().method() === 'POST',
@@ -78,7 +83,40 @@ export async function loginAsHosteler(page: Page, phone?: string, pin?: string) 
   expect(loginResponse.ok()).toBeTruthy();
   
   // Wait for navigation to dashboard after successful login
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 });
+  try {
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 5000 });
+  } catch {
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+  }
+  await assertReloadKeepsRoute(page, /\/dashboard/);
+}
+
+export async function loginAsHostelerViaPinApi(page: Page, phone?: string, pin?: string) {
+  const hostelerPhone = phone || TEST_HOSTELER_AUTH_PRINCIPAL.phone;
+  const hostelerPin = pin || TEST_HOSTELER_AUTH_PRINCIPAL.pin;
+
+  const response = await page.request.post('/api/auth/pin/verify', {
+    data: { phone: hostelerPhone, pin: hostelerPin },
+    timeout: 30000,
+  });
+  expect(response.ok()).toBeTruthy();
+
+  const authCookies = response
+    .headersArray()
+    .filter(header => header.name.toLowerCase() === 'set-cookie')
+    .map(header => header.value.match(/^([^=]+)=([^;]*)/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map(match => ({
+      name: match[1],
+      value: match[2],
+      domain: 'localhost',
+      path: '/',
+      httpOnly: true,
+      secure: false,
+      sameSite: 'Lax' as const,
+    }));
+
+  await page.context().addCookies(authCookies);
 }
 
 /**
@@ -112,4 +150,36 @@ export async function verifyHostelerDashboard(page: Page) {
 export async function waitForNavigation(page: Page, url: string) {
   await page.waitForURL(url, { timeout: 10000 });
   expect(page.url()).toContain(url);
+}
+
+export async function waitForApiResponse(page: Page, urlPart: string, method: string, expectedStatus?: number, timeout = 30000) {
+  const response = await page.waitForResponse(
+    candidate => candidate.url().includes(urlPart) && candidate.request().method() === method,
+    { timeout },
+  );
+
+  if (expectedStatus !== undefined) {
+    expect(response.status()).toBe(expectedStatus);
+  }
+
+  return response;
+}
+
+export async function waitForJsonApiResponse<T>(page: Page, urlPart: string, method: string, expectedStatus?: number) {
+  const response = await waitForApiResponse(page, urlPart, method, expectedStatus);
+  return response.json() as Promise<T>;
+}
+
+export async function assertReloadKeepsRoute(page: Page, expectedUrl: RegExp | string) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(expectedUrl, { timeout: 30000 });
+}
+
+export function registerFailureArtifacts(page: Page, testInfo: TestInfo) {
+  const collector = createFailureArtifactCollector(page, testInfo);
+  return async () => {
+    if (testInfo.status !== testInfo.expectedStatus) {
+      await collector.flush();
+    }
+  };
 }

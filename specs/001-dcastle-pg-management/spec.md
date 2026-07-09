@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-03
 
-**Updated**: 2026-07-04
+**Updated**: 2026-07-05
 
 **Status**: Draft
 
@@ -49,11 +49,11 @@ The owner opens the admin dashboard and immediately sees how many hostelers have
 
 ### User Story 3 — New Hosteler Activates Account via Invite Link (Priority: P2)
 
-The owner registers a new hosteler by entering their name, phone number, and room number. The system generates a unique invite link the owner shares via WhatsApp. The hosteler opens the link, is welcomed by name, and activates their account using Google sign-in or by setting a 4-digit PIN tied to their phone number.
+The owner registers a new hosteler by entering their name, phone number, and room number. The system generates a unique invite link the owner shares via WhatsApp. The hosteler opens the link, is welcomed by name, and activates their account using Google sign-in or by setting a 4-digit PIN tied to their phone number. For already active PIN-linked hostelers, an owner-regenerated invite link also serves as a secure owner-assisted forgot-PIN path to set a new PIN.
 
 **Why this priority**: Hostelers cannot log in without first activating their account. This story gates all hosteler functionality.
 
-**Independent Test**: Can be tested by the owner adding a new hosteler, copying the invite link, opening it as the new hosteler, and completing activation — then verifying the hosteler can log into the app.
+**Independent Test**: Can be tested by the owner adding a new hosteler, copying the invite link, opening it as the new hosteler, and completing activation — then verifying the hosteler can log into the app. It can also be tested by regenerating an invite for an already active PIN-linked hosteler and verifying the link completes a one-time PIN reset.
 
 **Acceptance Scenarios**:
 
@@ -63,12 +63,16 @@ The owner registers a new hosteler by entering their name, phone number, and roo
 4. **Given** a hosteler on the invite page chooses PIN setup, **When** they enter their phone (pre-filled, read-only), set a 4-digit PIN, and confirm it, **Then** their account is activated and they are redirected to the dashboard.
 5. **Given** a hosteler opens an invite link that has expired (older than 7 days), **When** the page loads, **Then** they see an error message telling them to contact the PG owner for a new link.
 6. **Given** an invite link has been used successfully, **When** someone attempts to reuse the same link, **Then** it is rejected as already activated.
+7. **Given** an owner regenerates an invite link for an already active PIN-linked hosteler who forgot their PIN, **When** the hosteler opens a valid, unexpired regenerated link, **Then** they are shown a secure owner-assisted PIN reset flow (not a new-account activation flow).
+8. **Given** an active PIN-linked hosteler completes the PIN reset flow, **When** they submit and confirm a new 4-digit PIN, **Then** the old PIN becomes invalid at the moment the reset success response is returned, the reset token is marked used, and any subsequent PIN login attempt with the old PIN is rejected while the new PIN is accepted immediately.
+9. **Given** an active hosteler account is linked only to Google and has no PIN credential, **When** that hosteler opens a regenerated invite intended for PIN recovery, **Then** PIN reset is not performed and the UI shows the exact instruction: "This account is linked to Google sign-in. Continue with your linked Google account.".
+10. **Given** an owner has regenerated a newer invite token before a hosteler submits an older already-open reset page, **When** the hosteler tries to submit the old page, **Then** submission fails with HTTP 409 and a structured `invite_superseded` error response and the UI requires reopening the latest invite link.
 
 ---
 
 ### User Story 4 — Hosteler Logs In on Subsequent Visits (Priority: P2)
 
-A returning hosteler opens the app and signs in using the credential they linked during activation: Google if they activated with Google, or their phone number and PIN if they activated with PIN. In v1, they are not required to add the second credential later. They remain logged in for 30 days without needing to re-authenticate.
+A returning hosteler opens the app and signs in using the credential they linked during activation: Google if they activated with Google, or their phone number and PIN if they activated with PIN. In v1, they are not required to add the second credential later. If they forget a PIN-linked credential, the owner can regenerate an invite link that provides a secure owner-assisted PIN reset path. They remain logged in for 30 days without needing to re-authenticate.
 
 **Why this priority**: Friction-free login is critical for daily usage compliance. If login is cumbersome, hostelers will not use the app.
 
@@ -83,6 +87,8 @@ A returning hosteler opens the app and signs in using the credential they linked
 5. **Given** an active hosteler with a PIN-linked account, **When** they enter an incorrect PIN, **Then** they see an error message and are not logged in.
 6. **Given** a Google account not linked to any registered hosteler, **When** the user attempts to sign in with Google, **Then** they see a message: "You are not registered. Contact your PG owner."
 7. **Given** a hosteler is logged in, **When** 30 days have not yet elapsed, **Then** they remain logged in and do not need to re-authenticate.
+8. **Given** an active PIN-linked hosteler has reset their PIN via a valid owner-regenerated invite, **When** they attempt login with the previous PIN, **Then** login is rejected.
+9. **Given** an active PIN-linked hosteler has reset their PIN via a valid owner-regenerated invite, **When** they login with phone number and the new PIN, **Then** login succeeds immediately with normal session behavior.
 
 ---
 
@@ -99,7 +105,7 @@ The owner views all hostelers grouped by status (active, pending, inactive, dele
 1. **Given** the owner is on the hostelers page, **When** they switch tabs, **Then** each tab shows only hostelers with the matching status (active, pending, inactive, deleted).
 2. **Given** an active hosteler with no future food preferences, **When** the owner clicks "Deactivate", **Then** the hosteler's status changes to inactive and they can no longer log in. **Given** an active hosteler who has food preferences recorded for future dates, **When** the owner clicks "Deactivate", **Then** a confirmation dialog appears: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" and the deactivation only proceeds if the owner confirms.
 3. **Given** an inactive hosteler, **When** the owner clicks "Reactivate", **Then** the hosteler's status changes to active and they can log in again.
-4. **Given** any hosteler, **When** the owner clicks "Reset", **Then** a new invite link is generated (the old one is invalidated) and shown with a copy button.
+4. **Given** any hosteler, **When** the owner clicks "Reset", **Then** a new single-use invite link is generated (the old unused invite link is invalidated) and shown with a copy button. **And Given** the target hosteler is active and PIN-linked, **When** they open that regenerated link, **Then** the link starts a secure owner-assisted forgot-PIN reset flow.
 5. **Given** an active hosteler, **When** the owner clicks "Delete", **Then** a confirmation explains that the hosteler will be treated as moved out of the PG, login access will be revoked, past and same-day owner-visible tracking history will be preserved, any future-dated food preferences after the deletion takes effect will be canceled, and the deletion only proceeds if the owner confirms.
 6. **Given** the owner confirms deletion of an active hosteler, **When** the action completes, **Then** the hosteler no longer appears in the active, pending, or inactive tabs, appears in the deleted tab, their previously recorded past and same-day owner-visible history remains available for tracking and audit, and any food preferences whose record date is later than the deletion effective date are canceled, remain visible only inside that deleted hosteler's dedicated deleted/audit view, and are excluded from normal owner history/export, future operational counts, and billing.
 7. **Given** a pending hosteler, **When** the owner clicks "Delete", **Then** the hosteler is removed from the pending tab, any unused invite is invalidated, and the hosteler appears in the deleted tab for owner tracking and audit.
@@ -256,6 +262,10 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - What happens if an Android mobile viewport has less usable height because of browser chrome, the virtual keyboard, or standalone PWA window differences? → User-facing screens must keep primary navigation and current task actions reachable without relying on fixed desktop-height assumptions; form fields and dialogs must remain visible or scroll naturally within the vertical viewport.
 - What happens if owner tables, dashboards, or hosteler history/billing views contain wide data on a 375 px Android viewport? → The screen must adapt the information into a mobile-usable layout without page-level horizontal overflow; any intentionally scrollable sub-region must be clearly bounded and must not hide primary actions off-screen.
 - What happens if a completed screen passes desktop or broad responsive tests but fails in installed Android standalone mode? → The screen is not accepted as complete until standalone PWA validation passes for the applicable user flow.
+- What happens when the owner regenerates invite links multiple times for the same hosteler? → Only the newest unexpired, unused token is valid; token supersession is deterministic by newest `generated_at` timestamp precedence. If timestamps are equal, the later persisted token record is treated as latest. If an older invite/reset page was already open, its submit attempt fails with HTTP 409 `invite_superseded`, and the user must reopen the latest link.
+- What happens when an owner-regenerated invite token for PIN recovery is expired or already used? → Expired attempts fail with HTTP 410 `invite_expired`; used attempts fail with HTTP 409 `invite_used`; both responses instruct the hosteler to contact the owner for a fresh link.
+- What happens if a regenerated invite token is opened for a hosteler who is not active (pending, inactive, or deleted) when attempting owner-assisted PIN recovery? → Owner-assisted PIN recovery is rejected with HTTP 403 `reset_not_allowed_non_active` because this reset path is active-hosteler-only.
+- What happens when a PIN-linked hosteler tries their old PIN after completing owner-assisted reset? → Login with the old PIN fails immediately; only the newly set PIN is accepted.
 - What happens when a hosteler's invite link expires before they activate? → The owner can generate a fresh invite link via the "Reset" action on the hostelers page.
 - What happens when a deactivated hosteler's device still has an active session cookie? → The next API call returns 401 with "Account deactivated"; the client redirects to the login page.
 - What happens when a hosteler enters a wrong PIN 5 times? → The phone number is locked out for 15 minutes; a message explains the cooldown.
@@ -274,12 +284,18 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 **Account Provisioning & Authentication**
 
 - **FR-001**: The owner MUST be able to register a new hosteler by providing their full name, phone number, and room number.
-- **FR-002**: The system MUST generate a unique, single-use invite link for each registered hosteler.
+- **FR-002**: The system MUST generate a unique, single-use invite link for each registered hosteler and for owner-triggered credential recovery when the owner regenerates an invite.
 - **FR-003**: Invite links MUST expire 7 days after generation.
 - **FR-004**: A new hosteler MUST be able to activate their account via the invite link using either a Google account or a 4-digit PIN linked to their phone number.
 - **FR-004a**: Activation MUST link only the credential path actually completed during activation. In v1, the system MUST NOT require the hosteler to add the second credential type later in order to use the app.
-- **FR-005**: The system MUST prevent activation of an invite link that has expired or has already been used.
+- **FR-005**: The system MUST prevent activation or PIN-reset use of an invite link that has expired or has already been used.
+- **FR-005b**: Owner-assisted invite-based PIN reset MUST be allowed only for hostelers currently in active status. Attempts to use this reset path for non-active statuses MUST be rejected.
+- **FR-005c**: Invite tokens used for activation or owner-assisted PIN reset MUST be one-time-use. On successful completion, the token is consumed and cannot be reused.
+- **FR-005d**: Invite/owner-assisted-reset submit failures MUST use distinct outcomes with a stable error taxonomy: expired token (`HTTP 410`, `invite_expired`), already used token (`HTTP 409`, `invite_used`), superseded token (`HTTP 409`, `invite_superseded`), and non-active reset attempt (`HTTP 403`, `reset_not_allowed_non_active`).
+- **FR-005e**: Invite/owner-assisted-reset error responses MUST use a structured shape containing `error.code`, `error.message`, and `error.recovery_action` so clients can render consistent recovery guidance.
 - **FR-006**: Hostelers MUST be able to log in on subsequent visits using only the credential type that was successfully linked during activation. Google-linked accounts use the same linked Google account; PIN-linked accounts use phone number plus PIN.
+- **FR-006b**: When an active PIN-linked hosteler completes owner-assisted PIN reset via a valid regenerated invite, the previously stored PIN credential MUST be invalidated immediately at reset-success completion and only the new PIN MUST authenticate all subsequent PIN logins. Any PIN verification request processed after reset success MUST reject the old PIN.
+- **FR-006c**: For active Google-linked hostelers with no PIN credential, regenerated invite usage MUST NOT create a new PIN in v1 through the owner-assisted reset flow. The flow MUST show the exact instruction: "This account is linked to Google sign-in. Continue with your linked Google account.".
 - **FR-006a**: After 5 consecutive failed PIN attempts for a given phone number, the system MUST lock out PIN login for that phone number for 15 minutes. The lockout resets after the cooldown period elapses.
 - **FR-007**: The system MUST reject sign-in attempts from Google accounts not linked to a provisioned hosteler, displaying a "contact your PG owner" message.
 - **FR-008**: Hosteler sessions MUST remain valid for 30 days without requiring re-authentication. Multiple concurrent sessions (across different devices) are permitted; each device maintains an independent session.
@@ -313,7 +329,9 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - **FR-027**: The owner MUST be able to deactivate any active hosteler. If the hosteler has food preferences recorded for future dates at the time of deactivation, the owner MUST be shown a confirmation dialog: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Deactivation only proceeds upon explicit owner confirmation. Upon deactivation, the hosteler's active sessions MUST be invalidated immediately; any subsequent API call from the deactivated hosteler MUST return HTTP 401 with an "Account deactivated" message.
 - **FR-028**: The owner MUST be able to reactivate any inactive hosteler.
 - **FR-028a**: In v1, deletion is supported only from pending or active status. Inactive hostelers are not directly deletable; the deleted view contains only records deleted from pending or active status.
-- **FR-029**: The owner MUST be able to generate a new invite link for any hosteler (invalidating any existing unused link).
+- **FR-029**: The owner MUST be able to generate a new invite link for any hosteler (invalidating any existing unused link). Token supersession ordering MUST be deterministic by latest token generation timestamp (`generated_at`); if multiple tokens share the same timestamp, later persisted token creation order determines precedence. If a newer invite has been regenerated before submission, any older already-open invite/reset page MUST fail on submit with `HTTP 409` and `invite_superseded`, and require reopening the latest link.
+- **FR-029e**: For active PIN-linked hostelers, owner "Reset" invite regeneration MUST act as a secure owner-assisted forgot-PIN recovery path. Opening a valid regenerated link MUST lead to PIN reset (not re-activation), require the hosteler to set a new 4-digit PIN, and preserve all existing account status and history.
+- **FR-029f**: Route ownership for this flow MUST be explicit: owner reset-link generation is handled by `POST /api/hostelers/[id]/reset-invite`; owner-assisted reset submit semantics are handled by `POST /api/invite/activate` using the invite token. The submit route MUST branch behavior between standard onboarding activation and owner-assisted reset based on hosteler status and linked credential context.
 - **FR-029a**: The owner MUST be able to delete any pending hosteler directly. Deleting a pending hosteler MUST invalidate any unused invite and prevent any future activation, while preserving an owner-visible deleted record for tracking and audit purposes.
 - **FR-029b**: The owner MUST be able to delete any active hosteler. Deleting an active hosteler MUST be treated as a moved-out-of-PG event: login access is revoked immediately across all active sessions on all devices, no new submissions are allowed, past and same-day owner-visible tracked history is preserved rather than removed, and any food preferences dated after the deletion effective date MUST be canceled so they are excluded from normal owner history/export, future operational counts, and billing. The deletion effective date is the IST calendar date on which the owner confirms deletion, so records dated on that same IST date are preserved and only later-dated records are canceled.
 - **FR-029c**: Deleted hostelers MUST remain viewable by the owner in a dedicated deleted status view showing full name, room number, phone number, deletion timestamp, and whether the record was deleted from pending or active status. For active deletions, this deleted/audit view MUST also be the only owner-visible location where canceled future-dated food preferences remain available for audit.
@@ -398,7 +416,7 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 
 - **Hosteler**: A paying guest registered by the owner. Identified by name, phone number, and room number. Has a lifecycle status of pending (invite sent, not yet activated), active (can log in and submit), or inactive (deactivated). If deleted from pending or active status, the person remains represented through an owner-visible deleted record rather than disappearing from owner tracking.
 - **Deleted Hosteler Record**: An owner-visible audit record created when a pending or active hosteler is deleted. Retains identifying details, deletion timing, prior status, and, for active deletions, the preserved past and same-day operational and billing history associated with the move-out event. Its deletion effective date is the IST calendar date on which the owner confirmed deletion: records dated on that same IST date and earlier remain preserved, while records dated later are canceled. It also retains canceled future-dated food preferences after the deletion effective date as audit-only records visible only inside the deleted hosteler's dedicated deleted/audit view and excluded from normal owner history/export, dashboard counts, and billing. Deleted records are audit-only and are not restorable in v1.
-- **Invite Token**: A unique, time-limited credential generated by the owner to provision a new hosteler. Expires in 7 days and becomes void after first use.
+- **Invite Token**: A unique, time-limited, one-time credential generated by the owner to provision a new hosteler or assist credential recovery for an active PIN-linked hosteler. Expires in 7 days and progresses through explicit states: latest active, superseded, used, or expired.
 - **Food Preference**: A hosteler's daily meal selection for a specific date. Records whether the hosteler opted for breakfast, lunch, and/or dinner. One record per hosteler per day; later submissions replace earlier ones.
 - **Meal Rate**: The price per meal type (breakfast, lunch, dinner) as configured by the owner. Each rate record has an effective start date, allowing historical rate lookup for accurate billing.
 - **Monthly Bill**: A computed record of a hosteler's total meals and charges for a given calendar month. Produced by manual owner action.
@@ -449,6 +467,7 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - The nightly backup runs on a fixed cron schedule (2:00 AM IST) and uses the owner's Cloudflare R2 storage for retention.
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 - The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.
+- Owner-assisted forgot-PIN in v1 is not self-service. It is initiated only by owner invite regeneration and is limited to active PIN-linked hostelers.
 
 ---
 
@@ -480,3 +499,10 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - Q: How is the Next.js version conflict resolved for this feature? → A: The actual repository stack, Next.js 15.3.3, is intended; planning and constitution artifacts must align to that baseline rather than downgrading the implementation.
 - Q: How should SC-001 and SC-010 be validated for v1 acceptance? → A: Treat them as scoped acceptance evidence tasks using representative browser/manual timing and seeded 100-hosteler scenarios; full load-testing infrastructure is not required unless explicitly documented later.
 - Q: How should Android mobile layout breakage be handled now that the app is already a PWA? → A: Treat Android mobile as the primary product experience. Completed user-facing screens must pass 375 px mobile baseline validation, and screens used from the installed app must also pass standalone PWA validation where applicable.
+
+### Session 2026-07-05
+
+- Q: When an owner regenerates an invite for an already active hosteler, is the link only for onboarding, or can it support credential recovery? → A: For active PIN-linked hostelers, regenerated invite links also serve as a secure owner-assisted forgot-PIN reset path.
+- Q: Which hosteler statuses are eligible for this invite-based PIN reset path? → A: Only active hostelers are eligible for owner-assisted PIN reset via regenerated invite links.
+- Q: How should regenerated invite reset behavior differ for Google-linked versus PIN-linked active hostelers? → A: PIN-linked active hostelers can reset their PIN via the regenerated link; Google-linked active hostelers without a PIN cannot create a PIN through this flow in v1 and must continue using linked Google sign-in.
+- Q: If a newer invite is regenerated before submit, what should happen to an older already-open reset page? → A: The older page must fail on submit with token-invalid (superseded), and the user must reopen the latest invite link.

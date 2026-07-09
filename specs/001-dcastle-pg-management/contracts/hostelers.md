@@ -290,15 +290,27 @@ Generate a new invite link for a non-deleted hosteler.
 {
   "token": "uuid-v4-string",
   "invite_url": "https://{domain}/join/{token}",
-  "expires_at": "2026-07-10T00:00:00.000Z"
+  "expires_at": "2026-07-10T00:00:00.000Z",
+  "generated_at": "2026-07-03T10:00:00.000Z"
 }
 ```
 
-**Response 400**: `{ "error": "Cannot reset invite for a deleted hosteler" }`
+**Response 400**:
+- `{ "error": { "code": "reset_invite_not_allowed_deleted", "message": "Cannot reset invite for a deleted hosteler", "recovery_action": "choose_non_deleted_hosteler" } }`
 
-**Response 404**: `{ "error": "Hosteler not found" }`
+**Response 404**:
+- `{ "error": { "code": "hosteler_not_found", "message": "Hosteler not found", "recovery_action": "refresh_list" } }`
 
 **Side effects**:
-- Marks all existing unused tokens for this hosteler as used.
+- Marks all existing unused tokens for this hosteler as superseded/consumed for submit purposes.
 - Creates a new 7-day invite token.
 - Does not change the hosteler lifecycle status or clear existing auth linkage.
+
+**Deterministic supersession rule**:
+- Token precedence is determined by latest `generated_at` for the hosteler.
+- If multiple tokens share the same `generated_at`, the later persisted token record is considered latest.
+- Older tokens can still be open in the browser, but submit attempts are rejected by `POST /api/invite/activate` with `HTTP 409` and `invite_superseded`.
+
+**Route ownership note**:
+- This route only creates/regenerates invite links.
+- Submit-time activation/reset decisions and token-state errors are owned by `POST /api/invite/activate`.

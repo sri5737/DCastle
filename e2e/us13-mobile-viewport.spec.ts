@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { loginAsAdmin, loginAsHosteler } from './helpers';
-import { TEST_HOSTELER, TEST_OWNER } from './test-data';
+import { TEST_OWNER } from './test-data';
+import { createActivePinHosteler } from './factories';
 
 /**
  * US13 (Phase 18) — Android mobile app experience validation.
@@ -67,8 +68,13 @@ test.describe('US13: Android mobile experience @375px', () => {
     await expectReachableWithinViewport(page, page.locator('form button[type="submit"]'));
   });
 
-  test('core hosteler flow (login → dashboard → submit → dashboard) stays mobile-usable', async ({ page }) => {
-    await loginAsHosteler(page, TEST_HOSTELER.phone, TEST_HOSTELER.pin);
+  test('core hosteler flow (login → dashboard → submit → dashboard) stays mobile-usable', async ({ page }, testInfo) => {
+    const hosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us13-mobile-hosteler-flow',
+    });
+    await loginAsHosteler(page, hosteler.phone, hosteler.pin);
 
     // Dashboard
     await expect(page).toHaveURL(/\/dashboard/);

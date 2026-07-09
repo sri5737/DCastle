@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 interface HostelerItem {
   id: string;
@@ -128,6 +129,7 @@ export default function HostelerManagementPage() {
     e.preventDefault();
     setAddError('');
     setAdding(true);
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-start', metadata: { phone } });
 
     const res = await fetch('/api/hostelers', {
       method: 'POST',
@@ -138,12 +140,14 @@ export default function HostelerManagementPage() {
 
     const data = await res.json();
     if (!res.ok) {
+      emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-failure', metadata: { status: res.status } });
       setAddError(data.error || 'Failed to add hosteler');
       setAdding(false);
       return;
     }
 
     setInviteUrl(data.invite.invite_url);
+  emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-success', metadata: { hostelerId: data.hosteler.id } });
     setShowInviteDialog(true);
 
     const createdHosteler: HostelerItem = {
@@ -166,6 +170,7 @@ export default function HostelerManagementPage() {
 
   async function handleDeactivate(hosteler: HostelerItem) {
     setActionLoading(hosteler.id);
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.deactivate', state: 'click', metadata: { hostelerId: hosteler.id } });
 
     const res = await fetch(`/api/hostelers/${hosteler.id}`, {
       method: 'PATCH',
@@ -232,6 +237,7 @@ export default function HostelerManagementPage() {
 
   async function handleReactivate(hosteler: HostelerItem) {
     setActionLoading(hosteler.id);
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.reactivate', state: 'click', metadata: { hostelerId: hosteler.id } });
 
     const res = await fetch(`/api/hostelers/${hosteler.id}`, {
       method: 'PATCH',
@@ -260,6 +266,7 @@ export default function HostelerManagementPage() {
 
   async function handleResetInvite(hosteler: HostelerItem) {
     setActionLoading(hosteler.id);
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.reset-invite', state: 'click', metadata: { hostelerId: hosteler.id } });
 
     const res = await fetch(`/api/hostelers/${hosteler.id}/reset-invite`, {
       method: 'POST',
@@ -279,6 +286,7 @@ export default function HostelerManagementPage() {
   }
 
   async function handleDelete(hosteler: HostelerItem) {
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.delete', state: 'click', metadata: { hostelerId: hosteler.id, status: hosteler.status } });
     if (hosteler.status === 'pending') {
       setDeleteTarget(hosteler);
       setDeletePreview(null);

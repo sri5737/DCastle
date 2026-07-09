@@ -1,68 +1,71 @@
 import { test, expect } from '@playwright/test';
-import { loginAsOwner } from './helpers';
+import { createPendingHosteler } from './factories';
+import { createSupabaseTestClient } from './supabase-test-client';
 
 test.describe('US3: Invite Activation', () => {
-  test('owner registers hosteler and hosteler activates via PIN', async ({ page, request }) => {
-    // Step 1: Login as owner first to get session cookies
-    await loginAsOwner(page);
+  test('owner registers hosteler and hosteler activates via PIN', async ({ page }, testInfo) => {
+    test.setTimeout(90000);
 
-    const uniquePhone = `9${Math.floor(100000000 + Math.random() * 900000000)}`;
-    const hostelerName = `E2E Invite Tester ${Date.now()}`;
+    const pendingHosteler = await createPendingHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us3-invite-activation',
+    });
 
-    // Create hosteler via browser fetch (uses owner's cookies)
-    const createResult = await page.evaluate(async (data) => {
-      const res = await fetch('/api/hostelers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      return { ok: res.ok, status: res.status, body: await res.json().catch(() => null) };
-    }, { name: hostelerName, phone: uniquePhone, room_number: 'T-201' });
-
-    expect(createResult.ok).toBeTruthy();
-    const hosteler = createResult.body.hosteler;
-
-    // Step 2: Generate invite token via browser fetch
-    const inviteResult = await page.evaluate(async (hostelerId) => {
-      const res = await fetch('/api/invite/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hosteler_id: hostelerId }),
-      });
-      return { ok: res.ok, body: await res.json().catch(() => null) };
-    }, hosteler.id);
-
-    expect(inviteResult.ok).toBeTruthy();
-    const token = inviteResult.body.token;
-
-    // Step 3: Hosteler visits the invite link (new browser context - no owner cookies)
     await page.context().clearCookies();
-    await page.goto(`/join/${token}`);
+    const validateResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/invite/validate') && response.request().method() === 'GET',
+      { timeout: 60000 },
+    );
+    await page.goto(pendingHosteler.inviteUrl, { waitUntil: 'domcontentloaded' });
+    const validateResponse = await validateResponsePromise;
+    expect(validateResponse.ok()).toBeTruthy();
 
-    // Step 4: Verify welcome/activation page loads
     await expect(
       page.getByRole('heading', { name: /Welcome to DCastle/i })
     ).toBeVisible({ timeout: 10000 });
 
-    // Step 5: Click "Set up 4-digit PIN" button
     await page.getByRole('button', { name: /set up 4-digit pin/i }).click();
 
-    // Step 6: Set a 4-digit PIN
     const pinInputs = page.locator('input[type="password"]');
     await pinInputs.nth(0).fill('5678');
     await pinInputs.nth(1).fill('5678');
 
-    // Step 7: Submit activation
+    const activationResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/invite/activate') && response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
     await page.getByRole('button', { name: /activate account/i }).click();
+    const activationResponse = await activationResponsePromise;
+    expect(activationResponse.ok()).toBeTruthy();
 
-    // Step 8: After activation, page navigates away from /join (to /dashboard or /login)
-    // The key assertion is that activation succeeded without showing an error
     await expect(page.getByText(/activation failed|network error/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
-    await page.waitForURL(url => !url.pathname.includes('/join'), { timeout: 15000 });
+    await page.waitForURL(url => !url.pathname.includes('/join'), { timeout: 30000 });
+
+    const supabase = createSupabaseTestClient();
+    const { data: activatedHosteler, error: hostelerError } = await supabase
+      .from('hostelers')
+      .select('status, auth_user_id')
+      .eq('id', pendingHosteler.hostelerId)
+      .single();
+    expect(hostelerError).toBeNull();
+    expect(activatedHosteler?.status).toBe('active');
+    expect(activatedHosteler?.auth_user_id).toBeTruthy();
+
+    const reusedTokenResponse = await page.request.get(`/api/invite/validate?token=${encodeURIComponent(pendingHosteler.inviteUrl.split('/').pop() || '')}`);
+    expect([400, 409]).toContain(reusedTokenResponse.status());
   });
 
   test('expired token shows error', async ({ page }) => {
-    await page.goto('/join/expired-invalid-token-12345');
+    test.setTimeout(60000);
+
+    const validateResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/invite/validate') && response.request().method() === 'GET',
+      { timeout: 60000 },
+    );
+    await page.goto('/join/expired-invalid-token-12345', { waitUntil: 'domcontentloaded' });
+    const validateResponse = await validateResponsePromise;
+    expect(validateResponse.ok()).toBeFalsy();
     await expect(
       page.getByRole('heading', { name: /expired|invalid/i })
     ).toBeVisible({ timeout: 10000 });

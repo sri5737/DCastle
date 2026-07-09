@@ -8,6 +8,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import dotenv from 'dotenv';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { cleanupRegisteredRecords } from './cleanup-registry';
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
 
@@ -26,7 +27,14 @@ async function globalTeardown() {
 
   console.log('🧹 E2E Global Teardown: Cleaning up test data...');
 
-  // --- 1. Clean up ALL E2E-created hostelers (names starting with "E2E") ---
+  const registryResult = await cleanupRegisteredRecords(supabase);
+  if (registryResult.failures.length > 0) {
+    console.warn('  ⚠ Registry cleanup completed with failures:', registryResult.failures.join('; '));
+  } else if (registryResult.attempted > 0) {
+    console.log(`  ✓ Registry cleanup removed/restored ${registryResult.attempted} tracked records`);
+  }
+
+  // --- 1. Clean up stable-marker E2E hostelers left by interrupted setup ---
   const { data: e2eHostelers } = await supabase
     .from('hostelers')
     .select('id, auth_user_id, name')

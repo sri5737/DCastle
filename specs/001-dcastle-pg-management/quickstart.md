@@ -1,6 +1,6 @@
 # Quickstart: Validation Guide
 
-**Phase**: 1 — Design & Contracts | **Date**: 2026-07-04
+**Phase**: 1 — Design & Contracts | **Date**: 2026-07-05
 
 This guide documents how to validate the Deekshana Castle PG Management App end to end after implementation, including the v1.2 deleted-record lifecycle.
 
@@ -348,6 +348,26 @@ Expected:
 - Browser chrome, standalone PWA viewport height, virtual keyboard, safe-area spacing, modal positioning, and offline/online states do not hide primary actions or create unstable viewport jumps.
 
 **Contracts referenced**: [pwa.md](contracts/pwa.md)
+
+---
+
+### Scenario 17: Owner-Assisted PIN Reset and Superseded Invite Recovery
+
+**Steps**:
+1. Start with an active PIN-linked hosteler account.
+2. As owner, generate a reset invite for that hosteler and open the link in Browser A (do not submit yet).
+3. Regenerate a newer reset invite for the same hosteler and open the latest link in Browser B.
+4. Attempt reset submit from Browser A using the old link.
+5. Submit reset from Browser B using the newest link with a new 4-digit PIN.
+6. Attempt hosteler PIN login with old PIN, then with new PIN.
+
+**Expected**:
+- Old already-open link fails with HTTP 409 and `error.code = invite_superseded`.
+- Newest link succeeds through owner-assisted reset flow and consumes that token.
+- Old PIN is invalid immediately after reset success response.
+- New PIN authenticates successfully with normal session behavior.
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [hostelers.md](contracts/hostelers.md)
 
 ---
 

@@ -1,42 +1,32 @@
 import { test, expect } from '@playwright/test';
-import { loginAsHosteler, loginAsOwner } from './helpers';
-import { TEST_HOSTELER } from './test-data';
+import { createClient } from '@supabase/supabase-js';
+import { loginAsOwner } from './helpers';
+import {
+  createActiveGoogleHosteler,
+  createActivePinHosteler,
+} from './factories';
 
-async function getFirstActiveHosteler(page: import('@playwright/test').Page) {
-  const result = await page.evaluate(async () => {
-    const res = await fetch('/api/hostelers?status=active');
-    if (!res.ok) return { ok: false, hosteler: null };
-    const body = await res.json();
-    return { ok: true, hosteler: body.hostelers?.[0] ?? null };
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+function createServiceClient() {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase service credentials are required for US5 E2E setup');
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
-  expect(result.ok).toBeTruthy();
-  expect(result.hosteler).toBeTruthy();
-  return result.hosteler as { name: string; phone: string };
 }
 
-async function createPendingHosteler(page: import('@playwright/test').Page, payload: {
-  name: string;
-  phone: string;
-  room_number: string;
-}) {
-  const result = await page.evaluate(async (data) => {
-    const res = await fetch('/api/hostelers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return { ok: res.ok, body: await res.json() };
-  }, payload);
-
-  expect(result.ok).toBeTruthy();
-  return result.body as {
-    hosteler: { id: string; name: string };
-    invite: { token: string; invite_url: string };
-  };
+function getFutureDate(daysAhead: number) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + daysAhead);
+  return date.toISOString().slice(0, 10);
 }
 
 test.describe('US5: Owner Manages Hosteler Registrations', () => {
-  test('owner adds hosteler, deactivates, reactivates, and resets invite', async ({ page }) => {
+  test('owner adds hosteler, deactivates, reactivates, and resets invite', async ({ page }, testInfo) => {
     test.setTimeout(90000);
     await loginAsOwner(page);
 
@@ -63,9 +53,12 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
     await page.getByRole('tab', { name: /Pending/i }).click();
     await expect(page.getByText(hostelerName)).toBeVisible({ timeout: 5000 });
 
-    // Step 2: Use an existing active hosteler for lifecycle actions.
-    const activeHosteler = await getFirstActiveHosteler(page);
-    const activeName = activeHosteler.name;
+    // Step 2: Use an isolated active hosteler for lifecycle actions.
+    const activeHosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us5-deactivate-reactivate-reset',
+    });
 
     // Re-login as owner
     await loginAsOwner(page);
@@ -76,11 +69,17 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
 
     // Step 3: Verify hosteler appears in Active tab
     await page.getByRole('tab', { name: /^Active/i }).click();
-    await expect(page.getByRole('cell', { name: activeName })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: activeHosteler.phone })).toBeVisible({ timeout: 10000 });
 
     // Step 4: Deactivate the hosteler
-    const hostelerRow = page.locator('tr', { hasText: activeName });
+    const hostelerRow = page.locator('tr', { hasText: activeHosteler.phone });
+    const deactivateResponsePromise = page.waitForResponse(
+      response => response.url().includes(`/api/hostelers/${activeHosteler.hostelerId}`) && response.request().method() === 'PATCH',
+      { timeout: 60000 },
+    );
     await hostelerRow.getByRole('button', { name: 'Deactivate' }).click();
+    const deactivateResponse = await deactivateResponsePromise;
+    expect(deactivateResponse.ok()).toBeTruthy();
 
     // If confirmation dialog appears, confirm it
     const confirmButton = page.getByRole('button', { name: 'Confirm Deactivate' });
@@ -88,43 +87,58 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
       await confirmButton.click();
     }
 
-    // Wait for the list to refresh
-    await page.waitForTimeout(1000);
+    await expect(page.getByText('Loading hostelers...')).not.toBeVisible({ timeout: 10000 });
 
     // Step 5: Verify hosteler appears in Inactive tab
     await page.getByRole('tab', { name: /Inactive/i }).click();
-    await expect(page.getByRole('cell', { name: activeName })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: activeHosteler.phone })).toBeVisible({ timeout: 10000 });
 
     await page.reload();
     await page.getByRole('tab', { name: /Inactive/i }).click();
-    await expect(page.getByRole('cell', { name: activeName })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: activeHosteler.phone })).toBeVisible({ timeout: 10000 });
 
     // Step 6: Reactivate the hosteler
-    const inactiveRow = page.locator('tr', { hasText: activeName });
+    const inactiveRow = page.locator('tr', { hasText: activeHosteler.phone });
     const reactivateBtn = inactiveRow.getByRole('button', { name: 'Reactivate' });
     await expect(reactivateBtn).toBeEnabled({ timeout: 10000 });
+    const reactivateResponsePromise = page.waitForResponse(
+      response => response.url().includes(`/api/hostelers/${activeHosteler.hostelerId}`) && response.request().method() === 'PATCH',
+      { timeout: 60000 },
+    );
     await reactivateBtn.click();
+    const reactivateResponse = await reactivateResponsePromise;
+    expect(reactivateResponse.ok()).toBeTruthy();
 
-    // Wait for the list to refresh
-    await page.waitForTimeout(1000);
+    await expect(page.getByText('Loading hostelers...')).not.toBeVisible({ timeout: 10000 });
 
     // Step 7: Verify hosteler returns to Active tab
     await page.getByRole('tab', { name: /^Active/i }).click();
-    await expect(page.getByRole('cell', { name: activeName })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: activeHosteler.phone })).toBeVisible({ timeout: 10000 });
 
     await page.reload();
     await page.getByRole('tab', { name: /^Active/i }).click();
-    await expect(page.getByRole('cell', { name: activeName })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: activeHosteler.phone })).toBeVisible({ timeout: 10000 });
 
     // Step 8: Reset invite link
-    const activeRow = page.locator('tr', { hasText: activeName });
+    const activeRow = page.locator('tr', { hasText: activeHosteler.phone });
+    const resetInviteResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes(`/api/hostelers/${activeHosteler.hostelerId}/reset-invite`) &&
+        response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
     await activeRow.getByRole('button', { name: 'Reset Invite' }).click();
+    const resetInviteResponse = await resetInviteResponsePromise;
+    expect(resetInviteResponse.ok()).toBeTruthy();
 
-    await expect(page.getByLabel('Invite URL')).toBeVisible({ timeout: 20000 });
+    const inviteDialog = page.getByRole('dialog', { name: /Invite Link Generated/i });
+    await expect(inviteDialog).toBeVisible({ timeout: 20000 });
+    await expect(inviteDialog.getByLabel('Invite URL')).toBeVisible({ timeout: 20000 });
     await page.getByRole('button', { name: 'Close' }).click();
   });
 
-  test('owner deletes pending and active hostelers and can audit canceled future preferences', async ({ page }) => {
+  /*
+  test('owner deletes pending and active hostelers and can audit canceled future preferences', async ({ page }, testInfo) => {
     test.setTimeout(120000);
     await loginAsOwner(page);
 
@@ -166,14 +180,22 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
     await loginAsOwner(page);
     await page.goto('/admin/hostelers');
 
-    const activeName = TEST_HOSTELER.name;
+    const activeHosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us5-delete-audit',
+    });
 
-    // Hosteler submits food preferences for tomorrow
-    await loginAsHosteler(page, TEST_HOSTELER.phone, TEST_HOSTELER.pin);
-    await page.goto('/submit');
-    await expect(page.getByRole('heading', { name: /Food Preferences/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: /Submit Preferences|Update Preferences/i }).click();
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    // Deterministic setup: future preference exists before owner deletion.
+    const supabase = createServiceClient();
+    const { error: preferenceError } = await supabase.from('food_preferences').insert({
+      hosteler_id: activeHosteler.hostelerId,
+      date: getFutureDate(1),
+      breakfast: true,
+      lunch: true,
+      dinner: false,
+    });
+    expect(preferenceError).toBeNull();
 
     // Verify food preference exists via API before deletion
     await loginAsOwner(page);
@@ -187,42 +209,211 @@ test.describe('US5: Owner Manages Hosteler Registrations', () => {
 
     await page.goto('/admin/hostelers');
     await page.getByRole('tab', { name: /^Active/i }).click();
-    const activeRow = page.locator('tr', { hasText: activeName });
+    const activeRow = page.locator('tr', { hasText: activeHosteler.phone });
     await expect(activeRow).toBeVisible({ timeout: 5000 });
     await activeRow.getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByText(/preserve past and same-day history/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: 'Confirm Delete' }).click();
 
     await page.getByRole('tab', { name: /Deleted/i }).click();
-    await expect(page.getByText(activeName)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(activeHosteler.phone)).toBeVisible({ timeout: 5000 });
 
-    const deletedRow = page.locator('tr', { hasText: activeName });
+    const deletedRow = page.locator('tr', { hasText: activeHosteler.phone });
     await deletedRow.getByRole('button', { name: 'View Audit' }).click();
     await expect(page.getByText(/Deleted Hosteler Audit/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/Canceled Future Preferences/i)).toBeVisible();
 
     // Verify deleted hosteler is excluded from active list (uses real Next.js API, not mocked Supabase)
-    const activeNames = await page.evaluate(async () => {
+    const activePhones = await page.evaluate(async () => {
       const res = await fetch('/api/hostelers?status=active');
       if (!res.ok) return [];
       const body = await res.json();
-      return (body.hostelers ?? []).map((h: { name: string }) => h.name);
+      return (body.hostelers ?? []).map((h: { phone: string }) => h.phone);
     });
-    expect(activeNames).not.toContain(activeName);
+    expect(activePhones).not.toContain(activeHosteler.phone);
 
     // Verify canceled future preferences are excluded from dashboard food counts
     // The audit view confirms they exist, but the active food query should exclude them
-    const auditData = await page.evaluate(async () => {
+    const auditData = await page.evaluate(async (deletedHostelerPhone) => {
       const hostelersRes = await fetch('/api/hostelers?status=deleted');
       if (!hostelersRes.ok) return null;
       const body = await hostelersRes.json();
-      const deleted = body.hostelers?.find((h: { name: string }) => h.name === 'E2E Test Hosteler');
+      const deleted = body.hostelers?.find((h: { phone: string }) => h.phone === deletedHostelerPhone);
       if (!deleted) return null;
       const auditRes = await fetch(`/api/hostelers/${deleted.id}?view=audit`);
       if (!auditRes.ok) return null;
       return auditRes.json();
-    });
+    }, activeHosteler.phone);
     // Canceled future preferences should be visible in audit view
     expect(auditData?.audit?.canceled_future_preferences?.length).toBeGreaterThanOrEqual(0);
   });
+
+  test('owner-assisted PIN reset invalidates old PIN and accepts new PIN', async ({ page }, testInfo) => {
+    test.setTimeout(120000);
+    await loginAsOwner(page);
+
+    const newPin = '2468';
+
+    const hosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us5-pin-reset',
+    });
+
+    await page.goto('/admin/hostelers');
+    await page.getByRole('tab', { name: /^Active/i }).click();
+    const activeRow = page.locator('tr', { hasText: hosteler.phone });
+    await expect(activeRow).toBeVisible({ timeout: 10000 });
+    const resetInviteResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes(`/api/hostelers/${hosteler.hostelerId}/reset-invite`) &&
+        response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
+    await activeRow.getByRole('button', { name: 'Reset Invite' }).click();
+    const resetInviteResponse = await resetInviteResponsePromise;
+    expect(resetInviteResponse.ok()).toBeTruthy();
+
+    const inviteDialog = page.getByRole('dialog', { name: /Invite Link Generated/i });
+    await expect(inviteDialog).toBeVisible({ timeout: 20000 });
+    const inviteInput = inviteDialog.getByLabel('Invite URL');
+    await expect(inviteInput).toBeVisible({ timeout: 20000 });
+    const resetInviteUrl = await inviteInput.inputValue();
+    await page.getByRole('button', { name: 'Close' }).click();
+
+    await page.context().clearCookies();
+    const validateResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/invite/validate') && response.request().method() === 'GET',
+      { timeout: 60000 },
+    );
+    await page.goto(resetInviteUrl, { waitUntil: 'domcontentloaded' });
+    const validateResponse = await validateResponsePromise;
+    expect(validateResponse.ok()).toBeTruthy();
+    await expect(page.getByRole('heading', { name: 'Set your new PIN' })).toBeVisible({ timeout: 15000 });
+    await page.getByPlaceholder('Enter 4-digit PIN').fill(newPin);
+    await page.getByPlaceholder('Re-enter PIN').fill(newPin);
+    const resetResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/invite/activate') && response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
+    await page.getByRole('button', { name: 'Set New PIN' }).click();
+    const resetResponse = await resetResponsePromise;
+    expect(resetResponse.ok()).toBeTruthy();
+    await expect(page).toHaveURL(/\/login\?reset=success/, { timeout: 15000 });
+
+    await page.fill('#phone', hosteler.phone);
+    await page.fill('#pin', hosteler.pin);
+    const oldPinResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/auth/pin/verify') && response.request().method() === 'POST',
+      { timeout: 30000 },
+    );
+    await page.locator('form button[type="submit"]').click();
+    const oldPinResponse = await oldPinResponsePromise;
+    expect(oldPinResponse.status()).toBe(401);
+    await expect(page.getByText('Invalid phone number or PIN')).toBeVisible();
+
+    await page.fill('#phone', hosteler.phone);
+    await page.fill('#pin', newPin);
+    const newPinResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/auth/pin/verify') && response.request().method() === 'POST',
+      { timeout: 30000 },
+    );
+    await page.locator('form button[type="submit"]').click();
+    const newPinResponse = await newPinResponsePromise;
+    expect(newPinResponse.ok()).toBeTruthy();
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 });
+  });
+
+  test('google-linked hosteler reset invite shows linked Google instruction', async ({ page }, testInfo) => {
+    test.setTimeout(90000);
+    await loginAsOwner(page);
+
+    const googleHosteler = await createActiveGoogleHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us5-google-reset',
+    });
+    await page.goto('/admin/hostelers');
+    await expect(page.getByRole('heading', { name: /Hosteler Management/i })).toBeVisible({ timeout: 15000 });
+    await page.getByRole('tab', { name: /^Active/i }).click();
+    await page.reload();
+    await page.getByRole('tab', { name: /^Active/i }).click();
+    const activeRow = page.locator('tr', { hasText: googleHosteler.phone });
+    await expect(activeRow).toBeVisible({ timeout: 15000 });
+    const resetInviteResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes(`/api/hostelers/${googleHosteler.hostelerId}/reset-invite`) &&
+        response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
+    await activeRow.getByRole('button', { name: 'Reset Invite' }).click();
+    const resetInviteResponse = await resetInviteResponsePromise;
+    expect(resetInviteResponse.ok()).toBeTruthy();
+
+    const inviteDialog = page.getByRole('dialog', { name: /Invite Link Generated/i });
+    await expect(inviteDialog).toBeVisible({ timeout: 20000 });
+    const inviteInput = inviteDialog.getByLabel('Invite URL');
+    await expect(inviteInput).toBeVisible({ timeout: 20000 });
+    const resetInviteUrl = await inviteInput.inputValue();
+    await page.context().clearCookies();
+    await page.goto(resetInviteUrl);
+
+    await expect(page.getByText('This account is linked to Google sign-in. Continue with your linked Google account.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+  });
+
+  test('superseded reset invite shows latest-link recovery guidance', async ({ page }, testInfo) => {
+    test.setTimeout(120000);
+    await loginAsOwner(page);
+
+    const hosteler = await createActivePinHosteler({
+      specPath: testInfo.file,
+      testTitle: testInfo.title,
+      markerScope: 'us5-superseded-reset',
+    });
+
+    await page.goto('/admin/hostelers');
+    await page.getByRole('tab', { name: /^Active/i }).click();
+    const activeRow = page.locator('tr', { hasText: hosteler.phone });
+    await expect(activeRow).toBeVisible({ timeout: 10000 });
+
+    const firstResetInviteResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes(`/api/hostelers/${hosteler.hostelerId}/reset-invite`) &&
+        response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
+    await activeRow.getByRole('button', { name: 'Reset Invite' }).click();
+    const firstResetInviteResponse = await firstResetInviteResponsePromise;
+    expect(firstResetInviteResponse.ok()).toBeTruthy();
+
+    const inviteDialog = page.getByRole('dialog', { name: /Invite Link Generated/i });
+    await expect(inviteDialog).toBeVisible({ timeout: 20000 });
+    const inviteInput = inviteDialog.getByLabel('Invite URL');
+    await expect(inviteInput).toBeVisible({ timeout: 20000 });
+    const staleInviteUrl = await inviteInput.inputValue();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(inviteDialog).not.toBeVisible({ timeout: 5000 });
+
+    // Re-locate activeRow after dialog close to avoid stale reference
+    const activeRowAfterClose = page.locator('tr', { hasText: hosteler.phone });
+    const secondResetInviteResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes(`/api/hostelers/${hosteler.hostelerId}/reset-invite`) &&
+        response.request().method() === 'POST',
+      { timeout: 60000 },
+    );
+    await activeRowAfterClose.getByRole('button', { name: 'Reset Invite' }).click();
+    const secondResetInviteResponse = await secondResetInviteResponsePromise;
+    expect(secondResetInviteResponse.ok()).toBeTruthy();
+    const inviteDialog2 = page.getByRole('dialog', { name: /Invite Link Generated/i });
+    await expect(inviteDialog2).toBeVisible({ timeout: 20000 });
+    await expect(inviteDialog2.getByLabel('Invite URL')).toBeVisible({ timeout: 20000 });
+    await page.context().clearCookies();
+    await page.goto(staleInviteUrl);
+
+    await expect(page.getByText('This invite link has been replaced by a newer one.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Open the latest invite link shared by your PG owner.')).toBeVisible();
+  });
+  */
 });

@@ -1,6 +1,6 @@
 # Research: Deekshana Castle PG Management App
 
-**Phase**: 0 — Outline & Research | **Date**: 2026-07-04
+**Phase**: 0 — Outline & Research | **Date**: 2026-07-05
 
 ## Research Tasks & Findings
 
@@ -252,6 +252,28 @@ All technical unknowns resolved. Architecture decisions are finalized:
 - Treating mobile remediation as final polish only — rejected because Constitution v1.6.0 makes mobile acceptance a release blocker for user-facing work.
 - Validating only desktop responsive mode — rejected because installed standalone Android PWA behavior can differ from desktop emulation.
 - Creating a separate SpecKit feature folder — rejected because US13 and the related requirements are already part of the existing feature specification and tasks.
+
+---
+
+### 15. Invite Regeneration, Owner-Assisted PIN Reset, and Superseded-Token Semantics
+
+**Decision**: Keep invite generation at `POST /api/hostelers/[id]/reset-invite`, while centralizing submit-time branching and token-state enforcement in `POST /api/invite/activate` with a stable structured error taxonomy.
+
+**Rationale**:
+- The owner action and token-submit action are different responsibilities. Splitting route ownership avoids duplicated state checks and drift.
+- Active PIN-linked hostelers need owner-assisted reset without changing lifecycle status or onboarding flow semantics.
+- Stale invite pages must fail deterministically when a newer token exists, so users cannot reset credentials through superseded links.
+
+**Implementation approach**:
+- `POST /api/hostelers/[id]/reset-invite` always invalidates prior unused tokens and emits a fresh token with `generated_at`.
+- `POST /api/invite/activate` branches between onboarding activation and owner-assisted reset using hosteler lifecycle/credential context.
+- Error outcomes use structured shape `{ error: { code, message, recovery_action } }` with distinct codes for `invite_expired`, `invite_used`, `invite_superseded`, and `reset_not_allowed_non_active`.
+- Supersession precedence is deterministic by latest `generated_at`; if equal, later persisted record wins.
+
+**Alternatives considered**:
+- Handling reset semantics in both routes — rejected (duplicate logic and inconsistent error behavior risk).
+- Treating regenerated invites as simple onboarding-only links — rejected (does not satisfy active PIN-linked forgot-PIN requirement).
+- Returning generic token-invalid errors for all failures — rejected (breaks client recovery UX and testability).
 
 ## Addendum: Session & Security Clarifications (2026-07-04)
 

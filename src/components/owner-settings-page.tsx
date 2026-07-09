@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatINR, getTomorrowDate } from '@/lib/utils';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 import type { MealType, SettingsResponse } from '@/types';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -99,6 +100,7 @@ export function OwnerSettingsPage() {
     }
 
     setSaving(true);
+  emitUiDiagnostic({ page: '/admin/settings', action: 'settings.save', state: 'submit-start', metadata: { hasRates: Object.keys(rates).length > 0 } });
     try {
       const response = await fetch('/api/settings', {
         method: 'PATCH',
@@ -108,6 +110,7 @@ export function OwnerSettingsPage() {
 
       const data = await response.json();
       if (!response.ok) {
+        emitUiDiagnostic({ page: '/admin/settings', action: 'settings.save', state: 'submit-failure', metadata: { status: response.status } });
         setError(data.error || 'Failed to save settings');
         return;
       }
@@ -127,6 +130,7 @@ export function OwnerSettingsPage() {
           ? `Settings saved. ${changedRateLabels.join(', ')} effective from tomorrow (${tomorrow}).`
           : 'Settings saved.'
       );
+      emitUiDiagnostic({ page: '/admin/settings', action: 'settings.save', state: 'submit-success', metadata: { changedRates: changedRateLabels.length } });
     } finally {
       setSaving(false);
     }

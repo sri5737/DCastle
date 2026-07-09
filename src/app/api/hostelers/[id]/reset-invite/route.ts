@@ -3,10 +3,11 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 const INVITE_EXPIRY_DAYS = 7;
 
-export async function POST(
+async function handlePost(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -66,4 +67,14 @@ export async function POST(
     invite_url,
     expires_at: expiresAt,
   });
+}
+
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  return withApiDiagnostic(
+    { route: '/api/hostelers/[id]/reset-invite', method: 'POST', action: 'hosteler.reset-invite' },
+    () => handlePost(request, context),
+  );
 }
