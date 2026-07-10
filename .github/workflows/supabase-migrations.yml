@@ -1,0 +1,41 @@
+name: Supabase Migrations
+
+on:
+  push:
+    branches: [qa, production, main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: ${{ github.ref_name == 'qa' || github.ref_name == 'production' || github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'qa' && 'qa' || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Apply pending migrations to Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Running migrations for branch: ${{ github.ref_name }}"
+          echo "Target environment: ${{ github.ref_name == 'qa' && 'qa' || 'production' }}"
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "SUPABASE_DB_URL secret is missing for this environment."
+            exit 1
+          fi
+          supabase db push --db-url "$SUPABASE_DB_URL"
