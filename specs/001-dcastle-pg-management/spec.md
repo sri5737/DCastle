@@ -231,21 +231,33 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 
 ---
 
-### User Story 13 — Users Operate the App as a Mobile Android App Experience (Priority: P1)
+### User Story 13 — Users Operate the App on Their Primary Devices (Priority: P1)
 
-An owner or hosteler uses Deekshana Castle primarily on Android mobile, either in Android Chrome or as an installed standalone PWA. The app layout behaves like a purpose-built mobile app: navigation is reachable without desktop assumptions, controls are touch-friendly, text remains readable, no screen creates horizontal overflow, and core owner and hosteler workflows remain usable at a 375 px viewport width.
+**Hostelers use Android mobile phones** as their primary device for the app. The app layout behaves like a purpose-built mobile app: navigation is reachable without desktop assumptions, controls are touch-friendly at 375 px width, text remains readable, and no screen creates horizontal overflow.
 
-**Why this priority**: The app is already a PWA, but daily use happens on Android phones. If the layout breaks on Android mobile, users cannot reliably submit meals, review counts, manage hostelers, or use the installed app as intended.
+**Owners use tablets (iPad-like, 768px+)** as their primary device for the app. The app layout is optimized for tablet usability: dashboards, hosteler tables, and settings use the full tablet width for data density and clarity. Mobile (375 px) rendering is a bonus; mobile breakage is acceptable.
 
-**Independent Test**: Can be tested by opening each completed user-facing screen at a 375 px Android mobile viewport and, where installability applies, from an installed/standalone PWA context, then completing the core owner and hosteler flows without horizontal scrolling, clipped text, unreachable actions, unstable viewport jumps, or controls that are too small for touch.
+**Authentication screens** (hosteler login, invite activation, PIN reset, owner login) are used by both roles on mobile devices and MUST work seamlessly at 375 px width regardless of the destination role.
+
+**Why this priority**: 
+- Hostelers submit meals daily on phones; if the mobile layout breaks, users cannot complete the core workflow. 
+- Owners manage the system primarily from tablets while monitoring hosteler counts and managing registrations; tablet usability ensures efficient owner operations. 
+- Authentication flows must be mobile-first because both roles authenticate on phones or other mobile-first scenarios.
+
+**Independent Test**: 
+- Hosteler screens: Open each completed hosteler-facing screen at 375 px Android mobile viewport and complete the core flows (login, submission, history, billing, settings) without horizontal scrolling or unreachable actions.
+- Owner screens: Open each completed owner-facing screen at 768 px tablet viewport and complete core owner flows (dashboard, hosteler management, billing, settings) with proper data density and layout.
+- Auth screens: Verify login, invite activation, and PIN reset screens work flawlessly at 375 px mobile width.
 
 **Acceptance Scenarios**:
 
-1. **Given** a completed hosteler-facing screen is opened on Android Chrome at 375 px width, **When** the user views and interacts with the screen, **Then** all content fits within the viewport with no horizontal scrolling, clipped primary content, or overlapping controls.
-2. **Given** a completed owner-facing screen is opened on Android Chrome at 375 px width, **When** the owner reviews dashboards, tables, forms, dialogs, and action controls, **Then** the layout remains usable without desktop-only columns, off-screen actions, or horizontal overflow.
-3. **Given** the app is installed and launched in Android PWA standalone mode, **When** a hosteler opens the dashboard, submits food preferences, and returns to the dashboard, **Then** navigation, viewport height, touch controls, confirmation state, and offline/online layout states behave like a mobile app and remain stable without browser-chrome-dependent spacing.
-4. **Given** the app is installed and launched in Android PWA standalone mode, **When** the owner logs in, opens the dashboard, manages hostelers, and updates settings, **Then** primary navigation and actions remain reachable, touch-friendly, readable, and not obscured by viewport, safe-area, keyboard, or modal positioning issues.
-5. **Given** any user-facing screen is marked complete, **When** acceptance evidence is recorded for that screen, **Then** the evidence includes validation at the 375 px mobile baseline and, where the screen participates in installed PWA usage, validation in standalone PWA context.
+1. **Given** a completed hosteler-facing screen is opened on Android Chrome at 375 px width, **When** the hosteler views and interacts with the screen, **Then** all content fits within the viewport with no horizontal scrolling, clipped primary content, or overlapping controls.
+2. **Given** a completed owner-facing screen is opened on a tablet viewport at 768 px or wider, **When** the owner reviews dashboards, hosteler tables, forms, dialogs, and action controls, **Then** the layout uses the full tablet width for data visibility and clarity without cramped or redundant spacing.
+3. **Given** authentication screens (hosteler login, invite activation, PIN reset, owner login) are accessed on mobile, **When** a user completes authentication, **Then** the screen is fully usable at 375 px width with proper spacing, readable text, and touch-friendly controls.
+4. **Given** an owner-facing screen is tested on Android mobile at 375 px width, **When** layout or functionality breaks, **Then** breakage is acceptable and does not block task completion. The owner primarily uses tablets; mobile rendering is an optional bonus.
+5. **Given** a hosteler-facing screen is tested on tablet at 768 px or wider, **When** the screen renders at full tablet width, **Then** rendering is a bonus. Hosteler screens are optimized for mobile baseline; tablet rendering beyond mobile optimization is not required.
+6. **Given** any hosteler-facing screen is marked complete, **When** acceptance evidence is recorded, **Then** the evidence includes mandatory validation at the 375 px mobile baseline. Tablet evidence is optional.
+7. **Given** any owner-facing screen is marked complete, **When** acceptance evidence is recorded, **Then** the evidence includes mandatory validation at 768 px tablet width. Mobile (375 px) evidence is optional.
 
 ---
 
@@ -405,17 +417,21 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - **FR-069**: Authentication E2E validation MUST log in owner and hosteler users through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated page, and verify the user remains on the correct role surface. Direct cookie or localStorage injection is allowed only for documented setup helpers, never as the core proof that login works.
 - **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit tests or E2E tests may not exercise.
 
-**Android Mobile App Experience**
+**Android Mobile and Tablet App Experience**
 
-- **FR-071**: Android mobile MUST be treated as the primary user experience for all completed user-facing screens, not as a desktop layout merely reduced to a smaller viewport.
-- **FR-072**: Every completed hosteler-facing and owner-facing screen MUST be usable at a 375 px wide Android mobile viewport with no page-level horizontal overflow, clipped primary content, overlapping interactive elements, or unreachable primary actions.
-- **FR-073**: Navigation on Android mobile MUST behave like a mobile app experience: primary owner and hosteler destinations must be reachable from the current role shell without relying on desktop-width sidebars, hover interactions, or off-screen menus.
-- **FR-074**: Interactive controls on Android mobile MUST be touch-friendly, with enough target size and spacing to avoid accidental activation in normal one-handed use.
-- **FR-075**: Text, labels, form fields, table/card content, dialog content, and status messages on Android mobile MUST remain readable without requiring pinch zoom, and long values MUST wrap, truncate with accessible context, or reflow without breaking the screen.
-- **FR-076**: Android mobile viewport behavior MUST remain stable across normal browser mode and installed PWA standalone mode, including safe spacing around the top and bottom viewport edges, modal/dialog positioning, virtual-keyboard interactions, and offline/online state changes.
-- **FR-077**: Core hosteler flows on Android mobile at 375 px width and in installed PWA standalone mode MUST support login, dashboard review, food preference submission, submission confirmation, and navigation back to the dashboard without layout breakage.
-- **FR-078**: Core owner flows on Android mobile at 375 px width and in installed PWA standalone mode MUST support login, dashboard count review, pending/submitted review, hosteler management actions, and settings updates without layout breakage.
-- **FR-079**: Completion evidence for any user-facing screen MUST include validation at the 375 px Android mobile baseline; if the screen participates in installed app usage, evidence MUST also include installed or standalone PWA context validation where applicable.
+- **FR-071**: Hosteler-facing screens MUST be optimized for Android mobile (375 px width) as the primary baseline. Hostelers access the app primarily on phones; all hosteler workflows must be usable at 375 px without horizontal scrolling or broken layouts.
+- **FR-072**: Owner-facing screens MUST be optimized for tablet (768px+ width) as the primary baseline. Owners access the app primarily on tablets; all owner workflows must be usable and data-dense at 768 px and wider. Mobile (375 px) compatibility is optional.
+- **FR-073**: Authentication screens (hosteler login, invite activation, PIN reset, owner login) MUST work seamlessly at 375 px mobile width for both roles, with readable text, touch-friendly controls, and no horizontal overflow.
+- **FR-074**: Every completed hosteler-facing screen MUST be usable at a 375 px wide Android mobile viewport with no page-level horizontal overflow, clipped primary content, overlapping interactive elements, or unreachable primary actions.
+- **FR-075**: Every completed owner-facing screen MUST be designed for tablet usability (768px+) with proper data density, table layouts optimized for tablet width, and efficient use of space for dashboards and management interfaces.
+- **FR-076**: Navigation on Android mobile hosteler screens MUST behave like a mobile app experience: primary hosteler destinations must be reachable from the current hosteler shell without relying on desktop-width sidebars, hover interactions, or off-screen menus.
+- **FR-077**: Interactive controls on hosteler screens at 375 px MUST be touch-friendly, with enough target size and spacing to avoid accidental activation in normal one-handed use.
+- **FR-078**: Text, labels, form fields, card content, dialog content, and status messages on hosteler screens at 375 px MUST remain readable without requiring pinch zoom, and long values MUST wrap, truncate with accessible context, or reflow without breaking the screen.
+- **FR-079**: Android mobile viewport behavior on hosteler screens MUST remain stable across normal browser mode and installed PWA standalone mode, including safe spacing around the top and bottom viewport edges, modal/dialog positioning, virtual-keyboard interactions, and offline/online state changes.
+- **FR-080**: Core hosteler workflows on Android mobile at 375 px width and in installed PWA standalone mode MUST support login, dashboard review, food preference submission, submission confirmation, and navigation back to the dashboard without layout breakage.
+- **FR-081**: Owner-facing tables, dashboards, hosteler lists, settings, and billing views MUST use the full tablet width (768px+) for data visibility and clarity, with proper spacing optimized for touch interaction and data density.
+- **FR-082**: Completion evidence for any hosteler-facing screen MUST include validation at the 375 px Android mobile baseline. If the screen participates in installed app usage, evidence MUST also include installed or standalone PWA context validation where applicable. Mobile tablet rendering evidence is optional.
+- **FR-083**: Completion evidence for any owner-facing screen MUST include validation at 768 px tablet width. Mobile (375 px) rendering evidence is optional; mobile rendering issues are acceptable and do not block owner-facing task completion.
 
 ---
 
@@ -451,8 +467,10 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - **SC-011**: In an installed Android PWA session with network disabled, the app shell loads in under 3 seconds and shows an offline state for data-dependent actions instead of a blank, browser error, or broken page.
 - **SC-012**: PWA verification produces passing automated evidence for manifest, service worker, offline shell, and install prompt behavior, plus manual Android evidence for app drawer presence and standalone launch.
 - **SC-013**: The owner can delete an active or pending hosteler and later locate that deleted record, with its retained audit context, in under 30 seconds; for active deletions, the deleted record keeps past and same-day history, exposes canceled future-dated food preferences only in the deleted/audit view, and ensures those canceled records never appear in normal owner history/export, dashboard counts, or bill inputs.
-- **SC-014**: At 375 px Android mobile viewport width, 100% of completed user-facing screens complete mobile layout validation with no page-level horizontal scrolling, no clipped primary content, no overlapping controls, and no unreachable primary action.
-- **SC-015**: In installed Android PWA standalone mode, the core hosteler flow and core owner flow can each be completed without viewport jumps, keyboard/modal obstruction, unsafe spacing, unreadable text, or navigation dead ends.
+- **SC-014**: At 375 px Android mobile viewport width, 100% of completed hosteler-facing screens complete mobile layout validation with no page-level horizontal scrolling, no clipped primary content, no overlapping controls, and no unreachable primary action.
+- **SC-015**: At 768 px tablet viewport width and above, 100% of completed owner-facing screens display with proper data density, no cramped layouts, and optimized use of tablet width for dashboards, tables, and data-rich views.
+- **SC-016**: All authentication screens (hosteler login, invite activation, PIN reset, owner login) work seamlessly at 375 px mobile width with readable text, touch-friendly controls, and no horizontal overflow.
+- **SC-017**: In installed Android PWA standalone mode, the core hosteler flow (login → dashboard → submission → confirmation → return) can be completed without viewport jumps, keyboard/modal obstruction, unsafe spacing, unreadable text, or navigation dead ends.
 
 ---
 
@@ -472,7 +490,9 @@ An owner or hosteler uses Deekshana Castle primarily on Android mobile, either i
 - Automated notifications (push, SMS, email) to hostelers are out of scope for v1.
 - Analytics dashboards and charts are out of scope for v1.
 - Android Chrome is the primary required installability target; iOS Safari add-to-home-screen support remains desirable where the browser permits it, but Android app drawer appearance is the required validation outcome.
-- Android mobile is the primary product experience for v1. Desktop and larger tablet layouts may exist, but they must not drive design decisions that break Android Chrome or installed Android PWA usage.
+- Android mobile is the primary product experience for hostelers (v1). Tablet and desktop layouts are progressive enhancements only after the mobile-first hosteler experience is complete.
+- Tablet (iPad-like, 768px+) is the primary product experience for owners (v1). Mobile (375 px) rendering is optional; mobile usability issues do not block owner-screen completion.
+- Authentication screens (hosteler login, invite activation, PIN reset, owner login) must work seamlessly at 375 px mobile width for both roles, regardless of their primary device strategy.
 - The nightly backup runs on a fixed cron schedule (2:00 AM IST) and uses the owner's Cloudflare R2 storage for retention.
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 - The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.

@@ -145,17 +145,43 @@ Do not run `npm run build:cloudflare` during normal local implementation or task
 
 ## Android Mobile App Experience Guardrails
 
-Android Chrome at 375 px width is the primary design baseline for all owner, hosteler, and auth screens. Desktop and tablet layouts are progressive enhancements only after the mobile experience is complete.
+**Device Strategy:**
+- **Hostelers**: Android mobile (375 px width) is the PRIMARY baseline. All hosteler-facing screens must be optimized for mobile-first experience.
+- **Owners**: Tablet (iPad-like, 768px+ width) is the PRIMARY baseline. Owner-facing screens must be designed for tablet usability. Mobile compatibility is a bonus, not required.
+- **Authentication screens** (login, invite activation): Mobile-first since both roles use these.
 
-For every user-facing UI change:
+**For Hosteler Screens (Mobile First — REQUIRED):**
+
+Android Chrome at 375 px width is the primary design baseline for all hosteler-facing screens. Desktop and tablet layouts are progressive enhancements only after the mobile experience is complete.
+
+For every hosteler-facing UI change:
 - Design and inspect the affected screen at 375 px mobile width first.
 - Preserve a mobile app experience: primary navigation and actions must be reachable without desktop-only sidebars, hover-only controls, off-screen menus, hidden actions, or precision mouse interactions.
 - Ensure no page-level horizontal overflow, clipped primary content, overlapping controls, unreachable submit/save/delete actions, unstable viewport jumps, or unreadable text.
 - Use touch-friendly controls with safe spacing; primary controls should be at least 44 px in their smallest touch dimension unless the design system imposes a stricter standard.
-- Convert data-dense owner surfaces into mobile-appropriate layouts such as stacked cards, segmented views, contained tables, or horizontally contained regions that do not create page-level overflow.
-- Validate affected screens in Android Chrome/mobile viewport E2E where practical, and validate installed/standalone PWA behavior where the screen is used from the installed app.
+- Validate affected hosteler screens in Android Chrome/mobile viewport E2E where practical, and validate installed/standalone PWA behavior where the screen is used from the installed app.
 
-Do not mark user-facing tasks complete if the affected screen breaks at the 375 px Android baseline, even when unit tests, E2E tests, or Cloudflare build pass.
+Do not mark hosteler-facing tasks complete if the affected screen breaks at the 375 px Android baseline, even when unit tests, E2E tests, or Cloudflare build pass.
+
+**For Owner Screens (Tablet First — REQUIRED):**
+
+Tablet (768px width and up) is the primary design baseline for owner-facing screens. Mobile compatibility (375 px) is optional but welcome if it doesn't compromise tablet usability.
+
+For every owner-facing UI change:
+- Design and inspect the affected screen at 768 px tablet width first (or actual iPad/tablet device if available).
+- Use the full tablet width for data-rich layouts: dashboards, tables, hosteler lists, settings, billing views.
+- Preserve a tablet app experience: primary navigation, data density, and actions must be optimized for tablet usability with touch-friendly spacing.
+- Ensure no unusual viewport jumps, keyboard obstruction, or modal positioning issues specific to tablets.
+- If mobile (375 px) rendering is attempted, ensure it remains usable without breaking primary functionality. Mobile breakage is acceptable; mobile optimization is not required.
+
+Do not mark owner-facing tasks complete if the affected screen is unusable on tablets (768px+), even when unit tests, E2E tests, or Cloudflare build pass. Mobile rendering issues are acceptable and do not block completion.
+
+**For Authentication Screens (Mobile First — REQUIRED):**
+
+Login, invite activation, and PIN reset screens are used by both roles on mobile devices. Apply mobile-first design (375 px baseline):
+- All auth screens MUST work seamlessly at 375 px width.
+- Touch-friendly controls and readable text are non-negotiable.
+- These screens are not owner-specific and do not follow the tablet-primary rule.
 
 Human approval is not required for iterative fixes, testing, or refactoring.
 
