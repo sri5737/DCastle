@@ -484,35 +484,41 @@ Phases 19–24 implement the comprehensive billing and operational management su
    - Constraints: `(room_id, cot_id_label)` unique
    - Note: When a hosteler is deactivated or deleted, `hosteler_id` is set to null
 
-5. **RoomRentRateHistory**: Immutable audit trail of room rent changes
+5. **RoomTypeHistory** (Q6 Clarification - Future/Current-Date Only Effective Dates): Immutable audit trail of room type attribute changes
+   - Fields: `id` (uuid), `room_type_id` (uuid, FK), `old_base_rent` (numeric, decimal(10,2), nullable), `new_base_rent` (numeric, decimal(10,2)), `old_cot_count` (integer, nullable), `new_cot_count` (integer), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+   - Constraints: `(room_type_id, effective_date)` unique (one change per room type per date); `effective_date >= today()` (no retroactive changes per Q6)
+   - Note: Immutable record; never updated/deleted; INSERT-only after `effective_date`. Historical lookups return the room type attributes effective on a given date for accurate multi-date billing. Owner UI prevents past-date selection via date picker validation and API layer rejects effective_date < today() with HTTP 400 "Effective date cannot be in the past"
+   - Billing Impact: When generating a bill, room type changes are consulted via historical lookup; bills use the room type (and thus base_rent, cot_count) effective on each billing day
+
+6. **RoomRentRateHistory**: Immutable audit trail of room rent changes
    - Fields: `id` (uuid), `room_id` (uuid, FK), `old_rent` (numeric, decimal(10,2), nullable), `new_rent` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
    - Constraints: `(room_id, effective_date)` unique (one rate change per room per date)
    - Note: Immutable record; never updated; only inserted for audit trail
 
-6. **MealRateRateHistory**: Immutable audit trail of meal rate changes
+7. **MealRateRateHistory**: Immutable audit trail of meal rate changes
    - Fields: `id` (uuid), `meal_type` (enum: 'breakfast'|'lunch'|'dinner'), `old_rate` (numeric, decimal(10,2), nullable), `new_rate` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
    - Constraints: `(meal_type, effective_date)` unique (one rate change per meal per date)
    - Note: Single table covers all three meal types; queries filter by `meal_type`
 
-7. **Employee**: Hostel staff member record
+8. **Employee**: Hostel staff member record
    - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (text), `job_description` (text), `current_salary` (numeric, decimal(10,2)), `active` (boolean, default true), `created_at`, `updated_at`
    - Note: `current_salary` is the active salary; historical changes tracked in `employee_salary_history`
 
-8. **EmployeeSalaryHistory**: Immutable audit trail of employee salary changes
+9. **EmployeeSalaryHistory**: Immutable audit trail of employee salary changes
    - Fields: `id` (uuid), `employee_id` (uuid, FK), `old_salary` (numeric, decimal(10,2), nullable), `new_salary` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
    - Constraints: `(employee_id, effective_date)` unique
    - Note: Immutable; never updated
 
-9. **MonthlyBill**: Two-phase billing record (generated, then transmitted)
+10. **MonthlyBill**: Two-phase billing record (generated, then transmitted)
    - Fields: `id` (uuid), `hosteler_id` (uuid, FK), `month` (date, first day of month), `status` (enum: 'generated'|'transmitted'), `room_rent_total` (numeric, decimal(10,2)), `meal_charges` (jsonb: `{ breakfast: decimal, lunch: decimal, dinner: decimal }`), `grand_total` (numeric, decimal(10,2)), `generated_at` (timestamp), `transmitted_at` (timestamp, nullable), `created_at`, `updated_at`
    - Constraints: `(hosteler_id, month)` unique (one bill per hosteler per month)
    - Note: On regeneration, old `status='generated'` bills are replaced; `status='transmitted'` bills are soft-replaced (new bill created in 'generated' status)
 
-10. **LineItemExpense**: One-time expenses added to profit dashboard
+11. **LineItemExpense**: One-time expenses added to profit dashboard
     - Fields: `id` (uuid), `owner_id` (uuid, FK), `month` (date, first day of month), `description` (text), `amount` (numeric, decimal(10,2)), `expense_date` (date, nullable, within the month), `created_at`, `updated_at`
     - Constraints: None (multiple expenses per month allowed)
 
-11. **MessFacilityAssignment**: Configuration for each hosteler (availing mess or not)
+12. **MessFacilityAssignment**: Configuration for each hosteler (availing mess or not)
     - Fields: `id` (uuid), `hosteler_id` (uuid, FK), `availing_mess` (boolean, default true), `created_at`, `updated_at`
     - Constraints: `hosteler_id` unique (one assignment per hosteler)
     - Note: Embedded in hosteler form during registration; can be updated later
@@ -544,6 +550,8 @@ Room 1──N Cot
     └──1 RoomType
 
 RoomType 1──N Room
+        │
+        └──1 RoomTypeHistory (audit trail - Q6 clarification)
 
 Room ──┬── RoomRentRateHistory (audit trail)
        │
@@ -566,9 +574,20 @@ LineItemExpense ──── Owner
 
 MealRateRateHistory ──── (global, not per-owner)
                       (breakfast, lunch, dinner)
+
+RoomTypeHistory ──── RoomType (audit trail - Q6 clarification)
 ```
 
 ### Rate History & Effective-Date Lookup Patterns
+
+**Room Type Lookup for a Specific Date** (Q6 Clarification):
+```sql
+SELECT new_base_rent, new_cot_count FROM room_type_history
+WHERE room_type_id = $room_type_id
+  AND effective_date <= $lookup_date
+ORDER BY effective_date DESC
+LIMIT 1;
+```
 
 **Room Rent Lookup for a Specific Date**:
 ```sql

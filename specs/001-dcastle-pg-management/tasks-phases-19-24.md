@@ -109,19 +109,25 @@ Phase 23 (US19) ─────────────────────�
 - [ ] AC5: `PATCH /api/admin/rooms/[id]` updates room details (number, floor, rent); validates uniqueness after update
 - [ ] AC6: `DELETE /api/admin/rooms/[id]` removes room only if no cots are assigned to active hostelers; otherwise returns 400
 - [ ] AC7: RLS prevents cross-owner room access (owner A cannot modify owner B's rooms)
+- [ ] AC8: `POST /api/admin/room-types/[id]/change` accepts JSON body: `{ new_base_rent: decimal, new_cot_count: int, effective_date: date }` per Q6 clarification
+- [ ] AC9: Validates: new_base_rent > 0, new_cot_count > 0 (same as room type creation); effective_date must be today or future (IST calendar date); returns HTTP 400 with specific error "Effective date cannot be in the past" if effective_date < today
+- [ ] AC10: Creates immutable `room_type_history` record (INSERT-only; no UPDATE/DELETE allowed after creation); does NOT modify `room_types` table until effective_date is reached
+- [ ] AC11: `GET /api/admin/room-types/[id]` returns extended response including: `{ ...current fields..., pending_change: { new_base_rent, new_cot_count, effective_date } | null }` where pending_change shows scheduled updates
+- [ ] AC12: `GET /api/billing/room-type?room_type_id=[id]&date=[date]` returns `{ base_rent, cot_count, effective_date }` for the room type effective on that specific date; uses historical lookups for billing; query: `SELECT base_rent, cot_count FROM room_type_history WHERE room_type_id=$id AND effective_date <= $date ORDER BY effective_date DESC LIMIT 1`
 
 **Test Coverage Required**:
-- Unit tests: Input validation (room number format, floor enum, rent amount), uniqueness constraints
-- API integration tests: Room CRUD workflow within building; RLS isolation; cascading cot relationships
-- Component tests (Phase 19 UI): Form field rendering, dropdown selection for room types and floors
+- Unit tests: Input validation (room number format, floor enum, rent amount), uniqueness constraints, effective-date validation (reject past dates, accept today/future, IST boundary edge cases)
+- API integration tests: Room CRUD workflow within building; RLS isolation; cascading cot relationships; room type history immutability (past changes block UPDATE/DELETE); historical lookup correctness
+- Component tests (Phase 19 UI): Form field rendering, dropdown selection for room types and floors, date picker behavior
+- E2E tests: Cross-story billing validation (create room with type change → generate bill for date before/after effective_date → verify billing uses correct type)
 
-**Dependencies**: T100 (schema), T101 (building routes)
+**Dependencies**: T100 (schema), T101 (building routes), T106 (room_type_history migration)
 
 **File Paths**:
-- Routes: `src/app/api/admin/room-types/route.ts`, `src/app/api/admin/buildings/[id]/rooms/route.ts`, `src/app/api/admin/rooms/[id]/route.ts`
-- Tests: `src/app/api/admin/rooms/__tests__/route.test.ts`
+- Routes: `src/app/api/admin/room-types/route.ts`, `src/app/api/admin/buildings/[id]/rooms/route.ts`, `src/app/api/admin/rooms/[id]/route.ts`, `src/app/api/admin/room-types/[id]/change/route.ts`, `src/app/api/billing/room-type/route.ts`
+- Tests: `src/app/api/admin/rooms/__tests__/route.test.ts`, `src/app/api/admin/room-types/__tests__/change.test.ts`, `src/app/api/billing/__tests__/room-type.test.ts`
 
-**Estimated Scope**: Small
+**Estimated Scope**: Medium
 
 ---
 
@@ -167,19 +173,23 @@ Phase 23 (US19) ─────────────────────�
 - [ ] AC7: Forms include validation (required fields, numeric rent, enum dropdowns for floor/cot type)
 - [ ] AC8: Success feedback (toast, snackbar) after create/update; error feedback with specific messages
 - [ ] AC9: On 375 px mobile baseline: no page-level horizontal overflow, all form fields are reachable, buttons are touch-friendly (≥44 px)
+- [ ] AC10: Owner can click "Change Room Type" button on any room type card → modal/form appears with: (a) input field for new base rent (pre-filled with current rent), (b) input field for new cot count (pre-filled with current count), (c) date picker for effective date (default to today) per Q6 clarification
+- [ ] AC11: Form submission calls `POST /api/admin/room-types/[id]/change` with `{ new_base_rent, new_cot_count, effective_date }`; on success, room type card displays label in orange/warning color: "Room type will be updated on [effective_date]" until the effective date is reached; on error (effective_date in past), error message displays inline below date picker: "Effective date cannot be in the past"
+- [ ] AC12: Date picker validation: (a) disallows selection of dates in the past (< today, IST calendar date), (b) submit button is disabled if effective_date < today, (c) date picker UI indicates "today" as default/highlighted option
+- [ ] AC13: On 375 px mobile: date picker form is fully rendered in viewport without horizontal scroll; input fields and buttons are touch-friendly (≥44 px tall); modal/form does not overlap with primary content
 
 **Test Coverage Required**:
-- Component tests: Form rendering, input validation, success/error state handling
-- API integration tests: Form submissions integrate with backend routes
-- E2E tests: Create building → add room → configure cots → verify hierarchy displays correctly
-- Mobile layout tests: Verify 375 px baseline compliance, no horizontal overflow, reachable primary actions
+- Component tests: Form rendering, input validation, success/error state handling, pending-change label display
+- API integration tests: Form submissions integrate with backend routes; effective-date validation
+- E2E tests: Create room type → schedule change for future date → verify pending label → advance calendar to effective date → verify label removed and new type applied
+- Mobile layout tests: Verify 375 px baseline compliance, no horizontal overflow, reachable primary actions, date picker accessibility
 
-**Dependencies**: T103 (API routes complete)
+**Dependencies**: T102 (API routes with effective-date support), T106 (room_type_history migration)
 
 **File Paths**:
 - Page: `src/app/admin/buildings/page.tsx`, `src/app/admin/buildings/[id]/page.tsx`
-- Components: `src/components/buildings/building-tree.tsx`, `src/components/buildings/add-building-form.tsx`, `src/components/buildings/add-room-form.tsx`, `src/components/buildings/add-room-type-form.tsx`, `src/components/buildings/configure-cots.tsx`
-- Tests: `src/components/buildings/__tests__/building-tree.test.tsx`, `src/app/admin/buildings/__tests__/page.test.tsx`
+- Components: `src/components/buildings/building-tree.tsx`, `src/components/buildings/add-building-form.tsx`, `src/components/buildings/add-room-form.tsx`, `src/components/buildings/add-room-type-form.tsx`, `src/components/buildings/room-type-change-form.tsx`, `src/components/buildings/configure-cots.tsx`
+- Tests: `src/components/buildings/__tests__/building-tree.test.tsx`, `src/components/buildings/__tests__/room-type-change-form.test.tsx`, `src/app/admin/buildings/__tests__/page.test.tsx`
 
 **Estimated Scope**: Medium
 
@@ -211,6 +221,58 @@ Phase 23 (US19) ─────────────────────�
 - Tests: `src/components/hostelers/__tests__/add-hosteler-form.test.tsx`
 
 **Estimated Scope**: Small
+
+---
+
+### T105b — Phase 19: Database Migration for Room Type History (Q6 Clarification)
+
+**User Story**: US14  
+**Functional Requirements**: Q6 (room type changes with effective dates)  
+**Acceptance Criteria**:
+- [ ] AC1: Migration creates `room_type_history` table with columns: `id` (PK, uuid), `room_type_id` (FK to room_types.id, ON DELETE CASCADE), `old_base_rent` (decimal, nullable), `new_base_rent` (decimal, NOT NULL, > 0), `old_cot_count` (int, nullable), `new_cot_count` (int, NOT NULL, > 0), `effective_date` (date, NOT NULL), `created_by` (uuid, FK to auth.users.id, NOT NULL), `created_at` (timestamptz, default now())
+- [ ] AC2: Unique constraint on `(room_type_id, effective_date)` — no two changes for same room type on same effective date
+- [ ] AC3: Indexes created on: `room_type_id`, `effective_date`, `created_at` for efficient historical lookups during billing
+- [ ] AC4: RLS or trigger enforces immutability: INSERT allowed, UPDATE/DELETE blocked on all rows (past effective_date cannot be modified)
+- [ ] AC5: Migration is idempotent (IF NOT EXISTS guards)
+
+**Test Coverage Required**:
+- Unit tests: Migration syntax, schema structure, constraints, idempotency
+- Integration tests: Immutability verified (UPDATE rejected, DELETE rejected); efficiency via EXPLAIN analysis for historical queries
+
+**Dependencies**: T100 (room_types table exists), T102 (room type CRUD routes reference history table)
+
+**File Paths**:
+- Migration: `supabase/migrations/XXX_room_type_history.sql`
+- Tests: `src/lib/__tests__/migrations.test.ts` (add room_type_history verification)
+
+**Estimated Scope**: Small
+
+---
+
+### T105c — Phase 19: Room Type History Validation, Immutability, and E2E Tests (Q6 Clarification)
+
+**User Story**: US14  
+**Functional Requirements**: Q6 (room type effective-date validation, immutability, billing accuracy)  
+**Acceptance Criteria**:
+- [ ] AC1: Unit tests for effective-date validation: (a) reject dates in past, (b) accept today/future (IST calendar date), (c) edge cases: midnight IST boundary, end-of-month, leap years, month transitions
+- [ ] AC2: Unit tests for room type history immutability: (a) INSERT new room_type_history record succeeds, (b) UPDATE attempted on any room_type_history row returns HTTP 403 Forbidden or blocks via RLS, (c) DELETE attempted on any room_type_history row returns HTTP 403 Forbidden or blocks via RLS
+- [ ] AC3: API integration tests: (a) `POST /api/admin/room-types/[id]/change` with past date returns HTTP 400 with specific error "Effective date cannot be in the past", (b) `POST` with future date succeeds and creates immutable history record, (c) `GET /api/admin/room-types/[id]` includes `pending_change` field until effective_date, then field removed, (d) `GET /api/billing/room-type?room_type_id=[id]&date=[date]` returns correct room type for dates before/on/after effective_date
+- [ ] AC4: E2E test (cross-story): (a) owner creates room with initial room_type (e.g., "2-sharing Non-AC" @ ₹5000), (b) owner schedules room type change for future date (new_base_rent=₹6000), (c) generate bill for date before effective_date → verify bill uses old base_rent ₹5000, (d) advance IST calendar date to effective_date, (e) generate bill for date on/after effective_date → verify bill uses new base_rent ₹6000
+- [ ] AC5: Immutability proof test: attempt to PATCH/UPDATE historical room_type_history row → verify HTTP 403 Forbidden or 400 Bad Request with appropriate error message
+
+**Test Coverage Required**:
+- Unit tests: 100% date validation coverage (past/future/boundary), immutability enforcement via RLS
+- API integration tests: Effective-date boundary testing (day boundaries, month boundaries), historical lookup correctness, error responses
+- E2E tests: Cross-story billing validation (end-to-end room type change → bill generation for multiple dates)
+
+**Dependencies**: T102 (room type change API routes), T105b (room_type_history schema)
+
+**File Paths**:
+- Tests: `src/app/api/admin/room-types/__tests__/change.test.ts` (new, effective-date and immutability tests)
+- Tests: `src/app/api/billing/__tests__/room-type.test.ts` (new, historical lookup tests)
+- E2E: `e2e/us14-room-type-history.spec.ts` (new, or append to existing US14 spec if one exists)
+
+**Estimated Scope**: Medium
 
 ---
 
