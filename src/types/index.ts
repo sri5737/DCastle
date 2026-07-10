@@ -142,3 +142,70 @@ export interface SessionUser {
   role: UserRole;
   hosteler_id?: string;
 }
+
+// ============================================================
+// Phase 19: Building & Room Management Types
+// ============================================================
+
+export interface Building {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  rooms?: Room[];
+}
+
+export type Floor = 'ground' | 'first' | 'second' | null;
+
+export interface RoomType {
+  id: string;
+  owner_id: string;
+  name: string;
+  base_rent: number;
+  cot_count: number;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Room {
+  id: string;
+  building_id: string;
+  room_number: string;
+  floor: Floor;
+  room_type_id: string;
+  current_rent: number;
+  created_at: string;
+  updated_at: string;
+  room_type?: RoomType;
+  cots?: Cot[];
+}
+
+export type CotType = 'lower_cot' | 'upper_cot';
+
+export interface Cot {
+  id: string;
+  room_id: string;
+  cot_id_label: string;
+  cot_type: CotType;
+  hosteler_id: string | null;
+  created_at: string;
+  updated_at: string;
+  hosteler?: Hosteler;
+}
+
+export interface HostelerRoomAssignment {
+  id: string;
+  hosteler_id: string;
+  building_id: string;
+  room_id: string;
+  cot_id: string;
+  assigned_at: string;
+  created_at: string;
+  updated_at: string;
+  building?: Building;
+  room?: Room;
+  cot?: Cot;
+}

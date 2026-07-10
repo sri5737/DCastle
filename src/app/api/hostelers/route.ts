@@ -115,7 +115,7 @@ async function handlePost(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
-  let body: { name?: string; phone?: string; room_number?: string };
+  let body: { name?: string; phone?: string; room_number?: string; building_id?: string; room_id?: string; cot_id?: string };
   try {
     body = await request.json();
   } catch {
@@ -125,6 +125,10 @@ async function handlePost(request: NextRequest) {
   const name = body.name?.trim();
   const phone = body.phone?.trim();
   const room_number = body.room_number?.trim();
+  const building_id = body.building_id?.trim();
+  const room_id = body.room_id?.trim();
+  const cot_id = body.cot_id?.trim();
+  const ownerId = authResult.ownerId;
 
   // Validation
   if (!name || name.length < 2 || name.length > 100) {
@@ -135,6 +139,14 @@ async function handlePost(request: NextRequest) {
   }
   if (!room_number || room_number.length < 1 || room_number.length > 10) {
     return NextResponse.json({ error: 'Room number must be 1-10 characters' }, { status: 400 });
+  }
+
+  // Validate building/room/cot if provided (all three must be provided together)
+  if ((building_id || room_id || cot_id) && !(building_id && room_id && cot_id)) {
+    return NextResponse.json(
+      { error: 'Building, room, and cot must all be provided together' },
+      { status: 400 }
+    );
   }
 
   const supabase = createServiceClient();
@@ -166,11 +178,77 @@ async function handlePost(request: NextRequest) {
     );
   }
 
+  // If building/room/cot provided, verify they belong to the owner and cot is free
+  if (building_id && room_id && cot_id) {
+    // Verify building belongs to owner
+    const { data: building, error: buildingError } = await supabase
+      .from('buildings')
+      .select('id')
+      .eq('id', building_id)
+      .eq('owner_id', ownerId)
+      .maybeSingle();
+
+    if (buildingError) {
+      console.error('Error verifying building:', buildingError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+
+    if (!building) {
+      return NextResponse.json({ error: 'Building not found or not owned by this owner' }, { status: 404 });
+    }
+
+    // Verify room belongs to building
+    const { data: room, error: roomError } = await supabase
+      .from('rooms')
+      .select('id')
+      .eq('id', room_id)
+      .eq('building_id', building_id)
+      .maybeSingle();
+
+    if (roomError) {
+      console.error('Error verifying room:', roomError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found in this building' }, { status: 404 });
+    }
+
+    // Verify cot belongs to room and is free
+    const { data: cot, error: cotError } = await supabase
+      .from('cots')
+      .select('id, hosteler_id')
+      .eq('id', cot_id)
+      .eq('room_id', room_id)
+      .maybeSingle();
+
+    if (cotError) {
+      console.error('Error verifying cot:', cotError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+
+    if (!cot) {
+      return NextResponse.json({ error: 'Cot not found in this room' }, { status: 404 });
+    }
+
+    if (cot.hosteler_id) {
+      return NextResponse.json({ error: 'This cot is already occupied' }, { status: 400 });
+    }
+  }
+
   // Create hosteler
   const { data: hosteler, error: hostelerError } = await supabase
     .from('hostelers')
-    .insert({ name, phone, room_number, status: 'pending' })
-    .select('id, name, phone, room_number, status, created_at')
+    .insert({
+      name,
+      phone,
+      room_number,
+      status: 'pending',
+      building_id: building_id || null,
+      room_id: room_id || null,
+      cot_id: cot_id || null,
+    })
+    .select('id, name, phone, room_number, status, building_id, room_id, cot_id, created_at')
     .single();
 
   if (hostelerError) {
@@ -187,6 +265,20 @@ async function handlePost(request: NextRequest) {
       );
     }
     return NextResponse.json({ error: 'Failed to create hosteler' }, { status: 500 });
+  }
+
+  // If cot was assigned, update the cot's hosteler_id
+  if (cot_id && hosteler) {
+    const { error: cotUpdateError } = await supabase
+      .from('cots')
+      .update({ hosteler_id: hosteler.id })
+      .eq('id', cot_id);
+
+    if (cotUpdateError) {
+      console.error('Error assigning cot to hosteler:', cotUpdateError);
+      // Don't fail the entire hosteler creation; just log the error
+      // The hosteler is created but cot assignment failed
+    }
   }
 
   // Generate invite token
