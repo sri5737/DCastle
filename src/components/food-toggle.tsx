@@ -25,8 +25,8 @@ export function FoodToggle({ meals, onChange, disabled = false }: FoodToggleProp
   return (
     <div className="flex flex-col gap-4">
       {MEAL_CONFIG.map(({ key, label, time }) => (
-        <div key={key} className="flex items-center justify-between">
-          <div>
+        <div key={key} className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="font-medium">{label}</p>
             <p className="text-sm text-muted-foreground">{time}</p>
           </div>
@@ -37,7 +37,7 @@ export function FoodToggle({ meals, onChange, disabled = false }: FoodToggleProp
             }
             disabled={disabled}
             className={cn(
-              'w-16 h-10 text-sm font-medium',
+              'h-11 w-16 shrink-0 text-base font-medium',
               meals[key]
                 ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'

@@ -1,244 +1,252 @@
 # Quickstart: Validation Guide
 
-**Phase**: 1 — Design & Contracts | **Date**: 2026-07-03
+**Phase**: 1 — Design & Contracts | **Date**: 2026-07-05
 
-This guide documents how to validate the Deekshana Castle PG Management App end-to-end after implementation. It covers prerequisites, setup, and validation scenarios that prove each major feature works correctly.
+This guide documents how to validate the Deekshana Castle PG Management App end to end after implementation, including the v1.2 deleted-record lifecycle.
 
 ---
 
 ## Prerequisites
 
-- Node.js 18+ and pnpm installed
-- Supabase account (free tier) with a project created
-- Cloudflare account (free tier) with Pages configured
-- Google Cloud Console project with OAuth 2.0 credentials (redirect URI: `{app-url}/api/auth/callback`)
-- GitHub repository with Actions enabled
+- Node.js 18+
+- Supabase CLI installed and authenticated
+- Supabase project on the free tier
+- Cloudflare Pages project on the free tier
+- Google OAuth credentials with redirect URI `{app-url}/api/auth/callback`
+- GitHub Actions enabled
 
 ## Environment Setup
 
 ```bash
-# Clone and install
-git clone <repo-url> && cd dCastle
-pnpm install
-
-# Copy env template
-cp .env.example .env.local
+git clone <repo-url>
+cd dCastle
+npm install --registry=https://registry.npmjs.org/ --progress=false
 ```
 
-Required `.env.local` values:
-```
+Create `.env.local` from `.env.example` and provide:
+
+```text
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+E2E_TEST_OWNER_EMAIL=owner@example.com
+E2E_TEST_OWNER_PASSWORD=strong-password
+E2E_TEST_HOSTELER_PHONE=9876543210
+E2E_TEST_HOSTELER_PIN=1234
 ```
 
 ## Database Setup
 
 ```bash
-# Apply migrations to Supabase
-pnpm supabase db push
-
-# Seed default settings and rates
-pnpm supabase db seed
+supabase db push
+supabase db seed
 ```
 
 Seed data includes:
-- `settings`: `deadline_time = '21:00'`
-- `meal_rates`: breakfast ₹30, lunch ₹50, dinner ₹40 (effective from project start date)
+- `settings.deadline_time = '21:00'`
+- Initial breakfast, lunch, and dinner meal rates
 
 ## Run Locally
 
 ```bash
-pnpm dev
-# App available at http://localhost:3000
+npm run dev
 ```
 
-## Run Tests
+## Run Validation Commands
 
 ```bash
-pnpm test          # Vitest in watch mode
-pnpm test:run      # Single run (CI mode)
+npm run test:run
+npm run test:e2e
 ```
+
+Story-scoped validation commands must exist for every user story and include the honest E2E evidence for that story, including `npm run test:us12` for the server-side auth proxy flow. Existing completed-story suites must be audited before acceptance so they prove exact business outcomes through the real UI and real Next.js API routes.
+
+For user-facing stories, acceptance evidence must also include Android Chrome validation at the 375 px baseline. Screens used from the installed app require standalone PWA validation where applicable. Passing desktop E2E or broad responsive checks is not sufficient when a completed owner, hosteler, or auth screen has page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, hover-only navigation, or unsafe touch spacing on Android mobile.
 
 ---
 
 ## Validation Scenarios
 
-### Scenario 1: Owner Login & Hosteler Registration
+### Scenario 1: Owner Login and Hosteler Registration
 
-**Steps**:
-1. Navigate to `/admin/login`
-2. Enter owner email and password → verify redirect to `/admin/dashboard`
-3. Navigate to `/admin/hostelers`
-4. Click "Add Hosteler" → enter name: "Test User", phone: "9876543210", room: "101"
-5. Submit → verify invite URL is displayed with copy button
+1. Open `/admin/login`.
+2. Sign in as owner and verify redirect to `/admin/dashboard`.
+3. Open `/admin/hostelers` and add a hosteler with name, phone, and room number.
+4. Verify the hosteler appears in the pending tab and an invite URL is shown.
 
-**Expected**:
-- Owner session persists for 7 days
-- Hosteler appears in "Pending" tab with status badge
-- Invite URL format: `{APP_URL}/join/{uuid}`
+Expected:
+- Owner session persists for 7 days.
+- New hosteler appears in the pending tab with `status = pending`.
+- Invite URL matches `{APP_URL}/join/{token}`.
 
-**Contracts referenced**: [auth.md](contracts/auth.md), [hostelers.md](contracts/hostelers.md)
+Contracts referenced: [auth.md](contracts/auth.md), [hostelers.md](contracts/hostelers.md)
 
 ---
 
 ### Scenario 2: Hosteler Activation via Google OAuth
 
-**Steps**:
-1. Open the invite URL from Scenario 1 in an incognito browser
-2. Verify welcome page shows "Welcome, Test User! Room 101"
-3. Click "Sign in with Google" → complete OAuth flow
-4. Verify redirect to hosteler dashboard
+1. Open the invite link in an incognito browser.
+2. Verify the welcome view shows the hosteler name and room.
+3. Complete Google sign-in.
+4. Verify redirect to the hosteler dashboard.
 
-**Expected**:
-- Hosteler status changes from `pending` to `active`
-- Invite token marked as `used`
-- Google ID stored in hosteler record
-- Supabase Auth user created and linked
+Expected:
+- Hosteler transitions from `pending` to `active`.
+- Invite token is marked used.
+- Supabase Auth user is linked to the hosteler.
 
-**Contracts referenced**: [auth.md](contracts/auth.md)
+Contracts referenced: [auth.md](contracts/auth.md)
 
 ---
 
 ### Scenario 3: Hosteler Activation via PIN
 
-**Steps**:
-1. Generate a new invite for a second hosteler
-2. Open invite URL → click "Set up PIN instead"
-3. Verify phone is pre-filled and read-only
-4. Enter PIN "1234", confirm PIN "1234" → submit
-5. Verify redirect to hosteler dashboard
+1. Generate a fresh invite for a second pending hosteler.
+2. Open the invite and choose the PIN path.
+3. Verify the phone number is pre-filled and read-only.
+4. Set and confirm a 4-digit PIN.
 
-**Expected**:
-- PIN stored as bcryptjs hash (verify in DB: NOT plaintext)
-- Hosteler activated with `pin_hash` set
-- Can subsequently log in at `/login` with phone + PIN
+Expected:
+- `pin_hash` is stored as a bcryptjs hash.
+- Hosteler becomes active and can later log in with phone plus PIN.
+
+Contracts referenced: [auth.md](contracts/auth.md)
 
 ---
 
-### Scenario 4: Food Preference Submission (Before Deadline)
+### Scenario 4: Food Preference Submission Before the Deadline
 
-**Steps**:
-1. Log in as an active hosteler
-2. Navigate to `/submit`
-3. Verify all three toggles (breakfast, lunch, dinner) are interactive
-4. Toggle breakfast ON, lunch ON, dinner OFF → save
-5. Verify dashboard shows green confirmation with "Breakfast, Lunch"
-6. Return to `/submit` → verify pre-filled state matches
-7. Change dinner to ON → save again
+1. Log in as an active hosteler.
+2. Open `/submit`.
+3. Select meal toggles and save.
+4. Reopen `/submit`, confirm values are pre-filled, then update and save again.
 
-**Expected**:
-- First save: creates `food_preferences` row for tomorrow
-- Second save: updates same row (upsert — no duplicate)
-- Dashboard immediately reflects latest selection
+Expected:
+- First save creates tomorrow's row.
+- Second save updates the same `(hosteler_id, date)` row.
+- Dashboard reflects the latest selected meals immediately.
 
-**Contracts referenced**: [food-preferences.md](contracts/food-preferences.md)
+Contracts referenced: [food-preferences.md](contracts/food-preferences.md)
 
 ---
 
 ### Scenario 5: Deadline Enforcement
 
-**Steps**:
-1. As owner, change deadline to 2 minutes from now via `/admin/settings`
-2. As hosteler, verify countdown banner appears (< 2 hours)
-3. Wait for deadline to pass
-4. Attempt to submit/change preferences
-5. Verify form is read-only with "Submissions closed" message
-6. Verify API returns 403 if attempted via curl/fetch
+1. As owner, change the deadline to a time a few minutes ahead.
+2. As hosteler, verify the countdown banner appears when inside the final two hours.
+3. Wait for the deadline to pass.
+4. Attempt another save.
 
-**Expected**:
-- Client shows read-only UI after deadline
-- Server rejects POST to `/api/food/submit` with 403 and deadline info
-- Server time is authoritative (IST)
+Expected:
+- Submission UI becomes read-only after the deadline.
+- `POST /api/food/submit` returns 403 with deadline and server-time details.
+- Server-side IST time remains authoritative.
 
-**Contracts referenced**: [food-preferences.md](contracts/food-preferences.md), [settings.md](contracts/settings.md)
+Contracts referenced: [food-preferences.md](contracts/food-preferences.md), [settings.md](contracts/settings.md)
 
 ---
 
 ### Scenario 6: Owner Real-Time Dashboard
 
-**Steps**:
-1. Open owner dashboard at `/admin/dashboard` in one browser
-2. In a separate browser/incognito, log in as a hosteler and submit preferences
-3. Observe owner dashboard — meal counts should update without refresh
+1. Keep `/admin/dashboard` open as owner.
+2. Submit or update food preferences in another browser as a hosteler.
+3. Observe owner meal counts and submitted/pending lists.
 
-**Expected**:
-- Count cards increment within 3 seconds
-- Hosteler moves from "Pending submissions" list to "Submitted" list
-- If WebSocket disconnects, "Live updates paused" banner appears after 10s
+Expected:
+- Counts update within 3 seconds without refresh.
+- Pending and submitted lists update accordingly.
+- The same exact counts and Pending/Submitted membership are correct on initial fetch, after a real hosteler UI submission live update, and after reloading the dashboard.
+- If the Realtime connection drops for 10 seconds, a reconnecting banner appears.
 
-**Contracts referenced**: [food-preferences.md](contracts/food-preferences.md)
+Contracts referenced: [food-preferences.md](contracts/food-preferences.md)
 
 ---
 
 ### Scenario 7: Monthly Bill Generation with Mid-Month Rate Change
 
-**Steps**:
-1. Seed food preference data for a full month (or use a month with real data)
-2. Midway through that month, set a new rate (e.g., breakfast from ₹30 → ₹35)
-3. As owner, navigate to `/admin/billing`
-4. Select the month → click "Generate Bills"
-5. Verify bill table shows all hostelers with correct totals
-6. Click into a hosteler → verify per-day breakdown shows old rate before change date, new rate after
+1. Seed a month of food preferences.
+2. Add a mid-month meal-rate change.
+3. Generate bills for that month from the owner billing page.
+4. Open a bill detail view.
 
-**Expected**:
-- Days before rate change: charged at ₹30/breakfast
-- Days after rate change: charged at ₹35/breakfast
-- Total = sum of (opted_days × applicable_rate) per meal
+Expected:
+- Days before the change use the prior rate.
+- Days after the change use the new rate.
+- Totals match day-level rate application.
 
-**Contracts referenced**: [billing.md](contracts/billing.md), [data-model.md](data-model.md)
+Contracts referenced: [billing.md](contracts/billing.md), [data-model.md](data-model.md)
 
 ---
 
 ### Scenario 8: Hosteler Deactivation with Future Preferences
 
-**Steps**:
-1. As a hosteler, submit food preferences for tomorrow
-2. As owner, go to hosteler management → click "Deactivate" on that hosteler
-3. Verify confirmation dialog mentions future preference count
-4. Confirm deactivation
-5. Verify hosteler cannot log in anymore
-6. Verify their existing food preferences remain in the database
+1. As a hosteler, submit a preference for tomorrow.
+2. As owner, deactivate that hosteler.
+3. Confirm the warning dialog.
+4. Attempt to use the hosteler session again.
 
-**Expected**:
-- Confirmation dialog: "This hosteler has submitted preferences for 1 future dates..."
-- After confirmation: status = `inactive`
-- Login attempt shows "Account is inactive" error
-- Food preferences not deleted (will be billed)
+Expected:
+- Warning includes the count of future-dated preferences.
+- Hosteler moves to `inactive`.
+- Existing future preference remains preserved and still billable.
+- Next authenticated call fails with the deactivated-account response.
 
-**Contracts referenced**: [hostelers.md](contracts/hostelers.md)
+Contracts referenced: [hostelers.md](contracts/hostelers.md)
 
 ---
 
-### Scenario 9: PWA Installation
+### Scenario 9: Pending and Active Hosteler Deletion
 
-**Steps**:
-1. Open app on Android Chrome (mobile)
-2. Verify install prompt appears on first visit
-3. Tap "Install" → verify app icon on home screen
-4. Open installed app → verify standalone mode (no browser chrome)
-5. Turn off network → verify app shell loads from cache
-6. Verify data screens show offline indicator
+1. Create one pending hosteler and one active hosteler.
+2. Delete the pending hosteler from `/admin/hostelers`.
+3. Verify the invite link becomes unusable and the hosteler appears in the deleted tab.
+4. For the active hosteler, ensure there is preserved history for today and a food preference dated after the deletion effective date.
+5. Trigger delete on the active hosteler, review the confirmation, and confirm the action.
+6. Reopen the deleted tab, dashboard, and any owner history/billing views that cover the relevant dates.
 
-**Expected**:
-- `manifest.json` serves correct name, icons, theme color
-- Service worker caches app shell assets
-- Offline: layout renders, data areas show "You're offline" indicator
+Expected:
+- Pending delete sets `status = deleted`, invalidates unused invites, and preserves an owner-visible deleted record.
+- Active delete sets `status = deleted`, revokes sessions immediately, preserves past and same-day history, and cancels food preferences dated after the deletion effective date.
+- The deleted-hosteler audit view is the only owner-visible surface that still shows the canceled future rows for the deleted active hosteler.
+- Normal owner history/export flows do not show the canceled future rows.
+- Canceled future rows no longer affect owner dashboard counts or billing generation inputs.
+- Deleted tab shows name, room, phone, deletion timestamp, and whether the row came from pending or active.
+
+Contracts referenced: [hostelers.md](contracts/hostelers.md), [food-preferences.md](contracts/food-preferences.md), [billing.md](contracts/billing.md)
 
 ---
 
-### Scenario 10: CI/CD Pipeline
+### Scenario 10: Android PWA Installation, Standalone Launch, and Offline Shell
 
-**Steps**:
-1. Push a commit to `main` branch
-2. Observe GitHub Actions workflow
-3. Verify `test` job runs first (Vitest)
-4. Verify `build` job runs only after `test` passes
-5. Verify `deploy` job runs only after `build` passes
-6. Introduce a failing test → push → verify pipeline stops at `test` job
+1. Open the deployed HTTPS app URL in Android Chrome on a real device or emulator.
+2. Wait for install eligibility and verify install UI appears only after eligibility exists.
+3. Install the app and verify it appears in the Android app drawer.
+4. Launch from the app drawer and verify standalone mode.
+5. Disable network, relaunch, and verify the app shell still loads.
+
+Expected:
+- Manifest and icons satisfy Android installability requirements.
+- Service worker caches the app shell.
+- Install UI is hidden when unsupported, unavailable, or already installed.
+- Offline launch renders the shell and explicit offline states instead of a broken page.
+
+Contracts referenced: [pwa.md](contracts/pwa.md)
+
+---
+
+### Scenario 11: CI/CD Pipeline
+
+1. Push a commit to `main`.
+2. Observe GitHub Actions.
+3. Verify `test` runs before `build`, and `build` runs before `deploy`.
+4. Push a failing test and verify the pipeline stops before build/deploy.
+
+Expected:
+- Deployment never runs when tests or build fail.
+- Validation remains aligned with the constitution.
 
 **Expected**:
 - Three distinct jobs visible in Actions UI
@@ -247,7 +255,7 @@ pnpm test:run      # Single run (CI mode)
 
 ---
 
-### Scenario 11: Nightly Backup
+### Scenario 12: Nightly Backup
 
 **Steps**:
 1. Manually trigger the backup workflow (or wait for cron schedule)
@@ -260,6 +268,106 @@ pnpm test:run      # Single run (CI mode)
 - File contains complete database dump
 - Retention policy enforced (90-day max)
 - Failure sends notification to owner
+- Restore is manual only — no restore UI exists in v1
+
+---
+
+### Scenario 13: PIN Brute-Force Lockout
+
+**Steps**:
+1. Log in as a hosteler via PIN to confirm credentials work
+2. Attempt PIN login 5 times with an incorrect PIN for the same phone number
+3. On the 5th failure, verify HTTP 429 response with lockout message
+4. Attempt login with the correct PIN within the 15-minute window → verify still locked
+5. Wait 15 minutes (or adjust `pin_login_attempts.locked_until` in DB) → verify login succeeds
+
+**Expected**:
+- Attempts 1–4: HTTP 401 "Invalid phone number or PIN"
+- Attempt 5: HTTP 429 "Too many failed attempts. Try again in 15 minutes." with `locked_until` timestamp
+- Correct PIN during lockout: still HTTP 429
+- After cooldown: login succeeds normally, counter is cleared
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [data-model.md](data-model.md)
+
+---
+
+### Scenario 14: Session Invalidation on Deactivation
+
+**Steps**:
+1. Log in as a hosteler on two separate browser sessions (simulating two devices)
+2. Verify both sessions can access `/dashboard` and `/submit`
+3. As owner, deactivate the hosteler (with confirmation if future preferences exist)
+4. In both hosteler sessions, attempt any API call (e.g., navigate to `/dashboard`)
+5. Verify both sessions receive HTTP 401 "Account deactivated" and are redirected to login
+
+**Expected**:
+- Before deactivation: both sessions work independently
+- After deactivation: both sessions are invalidated simultaneously
+- No manual logout required on either device
+- Reactivation allows the hosteler to log in fresh but does not restore old sessions
+
+**Contracts referenced**: [hostelers.md](contracts/hostelers.md), [auth.md](contracts/auth.md)
+
+---
+
+### Scenario 15: Honest E2E Evidence Audit
+
+**Steps**:
+1. Run each story-scoped command from US1 through US12, including `npm run test:us12` once added.
+2. Review each Playwright suite and confirm the core story action is performed through the real UI and real Next.js API route.
+3. For cross-role food/dashboard flows, confirm the hosteler submits exact meal choices through the UI and the owner dashboard shows exact resulting counts plus Pending-to-Submitted movement.
+4. For auth flows, confirm owner and hosteler login use the real login UI and server-side auth routes, wait for post-login client effects, reload, and remain on the correct role surface.
+5. Confirm no suite accepts route mocks, direct cookie/localStorage injection, broad placeholder assertions, conditional skips, or URL/heading-only checks as the core story proof.
+6. Record scoped acceptance evidence for SC-001 and SC-010: representative login-and-submit timing under 30 seconds and seeded up-to-100-hosteler submission/dashboard behavior.
+
+**Expected**:
+- Completed and future story E2E suites prove exact, falsifiable business outcomes.
+- US2 owner dashboard evidence covers initial fetch, live update, and reload-stable state.
+- US4/US12 auth evidence proves reload-stable login through the server-side routes without injected-session shortcuts.
+- PIN lockout and scoped performance acceptance evidence are covered before the related story or phase is marked complete.
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [food-preferences.md](contracts/food-preferences.md), [hostelers.md](contracts/hostelers.md)
+
+---
+
+### Scenario 16: Android Mobile App Experience Validation
+
+**Steps**:
+1. Inventory every completed auth, hosteler, and owner screen and record whether it is used in Android Chrome only, installed standalone PWA mode, or both.
+2. Open each completed user-facing screen at a 375 px Android mobile viewport and verify there is no page-level horizontal overflow.
+3. Complete the core hosteler flow: login, dashboard review, food preference submission, confirmation, and return to dashboard.
+4. Complete the core owner flow: login, dashboard count review, pending/submitted review, hosteler management action, and settings update.
+5. For screens used from the installed app, launch in standalone PWA context and repeat the applicable owner or hosteler flow.
+6. Record device/emulator name, Android version, Chrome version, viewport, browser or standalone context, pass/fail notes, and any screenshots or observations in `pwa-android-validation.md`.
+
+**Expected**:
+- All completed owner, hosteler, and auth screens remain readable and usable at 375 px width.
+- Primary navigation and actions are reachable without desktop-only sidebars, hover interactions, off-screen menus, hidden controls, or precision mouse interactions.
+- Controls are touch-friendly, with primary controls at least 44 px in their smallest touch dimension unless the component standard is stricter.
+- Tables, dashboards, lists, cards, dialogs, forms, tabs, toggles, and settings surfaces adapt without page-level horizontal scrolling, clipped primary content, overlapping controls, or unreachable save/delete/submit actions.
+- Browser chrome, standalone PWA viewport height, virtual keyboard, safe-area spacing, modal positioning, and offline/online states do not hide primary actions or create unstable viewport jumps.
+
+**Contracts referenced**: [pwa.md](contracts/pwa.md)
+
+---
+
+### Scenario 17: Owner-Assisted PIN Reset and Superseded Invite Recovery
+
+**Steps**:
+1. Start with an active PIN-linked hosteler account.
+2. As owner, generate a reset invite for that hosteler and open the link in Browser A (do not submit yet).
+3. Regenerate a newer reset invite for the same hosteler and open the latest link in Browser B.
+4. Attempt reset submit from Browser A using the old link.
+5. Submit reset from Browser B using the newest link with a new 4-digit PIN.
+6. Attempt hosteler PIN login with old PIN, then with new PIN.
+
+**Expected**:
+- Old already-open link fails with HTTP 409 and `error.code = invite_superseded`.
+- Newest link succeeds through owner-assisted reset flow and consumes that token.
+- Old PIN is invalid immediately after reset success response.
+- New PIN authenticates successfully with normal session behavior.
+
+**Contracts referenced**: [auth.md](contracts/auth.md), [hostelers.md](contracts/hostelers.md)
 
 ---
 
@@ -269,9 +377,11 @@ pnpm test:run      # Single run (CI mode)
 |------|-----------|
 | Auth - invite token | Valid/expired/used token handling |
 | Auth - Google OAuth | Link to hosteler, reject unregistered |
-| Auth - PIN verify | Correct/incorrect PIN, inactive account |
+| Auth - PIN verify | Correct/incorrect PIN, inactive account, brute-force lockout (5 attempts → 429) |
+| Auth - sessions | Concurrent multi-device sessions, invalidation on deactivation |
 | Deadline | Before/after/exact boundary, timezone handling |
 | Food upsert | Create new, update existing, no duplicates |
-| Bill calculation | Simple month, mid-month rate change, zero preferences |
+| Bill calculation | Simple month, mid-month rate change, zero preferences, regen without notification |
 | RLS policies | Hosteler isolation, owner access, anon rejection |
 | Realtime | Subscription connect/disconnect/reconnect |
+| Android mobile app experience | 375 px viewport overflow checks, primary-action reachability, app-like navigation, touch target checks, standalone PWA flow validation |

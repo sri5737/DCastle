@@ -7,17 +7,22 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 export default defineConfig({
   testDir: './e2e',
+  testMatch: '**/*.spec.ts',
   globalSetup: './e2e/global-setup.ts',
+  testIgnore: '**/*.test.ts', // optional but recommended in your mixed e2e folder
   globalTeardown: './e2e/global-teardown.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1, // Single worker = single browser instance
-  reporter: 'html',
+  workers: 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
+  outputDir: 'test-results',
   use: {
     baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    headless: false, // Show browser visually (use --headed/--headless to override)
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    headless: true,
     actionTimeout: 10000,
     navigationTimeout: 30000,
   },

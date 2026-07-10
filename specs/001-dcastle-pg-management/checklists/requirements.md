@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Deekshana Castle PG Management App (Full Application — v1)
+# Specification Quality Checklist: Deekshana Castle PG Management App (Full Application — v1.2)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-03
@@ -31,8 +31,8 @@
 
 ## Notes
 
-- All 10 user stories carry acceptance scenarios; 7 edge cases are documented.
-- 52 functional requirements cover provisioning, auth, food submission, owner dashboard, hosteler management, history, billing, settings, PWA, backup, and CI gate.
-- 10 measurable success criteria defined — all technology-agnostic.
+- All 13 user stories carry acceptance scenarios; 21 edge cases are documented.
+- 79 functional requirements (including FR-006a, FR-029a, FR-029b, FR-029c, FR-058a, and FR-071 through FR-079) cover provisioning, auth, food submission, owner dashboard, hosteler management, deletion auditability, history, billing, settings, PWA, Android mobile app experience, backup, and CI gate.
+- 15 measurable success criteria defined — all technology-agnostic.
 - Out-of-scope items (payments, notifications, multi-PG, auto-billing, analytics) are explicitly listed in Assumptions.
-- Spec passed all checklist items on first validation pass; no iterations required.
+- Clarification sessions on 2026-07-03, 2026-07-04, 2026-07-05, 2026-07-10, and 2026-07-10-clarify resolved security, session, backup, hosteler deletion auditability, honest E2E, Cloudflare parity, Android mobile app experience, billing lifecycle, rate changes, room rent proration, unassigned day handling, and profit dashboard historical analysis ambiguities. All billing and dashboard behavior is now fully specified and immutable for implementation.

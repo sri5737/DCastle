@@ -1,0 +1,65 @@
+name: Nightly Database Backup
+
+on:
+  schedule:
+    # 2:00 AM IST = 20:30 UTC (previous day)
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+env:
+  SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Create database dump
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl | gzip > "backup_${TIMESTAMP}.sql.gz"
+          echo "BACKUP_FILE=backup_${TIMESTAMP}.sql.gz" >> $GITHUB_ENV
+
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install
+
+      - name: Upload to R2
+        run: |
+          aws s3 cp "${{ env.BACKUP_FILE }}" "s3://${R2_BUCKET}/backups/${{ env.BACKUP_FILE }}" \
+            --endpoint-url "$R2_ENDPOINT"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+
+      - name: Cleanup old backups (90-day retention)
+        run: |
+          CUTOFF_DATE=$(date -d '90 days ago' +%Y%m%d)
+          aws s3 ls "s3://${R2_BUCKET}/backups/" --endpoint-url "$R2_ENDPOINT" | while read -r line; do
+            FILE=$(echo "$line" | awk '{print $4}')
+            FILE_DATE=$(echo "$FILE" | grep -oP '\d{8}' | head -1)
+            if [ -n "$FILE_DATE" ] && [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]; then
+              aws s3 rm "s3://${R2_BUCKET}/backups/${FILE}" --endpoint-url "$R2_ENDPOINT"
+              echo "Deleted old backup: $FILE"
+            fi
+          done
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+
+      - name: Alert on failure
+        if: failure()
+        run: |
+          echo "::error::Database backup failed at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "Check the workflow logs for details."
+          echo "Backup job failed - repository owner will receive GitHub's automatic failure notification email."

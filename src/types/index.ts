@@ -2,7 +2,11 @@
 // Database Entity Types
 // ============================================================
 
-export type HostelerStatus = 'pending' | 'active' | 'inactive';
+export type HostelerStatus = 'pending' | 'active' | 'inactive' | 'deleted';
+
+export type DeletedFromStatus = 'pending' | 'active';
+
+export type FoodPreferenceCancellationReason = 'hosteler_deleted';
 
 export interface Hosteler {
   id: string;
@@ -14,6 +18,9 @@ export interface Hosteler {
   pin_hash: string | null;
   auth_user_id: string | null;
   activated_at: string | null;
+  deleted_at: string | null;
+  deleted_from_status: DeletedFromStatus | null;
+  deletion_effective_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +45,13 @@ export interface FoodPreference {
   dinner: boolean;
   submitted_at: string;
   updated_at: string;
+  canceled_at: string | null;
+  cancellation_reason: FoodPreferenceCancellationReason | null;
+}
+
+export interface DeletedHostelerAudit {
+  preserved_history_through: string;
+  canceled_future_preferences: FoodPreference[];
 }
 
 export interface MealRate {
@@ -127,4 +141,71 @@ export interface SessionUser {
   email?: string;
   role: UserRole;
   hosteler_id?: string;
+}
+
+// ============================================================
+// Phase 19: Building & Room Management Types
+// ============================================================
+
+export interface Building {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  rooms?: Room[];
+}
+
+export type Floor = 'ground' | 'first' | 'second' | null;
+
+export interface RoomType {
+  id: string;
+  owner_id: string;
+  name: string;
+  base_rent: number;
+  cot_count: number;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Room {
+  id: string;
+  building_id: string;
+  room_number: string;
+  floor: Floor;
+  room_type_id: string;
+  current_rent: number;
+  created_at: string;
+  updated_at: string;
+  room_type?: RoomType;
+  cots?: Cot[];
+}
+
+export type CotType = 'lower_cot' | 'upper_cot';
+
+export interface Cot {
+  id: string;
+  room_id: string;
+  cot_id_label: string;
+  cot_type: CotType;
+  hosteler_id: string | null;
+  created_at: string;
+  updated_at: string;
+  hosteler?: Hosteler;
+}
+
+export interface HostelerRoomAssignment {
+  id: string;
+  hosteler_id: string;
+  building_id: string;
+  room_id: string;
+  cot_id: string;
+  assigned_at: string;
+  created_at: string;
+  updated_at: string;
+  building?: Building;
+  room?: Room;
+  cot?: Cot;
 }

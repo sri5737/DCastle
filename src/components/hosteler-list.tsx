@@ -25,6 +25,7 @@ export function HostelerList({ hostelers, emptyMessage = 'No hostelers' }: Hoste
       {hostelers.map((hosteler) => (
         <li
           key={hosteler.id}
+          data-testid="hosteler-list-item"
           className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/50"
         >
           <span className="text-sm font-medium">{hosteler.name}</span>

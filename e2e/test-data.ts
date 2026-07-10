@@ -8,11 +8,9 @@ export const TEST_OWNER = {
   password: process.env.E2E_TEST_OWNER_PASSWORD || '',
 };
 
-export const TEST_HOSTELER = {
-  name: 'E2E Test Hosteler',
+export const TEST_HOSTELER_AUTH_PRINCIPAL = {
   phone: process.env.E2E_TEST_HOSTELER_PHONE || '9999999999',
   pin: process.env.E2E_TEST_HOSTELER_PIN || '1234',
-  room_number: 'T-101',
   email: `${process.env.E2E_TEST_HOSTELER_PHONE || '9999999999'}@hosteler.dcastle.local`,
   password: process.env.E2E_TEST_HOSTELER_PIN || '1234', // PIN is used as Supabase Auth password
 };

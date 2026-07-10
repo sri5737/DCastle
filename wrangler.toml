@@ -1,0 +1,20 @@
+name = "dcastle"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+main = ".vercel/output/static/_worker.js/index.js"
+base_dir = ".vercel/output/static/_worker.js"
+find_additional_modules = true
+
+[[rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
+[assets]
+directory = ".vercel/output/static"
+
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://ijamwcpvboctjeejajzk.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqYW13Y3B2Ym9jdGplZWphanprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNzk2NjcsImV4cCI6MjA5ODY1NTY2N30.10Vt6lVVY6ji020DSwL0_SaKl2Fc76kRnHZJi-RdHeI"
+NEXT_PUBLIC_APP_URL = "https://dcastle.dcastle-app.workers.dev"
+OWNER_EMAIL = "sri5737@gmail.com"
+NEXT_PUBLIC_OWNER_EMAIL = "sri5737@gmail.com"

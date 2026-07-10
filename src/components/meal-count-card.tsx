@@ -34,14 +34,15 @@ export function MealCountCard({ mealType, count, label }: MealCountCardProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+      <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
+        <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
           {MEAL_ICONS[mealType]} {label}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6">
         <p
-          className={`text-3xl font-bold transition-transform duration-150 ${
+          data-testid={`${mealType}-count`}
+          className={`text-2xl font-bold transition-transform duration-150 sm:text-3xl ${
             animating ? 'scale-110 text-green-600' : 'scale-100'
           }`}
         >

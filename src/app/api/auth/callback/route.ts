@@ -2,8 +2,9 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
@@ -63,4 +64,11 @@ export async function GET(request: NextRequest) {
   }
 
   return response;
+}
+
+export async function GET(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/auth/callback', method: 'GET', action: 'auth.callback' },
+    () => handleGet(request),
+  );
 }

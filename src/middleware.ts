@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const OWNER_EMAIL = process.env.OWNER_EMAIL || '';
+// Use NEXT_PUBLIC_ var which is inlined at build time (safe for middleware on Cloudflare)
+const OWNER_EMAIL = process.env.NEXT_PUBLIC_OWNER_EMAIL || '';
 
 // Decode JWT payload without network call (for routing decisions only)
 function decodeJwtPayload(token: string): { email?: string; exp?: number; sub?: string } | null {

@@ -6,6 +6,7 @@ import { FoodToggle, type MealToggleState } from '@/components/food-toggle';
 import { CountdownBanner } from '@/components/countdown-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 export default function SubmitFoodPage() {
   const router = useRouter();
@@ -52,6 +53,7 @@ export default function SubmitFoodPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError('');
+    emitUiDiagnostic({ page: '/submit', action: 'food.submit', state: 'submit-start', metadata: { ...meals } });
 
     try {
       const res = await fetch('/api/food/submit', {
@@ -62,11 +64,13 @@ export default function SubmitFoodPage() {
 
       if (!res.ok) {
         const data = await res.json();
+        emitUiDiagnostic({ page: '/submit', action: 'food.submit', state: 'submit-failure', metadata: { status: res.status } });
         setError(data.error || 'Failed to submit');
         return;
       }
 
       setSubmitted(true);
+      emitUiDiagnostic({ page: '/submit', action: 'food.submit', state: 'navigation-intent', metadata: { redirectTo: '/dashboard' } });
       router.push('/dashboard');
     } finally {
       setSubmitting(false);
@@ -82,7 +86,7 @@ export default function SubmitFoodPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-6 space-y-4">
+    <div className="space-y-4">
       {serverTime && (
         <CountdownBanner deadlineTime={deadlineTime} serverTimeIST={serverTime} />
       )}

@@ -14,6 +14,15 @@ interface MealCounts {
   dinner: number;
 }
 
+interface DashboardResponse {
+  date: string;
+  deadlineTime: string;
+  serverTime: string;
+  counts: MealCounts;
+  submittedHostelers: HostelerListItem[];
+  pendingHostelers: HostelerListItem[];
+}
+
 export default function OwnerDashboardPage() {
   const [counts, setCounts] = useState<MealCounts>({ breakfast: 0, lunch: 0, dinner: 0 });
   const [submittedHostelers, setSubmittedHostelers] = useState<HostelerListItem[]>([]);
@@ -29,68 +38,30 @@ export default function OwnerDashboardPage() {
   const tomorrowDate = getTomorrowDate();
 
   const fetchDashboardData = useCallback(async () => {
-    const [settingsRes, prefsRes, hostelersRes] = await Promise.all([
-      supabase.from('settings').select('key, value').in('key', ['deadline_time']),
-      supabase
-        .from('food_preferences')
-        .select('hosteler_id, breakfast, lunch, dinner')
-        .eq('date', tomorrowDate),
-      supabase.from('hostelers').select('id, name, room_number').eq('status', 'active'),
-    ]);
-
-    // Set deadline
-    const deadlineSetting = settingsRes.data?.find((s) => s.key === 'deadline_time');
-    if (deadlineSetting) setDeadlineTime(deadlineSetting.value);
-
-    // Compute server time (IST)
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(now);
-    const h = parts.find((p) => p.type === 'hour')?.value ?? '00';
-    const m = parts.find((p) => p.type === 'minute')?.value ?? '00';
-    const s = parts.find((p) => p.type === 'second')?.value ?? '00';
-    setServerTime(`${h}:${m}:${s}`);
-
-    // Compute counts
-    const prefs = prefsRes.data ?? [];
-    const newCounts: MealCounts = { breakfast: 0, lunch: 0, dinner: 0 };
-    const submittedIds = new Set<string>();
-
-    for (const pref of prefs) {
-      if (pref.breakfast) newCounts.breakfast++;
-      if (pref.lunch) newCounts.lunch++;
-      if (pref.dinner) newCounts.dinner++;
-      submittedIds.add(pref.hosteler_id);
-    }
-    setCounts(newCounts);
-
-    // Split hostelers into submitted and pending
-    const allHostelers = hostelersRes.data ?? [];
-    const submitted: HostelerListItem[] = [];
-    const pending: HostelerListItem[] = [];
-
-    for (const h of allHostelers) {
-      if (submittedIds.has(h.id)) {
-        submitted.push(h);
-      } else {
-        pending.push(h);
-      }
+    const response = await fetch('/api/owner/dashboard', { cache: 'no-store' });
+    if (!response.ok) {
+      setLoading(false);
+      return;
     }
 
-    setSubmittedHostelers(submitted);
-    setPendingHostelers(pending);
+    const data = (await response.json()) as DashboardResponse;
+    setDeadlineTime(data.deadlineTime);
+    setServerTime(data.serverTime);
+    setCounts(data.counts);
+    setSubmittedHostelers(data.submittedHostelers);
+    setPendingHostelers(data.pendingHostelers);
     setLoading(false);
-  }, [tomorrowDate]);
+  }, []);
 
   // Initial data fetch (T044)
   useEffect(() => {
     fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Fallback refresh keeps dashboard data honest if Realtime is unavailable.
+  useEffect(() => {
+    const interval = setInterval(fetchDashboardData, 2_000);
+    return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
   // Supabase Realtime subscription (T042) + reconnection handling (T043)
@@ -146,7 +117,7 @@ export default function OwnerDashboardPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
       <p className="text-sm text-muted-foreground">
         Food counts for tomorrow ({tomorrowDate})
@@ -165,14 +136,14 @@ export default function OwnerDashboardPage() {
       )}
 
       {/* Meal count cards (T039/T041) */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <MealCountCard mealType="breakfast" count={counts.breakfast} label="Breakfast" />
         <MealCountCard mealType="lunch" count={counts.lunch} label="Lunch" />
         <MealCountCard mealType="dinner" count={counts.dinner} label="Dinner" />
       </div>
 
       {/* Pending hostelers list */}
-      <Card>
+      <Card data-testid="pending-hostelers">
         <CardHeader>
           <CardTitle className="text-base">
             Pending ({pendingHostelers.length})
@@ -187,7 +158,7 @@ export default function OwnerDashboardPage() {
       </Card>
 
       {/* Submitted hostelers (collapsible) */}
-      <Card>
+      <Card data-testid="submitted-hostelers">
         <CardHeader
           className="cursor-pointer"
           onClick={() => setShowSubmitted(!showSubmitted)}

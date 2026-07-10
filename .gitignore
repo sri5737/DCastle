@@ -1,17 +1,26 @@
 # IDE / Editor
 .vscode/
 
-# GitHub Copilot agent prompts (local only)
-.github/
+# Local GitHub Copilot agent customizations
+.github/agents/
+.github/prompts/
 
 # Dependencies
 node_modules/
+
+# Build outputs
+dist/
+build/
 
 # Next.js
 .next/
 out/
 
+# Logs
+*.log
+
 # Environment
+.env*
 .env
 .env.local
 .env.*.local

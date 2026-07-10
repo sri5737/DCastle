@@ -1,8 +1,7 @@
 import { cookies } from 'next/headers';
 import type { SessionUser, UserRole } from '@/types';
 import { createServiceClient } from '@/lib/supabase/server';
-
-const OWNER_EMAIL = process.env.OWNER_EMAIL || '';
+import { getEnvVar } from '@/lib/env';
 
 /** Session expiry durations in seconds */
 export const SESSION_EXPIRY = {
@@ -78,7 +77,8 @@ export async function getSession(): Promise<SessionUser | null> {
  * Determine user role based on email.
  */
 export function getUserRole(email: string | undefined): UserRole {
-  if (email && email === OWNER_EMAIL) return 'owner';
+  const ownerEmail = getEnvVar('OWNER_EMAIL');
+  if (email && email === ownerEmail) return 'owner';
   return 'hosteler';
 }
 

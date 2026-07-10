@@ -1,19 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const searchParams = useSearchParams();
 
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   // Handle error params from Google OAuth callback
   const callbackError = searchParams.get('error');
@@ -33,6 +47,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+  emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-start', metadata: { phone } });
     try {
       const res = await fetch('/api/auth/pin/verify', {
         method: 'POST',
@@ -42,23 +57,16 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || 'Login failed');
+      if (res.ok) {
+        emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'navigation-intent', metadata: { redirectTo: data.redirectTo } });
+        window.location.href = data.redirectTo || '/dashboard';
         return;
       }
 
-      // Set cookies for middleware auth (session JWT from server-side Supabase sign-in)
-      document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-      document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-
-      // Set session in Supabase client so client-side auth checks work
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-
-      window.location.href = '/dashboard';
+      emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-failure', metadata: { status: res.status } });
+      setError(data.error || 'Login failed');
     } catch {
+      emitUiDiagnostic({ page: '/login', action: 'auth.pin.login', state: 'submit-failure', metadata: { reason: 'network' } });
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
@@ -68,6 +76,7 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     setError('');
     setLoading(true);
+    emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'click' });
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -82,11 +91,13 @@ export default function LoginPage() {
       });
 
       if (oauthError) {
+        emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'submit-failure' });
         setError('Failed to initiate Google sign-in');
         setLoading(false);
       }
       // Redirects to Google — loading stays true
     } catch {
+      emitUiDiagnostic({ page: '/login', action: 'auth.google.login', state: 'submit-failure', metadata: { reason: 'network' } });
       setError('Network error. Please try again.');
       setLoading(false);
     }
@@ -121,7 +132,7 @@ export default function LoginPage() {
           onClick={handleGoogleSignIn}
           variant="outline"
           className="w-full h-12 text-base mb-4"
-          disabled={loading}
+          disabled={loading || !hydrated}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -162,11 +173,13 @@ export default function LoginPage() {
             <Input
               id="phone"
               type="tel"
+              inputMode="numeric"
               placeholder="9876543210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               maxLength={10}
-              disabled={loading}
+              disabled={loading || !hydrated}
+              className="h-12 text-base"
             />
           </div>
 
@@ -182,14 +195,25 @@ export default function LoginPage() {
               onChange={(e) => setPin(e.target.value)}
               maxLength={4}
               inputMode="numeric"
-              disabled={loading}
+              disabled={loading || !hydrated}
+              className="h-12 text-base"
             />
           </div>
 
-          <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+          <Button type="submit" className="w-full h-12 text-base" disabled={loading || !hydrated}>
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
+      </Card>
+    </div>
+  );
+}
+
+function LoginLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md p-6 text-center">
+        <p className="text-sm text-gray-500">Loading...</p>
       </Card>
     </div>
   );

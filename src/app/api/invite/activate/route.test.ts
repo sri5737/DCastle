@@ -1,19 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 
-// Mock Supabase
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockSingle = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
 const mockFrom = vi.fn();
+const mockCreateUser = vi.fn();
+const mockUpdateUserById = vi.fn();
 
 const mockSupabase = {
   from: mockFrom,
   auth: {
     admin: {
-      createUser: vi.fn(),
+      createUser: mockCreateUser,
+      updateUserById: mockUpdateUserById,
       generateLink: vi.fn(),
     },
     exchangeCodeForSession: vi.fn(),
@@ -29,184 +26,281 @@ vi.mock('@/lib/auth/guards', () => ({
   requireOwner: vi.fn().mockResolvedValue({ session: { id: 'owner-1', role: 'owner' } }),
 }));
 
-// Utility to setup chain mocks
-function setupQueryChain(returnData: unknown, returnError: unknown = null) {
-  const chain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
-    update: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
-  };
-  return chain;
+function createRequest(body: Record<string, unknown>) {
+  return new Request('http://localhost/api/invite/activate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
-describe('Invite Token Validation', () => {
+function selectChain(data: unknown, error: unknown = null) {
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data, error }),
+    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
+  };
+}
+
+function updateChain(error: unknown = null) {
+  return {
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    error,
+  };
+}
+
+function queueSupabaseChains(...chains: unknown[]) {
+  const queue = [...chains];
+  mockFrom.mockImplementation(() => {
+    const next = queue.shift();
+    if (!next) throw new Error('Unexpected Supabase query');
+    return next;
+  });
+}
+
+function validToken(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'token-1',
+    hosteler_id: 'hosteler-1',
+    used: false,
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    created_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function hosteler(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'hosteler-1',
+    name: 'John Doe',
+    room_number: '101',
+    phone: '9876543210',
+    status: 'pending',
+    pin_hash: null,
+    google_id: null,
+    auth_user_id: null,
+    ...overrides,
+  };
+}
+
+describe('POST /api/invite/activate token errors', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
+    mockCreateUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
+    mockUpdateUserById.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
   });
 
-  it('should reject an expired token', async () => {
-    const expiredToken = {
-      id: 'token-1',
-      hosteler_id: 'hosteler-1',
-      used: false,
-      expires_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    };
+  it('returns 410/invite_expired for an expired token', async () => {
+    queueSupabaseChains(
+      selectChain(validToken({ expires_at: new Date(Date.now() - 86400000).toISOString() })),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+    );
 
-    const tokenChain = setupQueryChain(expiredToken);
-    mockFrom.mockReturnValue(tokenChain);
-
-    // Import after mocks
     const { POST } = await import('@/app/api/invite/activate/route');
-
-    const request = new Request('http://localhost/api/invite/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'expired-token', method: 'pin', pin: '1234' }),
-    });
-
-    const response = await POST(request as any);
+    const response = await POST(createRequest({ token: 'expired-token', method: 'pin', pin: '1234' }) as any);
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toBe('Invalid or expired invite token');
+    expect(response.status).toBe(410);
+    expect(data.error).toMatchObject({
+      code: 'invite_expired',
+      message: 'This invite link has expired.',
+      recovery_action: 'contact_owner',
+    });
   });
 
-  it('should reject a used token', async () => {
-    const usedToken = {
-      id: 'token-1',
-      hosteler_id: 'hosteler-1',
-      used: true,
-      expires_at: new Date(Date.now() + 86400000).toISOString(), // 1 day from now
-    };
-
-    const tokenChain = setupQueryChain(usedToken);
-    mockFrom.mockReturnValue(tokenChain);
+  it('returns 409/invite_used for an already used token', async () => {
+    queueSupabaseChains(
+      selectChain(validToken({ used: true })),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+    );
 
     const { POST } = await import('@/app/api/invite/activate/route');
-
-    const request = new Request('http://localhost/api/invite/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'used-token', method: 'pin', pin: '1234' }),
-    });
-
-    const response = await POST(request as any);
+    const response = await POST(createRequest({ token: 'used-token', method: 'pin', pin: '1234' }) as any);
     const data = await response.json();
 
     expect(response.status).toBe(409);
-    expect(data.error).toBe('Token already used');
+    expect(data.error).toMatchObject({
+      code: 'invite_used',
+      message: 'This invite link has already been used.',
+      recovery_action: 'contact_owner',
+    });
   });
 
-  it('should reject a non-existent token', async () => {
-    const tokenChain = setupQueryChain(null, { code: 'PGRST116', message: 'not found' });
-    mockFrom.mockReturnValue(tokenChain);
+  it('returns 409/invite_superseded for an older unused token', async () => {
+    queueSupabaseChains(
+      selectChain(validToken({ id: 'older-token' })),
+      selectChain({ id: 'newer-token', created_at: new Date().toISOString() }),
+    );
 
     const { POST } = await import('@/app/api/invite/activate/route');
+    const response = await POST(createRequest({ token: 'older-token', method: 'pin', pin: '1234' }) as any);
+    const data = await response.json();
 
-    const request = new Request('http://localhost/api/invite/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'nonexistent', method: 'pin', pin: '1234' }),
+    expect(response.status).toBe(409);
+    expect(data.error).toMatchObject({
+      code: 'invite_superseded',
+      message: 'This invite link has been replaced by a newer one.',
+      recovery_action: 'open_latest_invite_link',
     });
+  });
 
-    const response = await POST(request as any);
+  it('returns structured invalid_request for invalid method', async () => {
+    const { POST } = await import('@/app/api/invite/activate/route');
+    const response = await POST(createRequest({ token: 'valid-token', method: 'invalid' }) as any);
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe('Invalid or expired invite token');
+    expect(data.error).toMatchObject({
+      code: 'invalid_request',
+      message: 'Method must be "google" or "pin"',
+      recovery_action: 'submit_valid_method',
+    });
   });
 });
 
-describe('PIN Hashing', () => {
-  it('should hash a 4-digit PIN with bcryptjs', async () => {
-    const pin = '1234';
-    const hash = await bcrypt.hash(pin, 10);
-
-    expect(hash).toBeDefined();
-    expect(hash).not.toBe(pin);
-    expect(hash.startsWith('$2a$') || hash.startsWith('$2b$')).toBe(true);
-  });
-
-  it('should verify correct PIN against hash', async () => {
-    const pin = '5678';
-    const hash = await bcrypt.hash(pin, 10);
-
-    const isMatch = await bcrypt.compare(pin, hash);
-    expect(isMatch).toBe(true);
-  });
-
-  it('should reject incorrect PIN against hash', async () => {
-    const pin = '5678';
-    const wrongPin = '9999';
-    const hash = await bcrypt.hash(pin, 10);
-
-    const isMatch = await bcrypt.compare(wrongPin, hash);
-    expect(isMatch).toBe(false);
-  });
-
-  it('should reject non-4-digit PINs', () => {
-    const pinRegex = /^\d{4}$/;
-    expect(pinRegex.test('123')).toBe(false);
-    expect(pinRegex.test('12345')).toBe(false);
-    expect(pinRegex.test('abcd')).toBe(false);
-    expect(pinRegex.test('12a4')).toBe(false);
-    expect(pinRegex.test('1234')).toBe(true);
-    expect(pinRegex.test('0000')).toBe(true);
-  });
-});
-
-describe('Google OAuth Account Linking', () => {
+describe('POST /api/invite/activate owner-assisted reset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
+    mockCreateUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
+    mockUpdateUserById.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
   });
 
-  it('should require google_access_token for google method', async () => {
-    const validToken = {
-      id: 'token-1',
-      hosteler_id: 'hosteler-1',
-      used: false,
-      expires_at: new Date(Date.now() + 86400000).toISOString(),
-    };
+  it('resets an active PIN-linked hosteler PIN and consumes the token', async () => {
+    const oldPinHash = bcrypt.hashSync('1234', 10);
+    const tokenUse = updateChain();
+    const hostelerUpdate = updateChain();
 
-    const tokenChain = setupQueryChain(validToken);
-    const hostelerChain = setupQueryChain({ id: 'hosteler-1', name: 'Test', room_number: '101', phone: '9876543210' });
-
-    let callCount = 0;
-    mockFrom.mockImplementation(() => {
-      callCount++;
-      return callCount === 1 ? tokenChain : hostelerChain;
-    });
+    queueSupabaseChains(
+      selectChain(validToken()),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+      selectChain(hosteler({ status: 'active', pin_hash: oldPinHash, auth_user_id: 'auth-user-1' })),
+      tokenUse,
+      hostelerUpdate,
+    );
 
     const { POST } = await import('@/app/api/invite/activate/route');
-
-    const request = new Request('http://localhost/api/invite/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'valid-token', method: 'google' }),
-    });
-
-    const response = await POST(request as any);
+    const response = await POST(createRequest({ token: 'reset-token', method: 'pin', pin: '5678' }) as any);
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toBe('Google access token is required');
+    expect(response.status).toBe(200);
+    expect(data.flow).toBe('reset');
+    expect(tokenUse.update).toHaveBeenCalledWith({ used: true });
+    expect(hostelerUpdate.update).toHaveBeenCalledWith({ pin_hash: expect.any(String) });
+    const [{ pin_hash: newPinHash }] = hostelerUpdate.update.mock.calls[0];
+    expect(bcrypt.compareSync('5678', newPinHash)).toBe(true);
+    expect(bcrypt.compareSync('1234', newPinHash)).toBe(false);
+    expect(mockUpdateUserById).toHaveBeenCalledWith('auth-user-1', {
+      password: 'pin:9876543210:5678',
+    });
   });
 
-  it('should reject invalid method', async () => {
+  it('returns google_linked for an active Google-linked hosteler without a PIN', async () => {
+    queueSupabaseChains(
+      selectChain(validToken()),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+      selectChain(hosteler({ status: 'active', pin_hash: null, google_id: 'google-sub-1' })),
+    );
+
     const { POST } = await import('@/app/api/invite/activate/route');
-
-    const request = new Request('http://localhost/api/invite/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'valid-token', method: 'invalid' }),
-    });
-
-    const response = await POST(request as any);
+    const response = await POST(createRequest({ token: 'reset-token', method: 'pin', pin: '5678' }) as any);
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toBe('Method must be "google" or "pin"');
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      flow: 'google_linked',
+      message: 'This account is linked to Google sign-in. Continue with your linked Google account.',
+    });
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+  });
+
+  it('returns 403/reset_not_allowed_non_active for non-active reset submission', async () => {
+    queueSupabaseChains(
+      selectChain(validToken()),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+      selectChain(hosteler({ status: 'inactive', pin_hash: bcrypt.hashSync('1234', 10) })),
+    );
+
+    const { POST } = await import('@/app/api/invite/activate/route');
+    const response = await POST(createRequest({ token: 'reset-token', method: 'pin', pin: '5678' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toMatchObject({
+      code: 'reset_not_allowed_non_active',
+      recovery_action: 'contact_owner',
+    });
+  });
+
+  it('rolls back token usage when PIN hash update fails', async () => {
+    const oldPinHash = bcrypt.hashSync('1234', 10);
+    const tokenUse = updateChain();
+    const hostelerUpdateFailure = updateChain({ message: 'database write failed' });
+    const tokenRollback = updateChain();
+
+    queueSupabaseChains(
+      selectChain(validToken()),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+      selectChain(hosteler({ status: 'active', pin_hash: oldPinHash, auth_user_id: 'auth-user-1' })),
+      tokenUse,
+      hostelerUpdateFailure,
+      tokenRollback,
+    );
+
+    const { POST } = await import('@/app/api/invite/activate/route');
+    const response = await POST(createRequest({ token: 'reset-token', method: 'pin', pin: '5678' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toMatchObject({ code: 'reset_failed' });
+    expect(tokenRollback.update).toHaveBeenCalledWith({ used: false });
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+  });
+
+  it('rolls back hosteler PIN and token usage when auth password update fails', async () => {
+    const oldPinHash = bcrypt.hashSync('1234', 10);
+    const tokenUse = updateChain();
+    const hostelerUpdate = updateChain();
+    const hostelerRollback = updateChain();
+    const tokenRollback = updateChain();
+    mockUpdateUserById.mockResolvedValue({ data: null, error: { message: 'auth update failed' } });
+
+    queueSupabaseChains(
+      selectChain(validToken()),
+      selectChain({ id: 'token-1', created_at: new Date().toISOString() }),
+      selectChain(hosteler({ status: 'active', pin_hash: oldPinHash, auth_user_id: 'auth-user-1' })),
+      tokenUse,
+      hostelerUpdate,
+      hostelerRollback,
+      tokenRollback,
+    );
+
+    const { POST } = await import('@/app/api/invite/activate/route');
+    const response = await POST(createRequest({ token: 'reset-token', method: 'pin', pin: '5678' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toMatchObject({
+      code: 'reset_failed',
+      recovery_action: 'try_again_or_contact_owner',
+    });
+    expect(hostelerRollback.update).toHaveBeenCalledWith({ pin_hash: oldPinHash });
+    expect(tokenRollback.update).toHaveBeenCalledWith({ used: false });
+  });
+});
+
+describe('PIN hashing', () => {
+  it('hashes and verifies 4-digit PINs with bcryptjs', () => {
+    const hash = bcrypt.hashSync('1234', 10);
+
+    expect(hash).not.toBe('1234');
+    expect(hash.startsWith('$2a$') || hash.startsWith('$2b$')).toBe(true);
+    expect(bcrypt.compareSync('1234', hash)).toBe(true);
+    expect(bcrypt.compareSync('9999', hash)).toBe(false);
   });
 });

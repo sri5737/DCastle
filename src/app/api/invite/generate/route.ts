@@ -3,10 +3,11 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
+import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 const INVITE_EXPIRY_DAYS = 7;
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
@@ -65,5 +66,12 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     { token, invite_url, expires_at: expiresAt },
     { status: 201 }
+  );
+}
+
+export async function POST(request: NextRequest) {
+  return withApiDiagnostic(
+    { route: '/api/invite/generate', method: 'POST', action: 'invite.generate' },
+    () => handlePost(request),
   );
 }

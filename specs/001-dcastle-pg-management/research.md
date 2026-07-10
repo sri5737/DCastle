@@ -1,15 +1,15 @@
 # Research: Deekshana Castle PG Management App
 
-**Phase**: 0 — Outline & Research | **Date**: 2026-07-03
+**Phase**: 0 — Outline & Research | **Date**: 2026-07-05
 
 ## Research Tasks & Findings
 
-### 1. Next.js 14 + Cloudflare Pages (Edge Runtime)
+### 1. Next.js 15.3.3 + Cloudflare Pages (Edge Runtime)
 
 **Decision**: Use `@cloudflare/next-on-pages` adapter with App Router
 
 **Rationale**: 
-- Cloudflare Pages supports Next.js via the `@cloudflare/next-on-pages` adapter
+- Cloudflare Pages supports the repository's Next.js 15.3.3 baseline via the `@cloudflare/next-on-pages` adapter
 - All route handlers must export `const runtime = 'edge'` — no Node.js runtime available
 - Static pages are pre-rendered at build time; dynamic routes use Edge Functions
 - `next.config.js` must be configured for the adapter (no `output: 'export'`)
@@ -75,24 +75,39 @@ supabase.channel('food-counts')
 
 ---
 
-### 4. PWA with @ducanh2912/next-pwa
+### 4. True PWA on Android Chrome
 
-**Decision**: Use `@ducanh2912/next-pwa` for service worker generation and PWA manifest
+**Decision**: Keep the existing Next.js PWA architecture with `@ducanh2912/next-pwa`, but validate it against Android Chrome installability, app drawer presence, standalone launch, maskable icon, offline app shell, and install-prompt requirements.
 
 **Rationale**:
-- Drop-in Next.js plugin; wraps `next.config.js`
-- Auto-generates service worker for app shell caching
-- Supports `manifest.json` configuration for installability
-- Works with Cloudflare Pages deployment
+- `@ducanh2912/next-pwa` remains the smallest architecture-preserving path for service worker generation in a Next.js App Router app deployed to Cloudflare Pages.
+- Android Chrome installability is controlled by browser criteria, not only by app UI. The app must provide a valid manifest, a registered service worker with fetch handling, suitable icons, and a stable HTTPS deployment.
+- App drawer presence and standalone launch cannot be proven by desktop-only tests; they require manual Android Chrome device or emulator evidence.
+- Offline support is app-shell scope only: layout, navigation, login entry points, and primary owner/hosteler shells must render from cache, while fresh data and writes show offline states.
 
-**Key configuration**:
-- Cache strategy: NetworkFirst for API calls, CacheFirst for static assets
-- Offline: App shell loads from cache; data screens show offline indicator
-- Install prompt: Use `beforeinstallprompt` event to show custom install UI on first visit
+**Required manifest and icon behavior**:
+- `manifest.json` includes `name`, `short_name`, `start_url`, `scope`, `display: "standalone"`, `theme_color`, `background_color`, and Android-suitable `icons`.
+- Icons include at least 192x192 and 512x512 PNG assets.
+- Maskable icon support is declared with `purpose: "maskable"` or `purpose: "any maskable"` so Android launchers can crop safely.
+
+**Service worker and offline behavior**:
+- Cache static assets and the core app shell needed for root layout, navigation, hosteler shell, owner shell, and login entry points.
+- Use network-first or no-store behavior for API/data requests so stale operational data is not presented as fresh.
+- When offline, render the cached shell and show explicit offline states for data-dependent actions instead of blank pages or browser network errors.
+
+**Install prompt behavior**:
+- Capture `beforeinstallprompt`, store the deferred event, and reveal install UI only while the event is available.
+- Trigger `prompt()` only from a user gesture and record the outcome.
+- Hide or disable install UI when the app is already installed, after `appinstalled`, when `matchMedia('(display-mode: standalone)')` is true, or when Android Chrome has not reported installability.
+
+**Validation approach**:
+- Automated checks: manifest response and required fields, icon metadata including maskable icons, service worker registration, offline shell load under network-disabled conditions, install UI hidden before eligibility, install UI shown after simulated `beforeinstallprompt` where the test environment supports it.
+- Manual checks: Android Chrome device or emulator installs the app, Deekshana Castle appears in the app drawer with the expected icon/name, launch opens standalone without the address bar, and offline launch renders the app shell within the success-criteria window.
 
 **Alternatives considered**:
-- `next-pwa` (original) — abandoned/unmaintained
-- Manual service worker — rejected (unnecessary complexity for standard PWA needs)
+- `next-pwa` (original) — rejected as less maintained than the selected package.
+- Manual service worker only — rejected unless generated service worker behavior cannot satisfy offline app-shell caching; it would increase maintenance with no current architecture need.
+- Treating PWA as only responsive web + manifest — rejected because the current feature specification and Constitution Principle X require Android app drawer presence, standalone launch, and offline app shell evidence.
 
 ---
 
@@ -183,12 +198,177 @@ WHERE fp.hosteler_id = $1 AND fp.date BETWEEN $2 AND $3
 
 ## Summary of Resolved Items
 
+All technical unknowns resolved. Architecture decisions are finalized:
+
+1. Next.js 15.3.3 + Cloudflare Pages via `@cloudflare/next-on-pages`
+2. Supabase Auth (Google OAuth) + custom PIN verify route
+3. Supabase Realtime for live meal counts
+4. True PWA via `@ducanh2912/next-pwa` with Android Chrome installability validation
+5. Per-day rate lookup for mid-month billing
+6. GitHub Actions cron → pg_dump → Cloudflare R2 for backups (restore is manual infrastructure process — no UI in v1)
+7. Server-side IST deadline enforcement via Intl APIs
+8. Three-job CI/CD pipeline (test → build → deploy)
+9. PIN brute-force lockout via `pin_login_attempts` table (5 attempts / 15-minute cooldown)
+10. Session invalidation on deactivation via Supabase Admin API `signOut(userId, 'global')`
+11. Unlimited concurrent sessions — no device limit enforcement
+12. Deleted hosteler lifecycle uses soft-delete metadata on the hosteler plus soft-cancellation markers on future-dated food preferences
+13. Honest E2E acceptance evidence is a delivery requirement: exact business outcomes, real UI/API paths, cross-role producer-to-consumer proof, dashboard initial/live/reload-stable evidence, auth reload stability through server-side routes, PIN lockout coverage, story-scoped scripts through US12, and scoped SC-001/SC-010 performance evidence
+
+---
+
+### 13. Honest E2E Audit and Scoped Acceptance Evidence
+
+**Decision**: Treat FR-066 through FR-069 and Constitution XI as a cross-cutting audit/correction requirement for every completed and future story E2E suite.
+
+**Rationale**:
+- E2E tests are acceptance evidence, so a passing suite must prove a falsifiable business outcome from the relevant independent test rather than only proving that a route, heading, or broad placeholder rendered.
+- The most important workflows are cross-role. Food submission only proves business value when the owner dashboard consumes the submitted choices as exact counts and Pending/Submitted membership.
+- Auth proxy validation must prove real login behavior through server-side routes and reload-stable authenticated pages; direct cookie or localStorage injection can support setup but cannot replace the core proof.
+- SC-001 and SC-010 are scoped v1 acceptance checks. They require representative browser/manual timing and seeded 100-hosteler evidence, not a new load-testing platform.
+
+**Alternatives considered**:
+- Keeping existing E2E tests unchanged after the clarification — rejected because FR-066 through FR-069 explicitly require audit and correction.
+- Using direct database writes or injected sessions as the primary proof — rejected because those shortcuts bypass the behavior users rely on.
+- Adding full performance/load-test infrastructure for SC-001/SC-010 — rejected because the clarified success criteria require scoped acceptance evidence only.
+
+---
+
+### 14. Android Mobile App Experience Governance
+
+**Decision**: Treat Constitution v1.6.0 Android mobile requirements as a cross-cutting planning and validation gate for all completed user-facing screens, represented by Phase 18 / US13 rather than a new feature folder.
+
+**Rationale**:
+- The feature spec already defines US13, FR-071 through FR-079, SC-014, and SC-015 for Android mobile app experience. Keeping the work in `specs/001-dcastle-pg-management` preserves the existing source of truth and avoids splitting one product into competing feature folders.
+- Android Chrome at 375 px is the primary baseline because daily owner and hosteler usage happens on phones. Desktop and tablet layouts remain enhancements only after mobile is accepted.
+- Installed standalone PWA behavior must be validated separately where applicable because browser chrome, app-window height, virtual keyboard, safe-area spacing, modal positioning, and offline/online layout states can differ from regular browser mode.
+- Phase 18 must preserve the Phase 17 honest E2E gate and Cloudflare build parity. Mobile fixes are accepted only when they keep exact story behavior intact and still pass `npm run test:run`, relevant story/mobile E2E commands, `npm run test:e2e`, and `npm run build:cloudflare`.
+
+**Validation approach**:
+- Automated Playwright mobile viewport checks should assert no page-level horizontal overflow and primary-action reachability for completed auth, owner, and hosteler screens where possible.
+- Manual Android evidence should record device/emulator, Android version, Chrome version, viewport, browser or standalone context, and pass/fail notes for installed-app flows that automation cannot fully prove.
+- Data-dense owner surfaces should use mobile-appropriate layouts such as stacked cards, segmented views, contained tables, or bounded horizontal regions that do not create page-level overflow.
+
+**Alternatives considered**:
+- Treating mobile remediation as final polish only — rejected because Constitution v1.6.0 makes mobile acceptance a release blocker for user-facing work.
+- Validating only desktop responsive mode — rejected because installed standalone Android PWA behavior can differ from desktop emulation.
+- Creating a separate SpecKit feature folder — rejected because US13 and the related requirements are already part of the existing feature specification and tasks.
+
+---
+
+### 15. Invite Regeneration, Owner-Assisted PIN Reset, and Superseded-Token Semantics
+
+**Decision**: Keep invite generation at `POST /api/hostelers/[id]/reset-invite`, while centralizing submit-time branching and token-state enforcement in `POST /api/invite/activate` with a stable structured error taxonomy.
+
+**Rationale**:
+- The owner action and token-submit action are different responsibilities. Splitting route ownership avoids duplicated state checks and drift.
+- Active PIN-linked hostelers need owner-assisted reset without changing lifecycle status or onboarding flow semantics.
+- Stale invite pages must fail deterministically when a newer token exists, so users cannot reset credentials through superseded links.
+
+**Implementation approach**:
+- `POST /api/hostelers/[id]/reset-invite` always invalidates prior unused tokens and emits a fresh token with `generated_at`.
+- `POST /api/invite/activate` branches between onboarding activation and owner-assisted reset using hosteler lifecycle/credential context.
+- Error outcomes use structured shape `{ error: { code, message, recovery_action } }` with distinct codes for `invite_expired`, `invite_used`, `invite_superseded`, and `reset_not_allowed_non_active`.
+- Supersession precedence is deterministic by latest `generated_at`; if equal, later persisted record wins.
+
+**Alternatives considered**:
+- Handling reset semantics in both routes — rejected (duplicate logic and inconsistent error behavior risk).
+- Treating regenerated invites as simple onboarding-only links — rejected (does not satisfy active PIN-linked forgot-PIN requirement).
+- Returning generic token-invalid errors for all failures — rejected (breaks client recovery UX and testability).
+
+## Addendum: Session & Security Clarifications (2026-07-04)
+
+### 9. PIN Brute-Force Lockout Implementation
+
+**Decision**: Track failed attempts in a `pin_login_attempts` table; enforce 5-attempt / 15-minute lockout per phone number
+
+**Rationale**:
+- Edge Runtime cannot rely on in-memory state (workers are stateless)
+- A dedicated Supabase table provides persistence across worker invocations
+- The `pin_login_attempts` table is keyed by `phone` with an `attempts` counter and `locked_until` timestamp
+- On each failed attempt: UPSERT row, increment `attempts`; when `attempts >= 5`, set `locked_until = now() + 15 min`
+- On success or after cooldown: DELETE the row (reset)
+- API returns HTTP 429 when `locked_until > now()`
+
+**Alternatives considered**:
+- KV store (Cloudflare KV) — possible but adds a dependency and free-tier limits; table is simpler
+- In-memory Map — rejected (Edge workers are ephemeral, state lost between requests)
+- Supabase RPC function — viable but unnecessary complexity for a simple counter
+
+---
+
+### 10. Session Invalidation on Deactivation
+
+**Decision**: Use Supabase Admin API `auth.admin.signOut(userId, 'global')` to revoke all sessions immediately upon deactivation
+
+**Rationale**:
+- Supabase Auth provides a server-side global sign-out that invalidates all refresh tokens for a user
+- The deactivation API route (owner-only) calls this after updating `hostelers.status = 'inactive'`
+- Subsequent requests from any device with a stale access token fail at JWT validation → 401
+- The middleware/guard layer additionally checks `hostelers.status` and returns "Account deactivated" for clarity
+
+**Alternatives considered**:
+- Token blacklist table — rejected (unnecessary; Supabase handles this natively)
+- Short-lived access tokens only — rejected (doesn't revoke immediately; waits for expiry)
+
+---
+
+### 11. Unlimited Concurrent Sessions
+
+**Decision**: No session limit enforcement; each device gets an independent 30-day session
+
+**Rationale**:
+- Target user base is ~40–100 hostelers using 1–2 personal devices
+- Enforcing a device cap adds complexity (session registry, eviction logic) with no business value
+
+---
+
+### 12. Deleted Hosteler Archive and Future-Preference Cancellation
+
+**Decision**: Represent a deleted hosteler as the existing `hostelers` row moved to `status = 'deleted'` with deletion metadata, and cancel future-dated `food_preferences` rows by marking them canceled rather than hard-deleting them, while exposing those canceled rows only through the deleted-hosteler audit detail.
+
+**Rationale**:
+- Preserves joins from the same person to historical food preferences and monthly bills without copying data into a second archive table.
+- Keeps the owner's deleted tab simple because it can read from the existing hosteler lifecycle surface using a new deleted status.
+- Preserves past and same-day operational and billing history while allowing future operational queries and billing generation to exclude rows canceled by deletion.
+- Avoids destructive deletion of operational data while still making the canceled future rows non-billable, absent from normal owner dashboard/history/export flows, and visible only where the spec permits: the deleted-hosteler audit view.
+
+**Implementation approach**:
+- Add `deleted_at`, `deleted_from_status`, and `deletion_effective_date` to `hostelers` and extend the status enum to include `deleted`.
+- When deleting a pending hosteler: mark the hosteler deleted and invalidate any unused invite token immediately.
+- When deleting an active hosteler: revoke sessions immediately, set deletion metadata, and mark every `food_preferences` row with `date > deletion_effective_date` as canceled.
+- Add `canceled_at` and `cancellation_reason` to `food_preferences`; owner dashboard, normal owner history/export, and billing queries filter out canceled rows by default.
+- Serve canceled future rows only from the deleted-hosteler audit detail, keyed by the deleted hosteler identity, so the owner can inspect what was canceled without reintroducing those rows into standard operational surfaces.
+
+**Alternatives considered**:
+- Separate `deleted_hosteler_records` archive table plus hard-delete of the live hosteler row — rejected because it complicates joins to preserved history and bill generation.
+- Hard-delete future food-preference rows — rejected because it removes useful audit context around what was canceled as part of deletion.
+- Supabase Auth naturally supports multiple refresh tokens per user without conflict
+- No security concern at this scale — PIN/Google auth already gates access
+
+**Alternatives considered**:
+- Max 3 devices — rejected (unnecessary friction, no spec requirement)
+
+---
+
+### 12. Manual Backup Restore (No UI)
+
+**Decision**: Backup restore remains a manual infrastructure operation in v1; no restore UI is provided
+
+**Rationale**:
+- Restoring a database backup is a destructive, irreversible operation that overwrites current data
+- At the scale of one PG (40–100 users), restore events are extremely rare emergency-only actions
+- Building a restore UI introduces complexity, requires confirmation flows, and creates a security surface with no proportional user value
+- The owner is notified of backup failures; restoration requires direct developer/admin access to R2 + Supabase
+
+**Alternatives considered**:
+- Self-service restore button — rejected (dangerous at this maturity; deferred to future version if needed)
+
 | Item | Resolution |
 |------|-----------|
 | Edge Runtime compatibility | bcryptjs, Web Crypto API, @supabase/supabase-js all Edge-safe |
 | PIN-based auth on Supabase | Custom API route + Supabase Admin API for session creation |
 | Real-time updates | Supabase Realtime (postgres_changes) with 10s reconnection banner |
-| PWA approach | @ducanh2912/next-pwa (auto service worker + manifest) |
+| PWA approach | @ducanh2912/next-pwa with Android Chrome installability, manifest/icon, offline app shell, install prompt, automated PWA, and manual Android validation gates |
 | Mid-month billing | Per-day rate lookup via `effective_from` in meal_rates |
 | Backup strategy | GitHub Actions cron → pg_dump → gzip → Cloudflare R2 |
 | IST deadline enforcement | Intl.DateTimeFormat in Edge Runtime, server-authoritative |

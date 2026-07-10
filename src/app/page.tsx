@@ -3,20 +3,20 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
 
 export default function LandingPage() {
   const router = useRouter();
 
   useEffect(() => {
     async function checkSession() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const response = await fetch('/api/auth/session');
+      if (!response.ok) return;
 
-      // Check if owner
-      const ownerEmail = process.env.NEXT_PUBLIC_OWNER_EMAIL;
-      if (user.email === ownerEmail) {
-        router.replace('/dashboard');
+      const session = await response.json();
+      if (!session.authenticated) return;
+
+      if (session.role === 'owner') {
+        router.replace('/admin/dashboard');
       } else {
         router.replace('/submit');
       }

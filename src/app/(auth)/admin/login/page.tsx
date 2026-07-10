@@ -1,42 +1,49 @@
 'use client';
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { useEffect, useState } from 'react';
+import { emitUiDiagnostic } from '@/lib/diagnostics/events';
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
+	const [error, setError] = useState('');
+	const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+	async function handleSubmit(e: React.FormEvent) {
+		e.preventDefault();
+		setError('');
+		setLoading(true);
+    emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-start', metadata: { email } });
 
-      if (authError) {
-        setError(authError.message);
-        return;
-      }
+		try {
+			const response = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email, password }),
+			});
 
-      if (data.session) {
-        // Store tokens in cookies for middleware access
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        window.location.href = '/admin/dashboard';
-      }
-    } catch {
-      setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }
+      const data = await response.json();
+
+      if (response.ok) {
+        emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'navigation-intent', metadata: { redirectTo: data.redirectTo } });
+        window.location.href = data.redirectTo || '/admin/dashboard';
+				return;
+			}
+
+      emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-failure', metadata: { status: response.status } });
+      setError(data.error || 'Login failed. Please check your credentials.');
+		} catch {
+			emitUiDiagnostic({ page: '/admin/login', action: 'auth.owner.login', state: 'submit-failure', metadata: { reason: 'network' } });
+			setError('An unexpected network error occurred. Please try again.');
+		} finally {
+			setLoading(false);
+		}
+	}
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -87,7 +94,7 @@ export default function AdminLoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !hydrated}
             className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
