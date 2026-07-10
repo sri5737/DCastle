@@ -35,4 +35,4 @@
 - 79 functional requirements (including FR-006a, FR-029a, FR-029b, FR-029c, FR-058a, and FR-071 through FR-079) cover provisioning, auth, food submission, owner dashboard, hosteler management, deletion auditability, history, billing, settings, PWA, Android mobile app experience, backup, and CI gate.
 - 15 measurable success criteria defined — all technology-agnostic.
 - Out-of-scope items (payments, notifications, multi-PG, auto-billing, analytics) are explicitly listed in Assumptions.
-- Clarification sessions on 2026-07-03 and 2026-07-04 resolved security, session, backup, billing, hosteler deletion auditability, honest E2E, Cloudflare parity, and Android mobile app experience ambiguities.
+- Clarification sessions on 2026-07-03, 2026-07-04, 2026-07-05, 2026-07-10, and 2026-07-10-clarify resolved security, session, backup, hosteler deletion auditability, honest E2E, Cloudflare parity, Android mobile app experience, billing lifecycle, rate changes, room rent proration, unassigned day handling, and profit dashboard historical analysis ambiguities. All billing and dashboard behavior is now fully specified and immutable for implementation.

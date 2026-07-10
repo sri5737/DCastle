@@ -461,6 +461,21 @@ Phase 2 (Foundational)
 - For user-facing stories, mobile-first layout and 375 px Android validation are part of the story's own implementation and E2E/manual evidence, with standalone PWA validation where applicable
 - Story complete before moving to next priority
 
+### Deprecation Policy (Phases 9–12 → Phases 19–24)
+
+**Old Food-Only Billing Tasks (Phases 9, 11)**: ⛔ DEPRECATED
+- Phase 9 (US6: Food bills only) → Replaced by Phase 22 (comprehensive room rent + food + transmission)
+- Phase 11 (US8: Food bill viewing) → Replaced by Phase 22 hosteler bill view
+
+**Optional Food History Tasks (Phases 10, 12)**: ⏸️ DEFERRED
+- Phase 10 (US7: Food history) → Optional; implement if needed after Phase 5
+- Phase 12 (US9: Food export) → Optional; consider consolidating with Phase 24 reporting
+
+**New Comprehensive Billing & Property Management (Phases 19–24)**: 🆕 PRIMARY FOCUS
+- Replaces food-only billing with full building/room/rent/meal/employee/profit tracking
+- All new owner and hosteler billing/accounting workflows route through these phases
+- Start immediately after Phase 8 (Settings) completes
+
 ### Parallel Opportunities
 
 **Phase 1** (all [P] tasks): T003, T004, T005, T006 can run in parallel after T001+T002

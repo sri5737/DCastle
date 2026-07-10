@@ -1,4 +1,4 @@
-# Feature Specification: Deekshana Castle PG Management App (Full Application — v1.2)
+# Feature Specification: Deekshana Castle PG Management App (Full Application — v1.3)
 
 **Feature Branch**: `001-dcastle-pg-management`
 
@@ -7,6 +7,8 @@
 **Updated**: 2026-07-10
 
 **Status**: Draft
+
+**Latest Update**: Added comprehensive billing and owner management functionality (User Stories 14-21): Building/Room Management, Room Rent Management with Effective Dates, Meal Rate Management with Effective Dates, Mess Facilities Assignment, Billing Generation & Transmission (two-phase), Employee Management with Salary Tracking, Profit Margin Dashboard, and Available Cot Dashboard. Includes 55 new functional requirements (FR-084 through FR-138), 13 new success criteria (SC-018 through SC-030), and 12 new key entities.
 
 ---
 
@@ -261,6 +263,154 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 
 ---
 
+### User Story 14 — Owner Manages Buildings, Rooms, and Room Types (Priority: P3)
+
+The owner creates hostel buildings, adds rooms within each building (optionally assigning to floors), and configures room types (e.g., 2-sharing AC, 4-sharing non-AC). Each room type has a base rent and specifies the number of cots. Cot assignments support different cot types (lower cot, upper cot). This structure enables the owner to track room inventory and assign hostelers to specific rooms and cot positions for accurate rent and facility tracking.
+
+**Why this priority**: Room and building management is essential infrastructure for accurate billing and asset management, but it is a setup task performed infrequently (typically once during deployment and occasionally as the hostel expands).
+
+**Independent Test**: Can be tested by creating a building, adding rooms with different floors and room types, configuring cot assignments, and verifying the building/room hierarchy is queryable for later hosteler assignment.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the buildings/rooms configuration page, **When** they click "Add Building", **Then** a form appears allowing building name entry and creation.
+2. **Given** a building has been created, **When** the owner clicks "Add Room" within that building, **Then** they can specify room number, floor (ground/first/second or null), room type, and base rent.
+3. **Given** the owner creates a new room type, **When** they define it, **Then** they specify name (e.g., "2-sharing AC"), base rent, and total cot count.
+4. **Given** a room type has been defined with a cot count, **When** the owner assigns cot details, **Then** they can configure individual cot IDs and cot types (lower cot, upper cot).
+5. **Given** rooms and cot assignments are configured, **When** the owner views the buildings dashboard, **Then** they see a tree/hierarchical view showing buildings, their rooms, room types, and available cots.
+
+---
+
+### User Story 15 — Owner Manages Room Rent with Effective Dates (Priority: P3)
+
+The owner can update room rent for existing rooms with an effective date (using a date picker). Until the effective date is reached, the UI shows a label: "Rent will be updated on [effective date]". Rate changes support previous calendar month, current calendar month, and future dates. On the effective date, the new rent applies for billing calculations for that date and forward.
+
+**Why this priority**: Room rent management is periodic and critical for accurate billing, but it is not performed daily. Mid-month changes are supported to reflect seasonal adjustments or renovations.
+
+**Independent Test**: Can be tested by setting a future room rent change, verifying the pending-change label displays, then advancing the effective date and confirming bills generated after that date use the new rent.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner views an existing room, **When** they click "Change Rent", **Then** a form appears with a date picker and new rent input field.
+2. **Given** the owner enters a future effective date and new rent amount, **When** they save, **Then** a "Rent will be updated on [date]" label appears on the room card until the effective date.
+3. **Given** the current date has reached the effective date of a pending rent change, **When** the owner views the room, **Then** the label disappears and the new rent is now active.
+4. **Given** the owner wants to change a rent that was previously changed, **When** they perform a subsequent rent change with a new effective date, **Then** the system tracks multiple rate history entries for accurate historical billing.
+5. **Given** rent changes exist for previous calendar months, current month, and future dates, **When** bills are generated, **Then** each day's rent is calculated using the rate effective on that specific date.
+
+---
+
+### User Story 16 — Owner Manages Meal Rates with Effective Dates (Priority: P3)
+
+The owner can update meal rates (breakfast, lunch, dinner) with an effective date (using a date picker). Until the effective date is reached, the UI shows a label: "Meal rate will be updated on [effective date]". Rate changes support previous calendar month, current calendar month, and future dates. On the effective date, the new meal rates apply for billing calculations for that date and forward.
+
+**Why this priority**: Meal rate management is periodic and less frequent than room rent changes, but it is essential for accurate monthly billing when meal service costs change seasonally.
+
+**Independent Test**: Can be tested by setting a future meal rate change, verifying the pending-change label displays, then advancing the effective date and confirming bills generated after that date use the new rates.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the settings page, **When** they click "Update Meal Rates", **Then** a form appears with date picker and input fields for breakfast, lunch, and dinner rates.
+2. **Given** the owner enters a future effective date and new rate amounts, **When** they save, **Then** a "Meal rate will be updated on [date]" label appears in the settings until the effective date.
+3. **Given** the current date has reached the effective date of a pending meal rate change, **When** the owner views settings, **Then** the label disappears and the new rates are now active.
+4. **Given** meal rate changes exist for multiple months (previous, current, future), **When** bills are generated for any month, **Then** each day's meal charges are calculated using the rates effective on that specific date.
+
+---
+
+### User Story 17 — Owner Assigns Mess Facilities to Hostelers (Priority: P3)
+
+The owner can specify whether each hosteler is availing mess (meal) facilities. If NOT availing, the system defaults the hosteler's food preference to NO for all three meals (breakfast, lunch, dinner); hostelers can override these daily. If YES availing, the system defaults to YES for all three meals; hostelers can override these daily. This assignment is made during hosteler registration and can be updated later.
+
+**Why this priority**: Mess facility assignment is essential for accurate billing, as hostelers who don't avail facilities should not be charged for meals even if they accidentally submit preferences.
+
+**Independent Test**: Can be tested by registering hostelers with different mess-facility settings, verifying their default daily food preferences, and confirming they can override those defaults if needed.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is registering a new hosteler, **When** they fill in the hosteler form, **Then** they see a "Availing Mess Facilities?" toggle (defaulting to YES).
+2. **Given** a hosteler with "NOT availing" mess is registered, **When** they open the food submission page for any date, **Then** all three meal toggles default to OFF, but they can manually toggle any on if needed.
+3. **Given** a hosteler with "YES availing" mess is registered, **When** they open the food submission page for any date, **Then** all three meal toggles default to ON, but they can toggle any off if needed.
+4. **Given** a hosteler's mess-facility status is set, **When** the owner views that hosteler's details, **Then** the current mess-facility status is displayed and can be edited.
+5. **Given** the owner updates a hosteler's mess-facility status from "not availing" to "availing", **When** that hosteler next submits, **Then** the new defaults apply, but any previously submitted preferences remain unchanged.
+
+---
+
+### User Story 18 — Owner Generates and Transmits Hosteler Bills (Priority: P3)
+
+The owner clicks "Generate Bill" and can generate bills for: all hostelers, a specific building, or an individual hosteler. Bills are generated separately from transmission. Once generated, the owner can view the bill before transmission. Each bill shows: room rent + food charges = total. The owner then clicks "Transmit Bill" to make the bill visible to hostelers. Bills are visible to hostelers only after transmission.
+
+**Why this priority**: Two-phase billing (generation and transmission) provides the owner with an audit step before hostelers see final amounts, reducing disputes.
+
+**Independent Test**: Can be tested by generating a bill, verifying the owner can view it without hostelers seeing it, then transmitting and confirming hostelers can view the transmitted bill.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the billing page, **When** they click "Generate Bill", **Then** a dialog appears allowing them to select: All Hostelers, Specific Building, or Individual Hosteler, and a month picker.
+2. **Given** the owner completes the generation dialog, **When** they click "Generate", **Then** bills are computed for the selected scope and month. Status shows "Generated, Awaiting Transmission".
+3. **Given** bills have been generated, **When** the owner clicks on a hosteler's bill row, **Then** a detailed view shows room rent breakdown, meal charges by type, total amount, and a "Transmit Bill" button.
+4. **Given** a bill is in "Awaiting Transmission" status, **When** the hosteler tries to view their bill, **Then** they see a "Bill not yet available" message or the bill does not appear in their bill list.
+5. **Given** a bill is in "Awaiting Transmission" status, **When** the owner clicks "Transmit Bill", **Then** the bill status changes to "Transmitted" and becomes immediately visible to the hosteler.
+6. **Given** a bill has been transmitted, **When** the owner regenerates bills for the same month, **Then** the old transmitted bill is replaced with the new generated bill (not transmitted until the owner chooses to transmit again).
+
+---
+
+### User Story 19 — Owner Manages Employee Records and Salary with Effective Dates (Priority: P3)
+
+The owner can add employee records (name, job description, salary) for hostel staff. Salary changes are tracked with effective dates (using a date picker). Until the effective date is reached, the UI shows: "Salary will be updated on [effective date]". This creates an audit trail of hostel operations and enables salary expense tracking for profit margin calculations.
+
+**Why this priority**: Employee management is required for operational transparency and profit margin calculations, but it is a periodic setup/update task.
+
+**Independent Test**: Can be tested by adding employees, updating their salaries with future effective dates, and verifying the pending-change labels display correctly.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the employee management page, **When** they click "Add Employee", **Then** a form appears for name, job description, and initial salary entry.
+2. **Given** an employee has been created, **When** the owner clicks "Update Salary", **Then** a form appears with date picker and new salary input.
+3. **Given** the owner enters a future effective date and new salary, **When** they save, **Then** a "Salary will be updated on [date]" label appears on the employee card until the effective date.
+4. **Given** the current date has reached a pending salary change effective date, **When** the owner views the employee record, **Then** the label disappears and the new salary is active.
+5. **Given** the owner views the employee list, **Then** each employee shows: name, job description, current salary, and any pending salary changes with their effective dates.
+6. **Given** salary changes are tracked historically, **When** profit margin dashboards are calculated, **Then** the correct salary values are used based on the effective dates during the period.
+
+---
+
+### User Story 20 — Owner Views Profit Margin Dashboard (Priority: P3)
+
+The owner selects a month and views a dashboard showing: total income (from room rent + meal charges), total expenses (sum of employee salaries + other expenses added by owner), and calculated profit (income − expenses). The owner can add line-item expenses (e.g., "EB bill ₹5000"). The dashboard is month-aware: it uses room rent rates, meal rates, and employee salaries effective for that specific month (not current month rates).
+
+**Why this priority**: Profit tracking is essential for business decision-making, but it is a periodic review task (typically monthly).
+
+**Independent Test**: Can be tested by seeding a month with hostelers, rooms, meal rates, employee salaries, and expenses, then verifying the dashboard correctly calculates income, expenses, and profit using the rates effective for that month.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the profit margin dashboard, **When** they select a month using a date picker, **Then** the dashboard loads and displays income, expenses, and profit for that month.
+2. **Given** the dashboard is displayed for a specific month, **When** the owner views income, **Then** it is calculated as: SUM(room rent for all billable hostelers in that month) + SUM(meal charges for all billable hostelers in that month), using rates effective for each date in that month.
+3. **Given** the dashboard displays expenses, **When** the owner views it, **Then** expenses include: SUM(employee salaries for all employees, using salary effective for each date in that month) + SUM(any owner-added line-item expenses recorded for that month).
+4. **Given** the owner wants to add a one-time expense, **When** they click "Add Expense", **Then** a form appears to enter description, amount, and optional date within the selected month.
+5. **Given** an expense has been added to the dashboard, **When** the total expenses are recalculated, **Then** profit margin is updated: Profit = Income − Expenses.
+6. **Given** a month contains mid-month rate changes (room rent, meal rates, or salary changes), **When** the dashboard calculates income and expenses, **Then** it uses the correct rates/salaries effective for each date, not applying a single blanket rate.
+7. **Given** the owner views a dashboard for a past month, **When** room rent, meal rates, or employee salaries were different in that month compared to today, **Then** the dashboard correctly reflects those historical rates, not current rates.
+8. **Given** the owner views the profit dashboard, **When** they click on income or expenses sections, **Then** a detailed breakdown is shown (e.g., per-hosteler room rent, per-meal-type food charges, per-employee salary).
+
+---
+
+### User Story 21 — Owner Views Available Cot Dashboard (Priority: P3)
+
+The owner can view a dashboard showing all rooms, their cot inventory, and occupancy status (which cots are assigned to active hostelers, which are free). This provides a quick overview of hostel capacity and available cots for new registrations.
+
+**Why this priority**: Cot occupancy visibility helps the owner understand capacity and plan new admissions, but it is a periodic review task.
+
+**Independent Test**: Can be tested by assigning hostelers to specific cots, then verifying the dashboard correctly marks those cots as occupied and displays free cots available for assignment.
+
+**Acceptance Scenarios**:
+
+1. **Given** the owner is on the available-cot dashboard, **When** the page loads, **Then** a view shows all buildings and their rooms with cot status (occupied/free).
+2. **Given** cots are displayed, **When** a cot is assigned to an active hosteler, **Then** it is marked "Occupied" with the hosteler's name and room assignment details.
+3. **Given** a cot is not assigned to any active hosteler, **When** it is displayed, **Then** it is marked "Free" with its cot type (lower/upper) and room details.
+4. **Given** a hosteler is deleted or deactivated, **When** the available-cot dashboard is refreshed, **Then** their previously assigned cots are marked "Free" again.
+5. **Given** the owner clicks on a building, **When** the view expands, **Then** all rooms in that building and their cots are shown with clear visual distinction between occupied and free cots.
+
+---
+
 ### Edge Cases
 
 - What happens when a hosteler submits preferences exactly at the deadline second? → Submission is rejected server-side; client shows "closed" message.
@@ -417,6 +567,85 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **FR-069**: Authentication E2E validation MUST log in owner and hosteler users through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated page, and verify the user remains on the correct role surface. Direct cookie or localStorage injection is allowed only for documented setup helpers, never as the core proof that login works.
 - **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit tests or E2E tests may not exercise.
 
+**Building, Room, and Room Type Management**
+
+- **FR-084**: The owner MUST be able to create new hostel buildings with a name and optional description.
+- **FR-085**: The owner MUST be able to add rooms within a building, specifying: room number, optional floor (ground, first, second), associated room type, and base rent.
+- **FR-086**: The owner MUST be able to define custom room types with: name (e.g., "2-sharing AC"), description, base rent, and total cot count.
+- **FR-087**: The owner MUST be able to configure individual cots within a room type, specifying cot ID and cot type (lower cot, upper cot).
+- **FR-088**: The building/room/cot hierarchy MUST be queryable and displayable in a tree or hierarchical view showing all buildings, rooms within each building, room types, and cot assignments.
+- **FR-089**: When a hosteler is registered, the owner MUST be able to assign them to a specific building, room, and available cot.
+- **FR-090**: The system MUST prevent multiple hostelers from being assigned to the same cot within a room at the same time; each cot can be occupied by only one active hosteler.
+
+**Room Rent Management with Effective Dates**
+
+- **FR-091**: The owner MUST be able to change room rent for any existing room by specifying a new rent amount and an effective date (using a date picker).
+- **FR-092**: Effective dates MUST support: previous calendar month, current calendar month, and all future dates.
+- **FR-093**: Until the effective date of a pending rent change is reached, the room display MUST show a label: "Rent will be updated on [effective date]".
+- **FR-094**: Once the effective date is reached, the label MUST disappear and the new rent MUST become active for billing calculations from that date forward.
+- **FR-095**: The system MUST maintain a complete historical record of all room rent changes with effective dates, enabling accurate billing for any month with rate changes.
+- **FR-096**: When bills are generated for a month containing room rent changes, the system MUST apply each room's rate that was effective on each individual date.
+
+**Meal Rate Management with Effective Dates**
+
+- **FR-097**: The owner MUST be able to update meal rates (breakfast, lunch, dinner) by specifying new rates and an effective date (using a date picker).
+- **FR-098**: Effective dates MUST support: previous calendar month, current calendar month, and all future dates.
+- **FR-099**: Until the effective date of a pending meal rate change is reached, the settings display MUST show a label: "Meal rate will be updated on [effective date]".
+- **FR-100**: Once the effective date is reached, the label MUST disappear and the new rates MUST become active for billing calculations from that date forward.
+- **FR-101**: The system MUST maintain a complete historical record of all meal rate changes with effective dates, enabling accurate billing for any month with rate changes.
+- **FR-102**: When bills are generated for a month containing meal rate changes, the system MUST apply each meal's rate that was effective on each individual date.
+
+**Mess Facilities Assignment**
+
+- **FR-103**: When registering a new hosteler, the owner MUST be able to specify whether the hosteler is availing mess (meal) facilities using a toggle or checkbox.
+- **FR-104**: If a hosteler is NOT availing mess facilities, their food preference defaults MUST be NO (off) for all three meals (breakfast, lunch, dinner) on any submission date, but the hosteler MUST be able to manually toggle any meal ON if desired.
+- **FR-105**: If a hosteler IS availing mess facilities, their food preference defaults MUST be YES (on) for all three meals on any submission date, but the hosteler MUST be able to manually toggle any meal OFF if desired.
+- **FR-106**: The owner MUST be able to view and update a hosteler's mess-facility assignment status after registration.
+- **FR-107**: When a hosteler's mess-facility status changes, the new default preferences MUST apply to future submissions, but previously submitted preferences MUST remain unchanged.
+
+**Billing Generation and Transmission**
+
+- **FR-108**: The owner MUST be able to trigger bill generation via a "Generate Bill" button on the billing page.
+- **FR-109**: When generating bills, the owner MUST be able to select the generation scope: All Hostelers, Specific Building, or Individual Hosteler.
+- **FR-110**: Bill generation MUST accept a month/year parameter and generate bills for all hostelers with billable history (food preferences and/or room assignment) in the selected month.
+- **FR-111**: Generated bills MUST calculate each hosteler's total as: (days breakfast opted × breakfast rate) + (days lunch opted × lunch rate) + (days dinner opted × dinner rate) + room rent.
+- **FR-112**: If meal rates or room rent changed during the selected month, bills MUST apply the rate/rent that was effective on each individual date.
+- **FR-113**: Generated bills MUST be placed in a "Generated, Awaiting Transmission" status and MUST NOT be visible to hostelers until transmission.
+- **FR-114**: The owner MUST be able to view detailed bill information after generation, including per-day breakdowns, meal charges by type, room rent, and total amount.
+- **FR-115**: The owner MUST be able to transmit a generated bill via a "Transmit Bill" button. Once transmitted, the bill MUST become immediately visible to the hosteler.
+- **FR-116**: If the owner regenerates bills for a month that already has transmitted bills, the previously transmitted bills MUST be replaced with the newly generated bills (which remain in "Awaiting Transmission" status until the owner chooses to transmit again).
+- **FR-117**: Hostelers MUST be able to view only bills that have been transmitted by the owner. Bills in "Awaiting Transmission" status MUST NOT appear in the hosteler's bill list.
+
+**Employee Management with Salary Tracking**
+
+- **FR-118**: The owner MUST be able to add employee records by providing: name, job description, and initial salary.
+- **FR-119**: The owner MUST be able to update an employee's salary by specifying a new salary amount and an effective date (using a date picker).
+- **FR-120**: Until the effective date of a pending salary change is reached, the employee display MUST show a label: "Salary will be updated on [effective date]".
+- **FR-121**: Once the effective date is reached, the label MUST disappear and the new salary MUST become active.
+- **FR-122**: The system MUST maintain a complete historical record of all employee salary changes with effective dates, enabling accurate expense calculations for profit margin dashboards.
+- **FR-123**: The owner MUST be able to view a list of all employees with their current salary and any pending salary changes with effective dates.
+- **FR-124**: The owner MUST be able to deactivate or delete employee records when they are no longer employed.
+
+**Profit Margin Dashboard**
+
+- **FR-125**: The owner MUST be able to select a month/year and view a profit margin dashboard displaying: total income, total expenses, and calculated profit (income − expenses).
+- **FR-126**: Income MUST be calculated as: SUM(room rent for all billable hostelers in the selected month) + SUM(meal charges for all billable hostelers in the selected month), using rates effective for each date in that month.
+- **FR-127**: Expenses MUST include: SUM(employee salaries for all employees, using salary effective for each date in the selected month) + SUM(any owner-added line-item expenses for that month).
+- **FR-128**: The owner MUST be able to add line-item expenses (e.g., "EB bill ₹5000") by specifying description, amount, and optional date within the selected month.
+- **FR-129**: When the owner adds an expense to the dashboard, the total expenses and profit margin MUST be recalculated immediately.
+- **FR-130**: When viewing a dashboard for a past month, the system MUST use historical rates effective for that month (room rent, meal rates, employee salaries), not current rates, to ensure accurate historical profit calculation.
+- **FR-131**: The owner MUST be able to click on income or expense sections in the dashboard to view detailed breakdowns (e.g., per-hosteler room rent, per-meal-type food charges, per-employee salary).
+- **FR-132**: The profit margin dashboard MUST display month-aware data, accounting for mid-month rate and salary changes, ensuring accuracy when rates or salaries change during a month.
+
+**Available Cot Dashboard**
+
+- **FR-133**: The owner MUST be able to view a dashboard showing all buildings, rooms, and their cot inventory with occupancy status (occupied/free).
+- **FR-134**: Occupied cots MUST display the assigned hosteler's name, cot ID, and cot type (lower/upper).
+- **FR-135**: Free cots MUST display as available with cot ID and cot type clearly marked.
+- **FR-136**: When a hosteler is deleted or deactivated, their assigned cots MUST automatically be marked as "Free" on the available-cot dashboard.
+- **FR-137**: The owner MUST be able to expand/collapse buildings and rooms in the dashboard to focus on specific areas of the hostel.
+- **FR-138**: The available-cot dashboard MUST update in real time or on refresh to reflect current occupancy changes.
+
 **Android Mobile and Tablet App Experience**
 
 - **FR-071**: Hosteler-facing screens MUST be optimized for Android mobile (375 px width) as the primary baseline. Hostelers access the app primarily on phones; all hosteler workflows must be usable at 375 px without horizontal scrolling or broken layouts.
@@ -447,6 +676,17 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **Monthly Bill**: A computed record of a hosteler's total meals and charges for a given calendar month. Produced by manual owner action.
 - **Settings**: System-wide configuration values. Includes the daily submission deadline time, which is owner-configurable.
 - **Android Mobile App Experience**: The primary presentation and interaction mode for Deekshana Castle on Android phones, covering Android Chrome and installed standalone PWA usage. It includes mobile navigation, viewport-safe layout, touch-friendly controls, readable content, and validation at the 375 px mobile baseline.
+- **Building**: A physical structure within the hostel property that houses rooms. Contains name and optional description. Used for organizational grouping of rooms.
+- **Room**: A rentable unit within a building. Identified by room number and optionally associated with a floor (ground, first, second). Has an associated room type and current base rent.
+- **Room Type**: A classification for groups of identical rooms with the same configuration. Specifies: name (e.g., "2-sharing AC"), description, base rent, and total cot count. Used for inventory tracking and rate management.
+- **Cot**: A bed or sleeping unit within a room. Has a unique cot ID, associated cot type (lower cot, upper cot), and occupancy status (assigned to a hosteler or free). Each room has multiple cots based on its room type configuration.
+- **Room Rent Rate History**: A record of room rent changes over time. Each entry contains: room ID, new rent amount, effective date, and creation timestamp. Enables historical lookup for accurate billing when rent changes mid-month.
+- **Meal Rate History**: A record of meal rate changes over time. Each entry contains: meal type (breakfast/lunch/dinner), new rate, effective date, and creation timestamp. Enables historical lookup for accurate billing when rates change mid-month.
+- **Employee**: A hostel staff member record containing: name, job description, and current salary. Salary changes are tracked with effective dates to support expense calculations for profit margin analysis.
+- **Employee Salary History**: A record of employee salary changes over time. Each entry contains: employee ID, new salary amount, effective date, and creation timestamp. Enables historical lookup for accurate expense calculation when salaries change mid-month.
+- **Line-Item Expense**: A one-time expense entry added by the owner to the profit margin dashboard for a specific month. Contains: description (e.g., "EB bill"), amount, optional date within the month, and month reference.
+- **Monthly Bill (Extended)**: A computed billing record for a hosteler for a specific month. Contains: hosteler ID, month/year, room rent total, meal charges by type, grand total, generation timestamp, transmission timestamp (null until transmitted), and status (Generated/Transmitted). Bill generation separates into two phases: generation (computed but not visible to hosteler) and transmission (owner confirms, bill becomes visible).
+- **Mess Facility Assignment**: An owner-set configuration for each hosteler indicating whether they are availing mess (meal) facilities. When set to NO, food preference defaults to off for all meals; when set to YES, defaults to on.
 
 ---
 
@@ -471,6 +711,19 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - **SC-015**: At 768 px tablet viewport width and above, 100% of completed owner-facing screens display with proper data density, no cramped layouts, and optimized use of tablet width for dashboards, tables, and data-rich views.
 - **SC-016**: All authentication screens (hosteler login, invite activation, PIN reset, owner login) work seamlessly at 375 px mobile width with readable text, touch-friendly controls, and no horizontal overflow.
 - **SC-017**: In installed Android PWA standalone mode, the core hosteler flow (login → dashboard → submission → confirmation → return) can be completed without viewport jumps, keyboard/modal obstruction, unsafe spacing, unreadable text, or navigation dead ends.
+- **SC-018**: The owner can create a building, add rooms with different room types and floors, and configure cots within 5 minutes, with a queryable hierarchical structure for later hosteler assignments.
+- **SC-019**: Room rent rate changes with future effective dates display a pending-change label until the effective date; after the effective date, the label disappears and new rent applies for billing from that date forward.
+- **SC-020**: Meal rate changes with future effective dates display a pending-change label until the effective date; after the effective date, the label disappears and new rates apply for billing from that date forward.
+- **SC-021**: Bills generated for a month containing mid-month room rent or meal rate changes apply each rate that was effective on each individual date, not a blanket rate for the entire month.
+- **SC-022**: A hosteler registered with "NOT availing mess" has food preference defaults of OFF for all meals on first submission, but can manually toggle meals ON.
+- **SC-023**: A hosteler registered with "YES availing mess" has food preference defaults of ON for all meals on first submission, but can manually toggle meals OFF.
+- **SC-024**: The owner can generate a bill, review it in "Awaiting Transmission" status (not visible to hosteler), and then transmit it to make it visible to the hosteler within 2 minutes of generation.
+- **SC-025**: Bills in "Awaiting Transmission" status do not appear in any hosteler's bill list; only transmitted bills are hosteler-visible.
+- **SC-026**: The owner can add employees with salary and salary change history; salary changes with future effective dates display pending-change labels until the effective date is reached.
+- **SC-027**: A profit margin dashboard for a specific month calculates income, expenses, and profit using rates and salaries effective for that month, accounting for mid-month changes and not applying current month rates retroactively.
+- **SC-028**: When the owner adds a line-item expense to the profit margin dashboard, the total expenses and profit margin are recalculated immediately.
+- **SC-029**: The available-cot dashboard shows all buildings, rooms, and cots with occupancy status (occupied with hosteler name / free); occupied cots become free immediately when their assigned hosteler is deactivated or deleted.
+- **SC-030**: For a past month with historical rate/salary changes, the profit margin dashboard correctly reflects the rates and salaries that were effective in that month, not current rates.
 
 ---
 
@@ -497,6 +750,14 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 - The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.
 - Owner-assisted forgot-PIN in v1 is not self-service. It is initiated only by owner invite regeneration and is limited to active PIN-linked hostelers.
+- Buildings, rooms, room types, and cots are hostel infrastructure configured once at setup; room/building hierarchy changes are infrequent (typically at deployment or when hostel physically expands).
+- A single cot can only be occupied by one active hosteler at a time. When a hosteler is deleted or deactivated, their cot is immediately freed for reassignment.
+- Room rent and meal rates can change mid-month; the system tracks complete rate history to enable accurate billing for any month with changes.
+- Employee salary changes are tracked historically to enable accurate expense calculations for profit margin dashboards; salary does not retroactively change.
+- Bill generation is a two-phase process: generation (computed, owner-only-visible) and transmission (owner approves, hosteler-visible). Bills are not visible to hostelers until transmission.
+- Mess facility assignment defaults (YES/NO) are applied only to the first submission after the assignment changes; prior submissions retain their choices and are not retroactively updated.
+- Profit margin dashboards are month-aware and use historical rates effective for that month; past months always reflect rates/salaries from their respective month, never current rates.
+- Expenses added to profit margin dashboards are one-time line items; recurring expenses (e.g., monthly internet) are not automated and must be re-entered each month if they recur.
 
 ---
 
@@ -535,3 +796,42 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 - Q: Which hosteler statuses are eligible for this invite-based PIN reset path? → A: Only active hostelers are eligible for owner-assisted PIN reset via regenerated invite links.
 - Q: How should regenerated invite reset behavior differ for Google-linked versus PIN-linked active hostelers? → A: PIN-linked active hostelers can reset their PIN via the regenerated link; Google-linked active hostelers without a PIN cannot create a PIN through this flow in v1 and must continue using linked Google sign-in.
 - Q: If a newer invite is regenerated before submit, what should happen to an older already-open reset page? → A: The older page must fail on submit with token-invalid (superseded), and the user must reopen the latest invite link.
+
+### Session 2026-07-10
+
+- Q: How should room rent changes with effective dates be calculated for billing when a month contains multiple rent changes? → A: Each room's rent for billing is determined by which rate was effective on that specific date. If rent changes on the 15th, days 1-14 use the old rate and days 15-31 use the new rate.
+- Q: What happens if a room rent effective date is set to a date in the past? → A: The UI should prevent selecting past dates; only current date onwards is allowed for new rate changes to prevent retroactive billing confusion.
+- Q: If an owner adds a building/room/cot hierarchy but then wants to reorganize, what happens to historical data? → A: Room/building hierarchy changes are allowed; historical billing and food preference records remain attached to their original room/hosteler references. Reorganizing the structure does not affect historical accuracy.
+- Q: Can a single hosteler be assigned to multiple cots simultaneously? → A: No. A hosteler can only occupy one cot at a time. Reassigning a hosteler to a different cot must deassign them from the current cot first.
+- Q: What happens if the owner tries to delete a building that still has rooms and assigned hostelers? → A: The system should warn the owner about the impact and require confirmation. Deleting a building with active assignments should either cascade-delete or mark the structure as inactive, preserving historical data.
+- Q: For profit margin dashboard, if a hosteler is deleted mid-month, should their partial-month history be included in expense calculations? → A: Yes. Deleted hostelers' historical room rent and meal charges for dates prior to deletion are included in income calculations. Only future-dated preferences after the deletion effective date are excluded.
+- Q: Can the owner have multiple effective-date-pending changes for the same room or meal rate? → A: No. Only one pending change per room or meal type is allowed. If a new effective date is set before the previous one is reached, it replaces the pending change.
+- Q: How should the profit margin dashboard handle employees who were hired mid-month or during the month they are being calculated? → A: The dashboard includes their salary from their hire date (effective date) onward for the selected month. If hired after the selected month, they contribute no salary expense.
+- Q: What is the minimum and maximum value for room rent, meal rates, and salary? → A: No hard limits in v1; the system accepts any positive integer value. Business logic validation (e.g., zero checks) is left to the owner.
+- Q: If a hosteler with "NOT availing mess" later changes to "YES availing mess", what happens to their past food preferences? → A: Past food preferences remain unchanged. Only future submissions default to YES for all meals.
+- Q: For bills generated but awaiting transmission, who can see them and for how long are they retained? → A: Only the owner can see bills awaiting transmission. They are retained indefinitely (or until manually deleted) and do not auto-expire.
+- Q: Can an owner regenerate/retransmit a bill after it has already been transmitted to a hosteler? → A: Yes. If the owner regenerates bills for a month that already has a transmitted bill, the old transmitted bill is replaced and the new bill remains in "Awaiting Transmission" until retransmitted.
+- Q: How is the billing calculation performed when a hosteler's mess-facility assignment changes mid-month? → A: The hosteler's food preferences (which were already submitted) are used as-is for billing. Changing mess-facility assignment affects only future submission defaults, not retroactive food preference billing.
+- Q: What if the owner assigns a cot to a hosteler but then deletes that hosteler? Are cots freed for assignment? → A: Yes. Deleted or deactivated hostelers' assigned cots become immediately "Free" and can be reassigned to new hostelers.
+- Q: What is the bill lifecycle, and can bills be modified after transmission? → A: Bills can only be in two states: "Awaiting Transmission" (mutable, owner can regenerate) or "Transmitted" (immutable and permanent). Once transmitted, a bill cannot be edited. If a hosteler is deleted before transmission, their bill remains in "Awaiting Transmission" and can still be transmitted after deletion; the deleted hosteler's history is preserved in the bill.
+- Q: How should room rent be prorated when a hosteler's room assignment changes or a hosteler moves in/out mid-month? → A: **Option A - Prorate by date (SELECTED)**: Room rent is split based on how many days the hosteler occupied each room. For example, if a hosteler occupied Room A for 15 days and Room B for 16 days of a 31-day month, Room A's rent is divided by days occupied / total room days, and Room B's rent is calculated proportionally. Bills show the breakdown per room with the prorated amount.
+- Q: What should happen if a hosteler has no room assignment for part of the month? Should the owner be charged room rent for unassigned days? → A: **Option A - Skip billing for unassigned days (SELECTED)**: If a hosteler has no room assignment for any portion of the month, no room rent is charged for those days. Only days when a room assignment is active are subject to room rent billing.
+- Q: When a rate (room rent, meal rate, or salary) is changed with an effective date, should past bills be recalculated with the new rate, or remain locked with their original rates? → A: **Option A - Immutable Past Rates (SELECTED)**: Once a rate change takes effect, only future bills use the new rate. Past bills remain locked and cannot be recalculated. This ensures billing history is stable and prevents retroactive financial surprises.
+- Q: For the profit margin dashboard, should the owner be able to select only the current month, or any month in history? If selecting past months, should rates be recalculated with current rates or the historical rates that were effective during that month? → A: **Option B - Historical Month Selection (Full History) (SELECTED)**: The dashboard allows owner to select any past, current, or future month. When a past month is selected, the dashboard recalculates using the rates (room, meal, salary) that were effective during that specific month. This provides accurate historical profit analysis.
+
+### Session 2026-07-10-clarify
+
+**Billing Clarifications Workflow Completed**
+
+All 5 critical billing and dashboard decisions have been clarified and integrated:
+
+1. **Q1: Bills Immutable Once Transmitted (Generated → Transmitted end state)** → Bills exist in exactly two states: "Awaiting Transmission" (mutable, owner can regenerate) or "Transmitted" (immutable and permanent). Once a bill is transmitted to a hosteler, it cannot be modified or edited. This ensures billing transparency and prevents disputes over historical charges.
+
+2. **Q2: Room Rent Prorated by Date of Occupation** → Room rent is split based on how many days the hosteler occupied each room during the billing month. For example, if a hosteler occupied Room A for 15 days and Room B for 16 days of a 31-day month, rent is calculated proportionally per room. Bills show the per-room breakdown with prorated amounts.
+
+3. **Q3: Skip Billing for Unassigned Days** → If a hosteler has no room assignment for any portion of the billing month, no room rent is charged for those unassigned days. Only days when a room assignment is active are subject to room rent billing.
+
+4. **Q4: Past Rates Immutable After Billing** → Once a rate change (room rent, meal rate, or salary) takes effect, only future bills use the new rate. Past bills remain locked with their original rates and cannot be recalculated retroactively. This ensures billing history is stable and prevents retroactive financial surprises.
+
+5. **Q5: Profit Dashboard Allows Full Historical Month Selection** → The profit margin dashboard allows the owner to select any past, current, or future month for analysis. When a past month is selected, the dashboard recalculates income and expenses using the historical rates (room rent, meal rates, salaries) that were effective during that specific month. This provides accurate historical profit margin analysis and period-over-period comparison without retroactively modifying archived bills.
+

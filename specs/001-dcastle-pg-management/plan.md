@@ -450,3 +450,773 @@ This pre-check ensures the owner receives a clear, actionable error for the oper
 **Phase 18 consistency note**: Phase 18 / US13 is a planning and validation gate for completed user-facing screens, not permission to change business behavior. Any mobile remediation must preserve the existing story contracts in `spec.md`, the task order in `tasks.md`, and the honest E2E/Cloudflare parity evidence requirements from Phase 17.
 
 **Checkpoint**: Android mobile validation passes for completed user-facing screens, applicable standalone PWA validation passes, and the app can be used as a stable mobile app for the documented owner and hosteler core flows.
+
+---
+
+## Phase 19: Billing and Owner Management Features (User Stories 14–21)
+
+**Updated**: 2026-07-10 | **Scope**: Building/Room Management, Rate History Tracking, Billing Generation, Employee Management, Profit Dashboard, Available Cot Dashboard
+
+### Overview
+
+Phases 19–24 implement the comprehensive billing and operational management suite for owners (US14–US21). These stories introduce multi-property infrastructure (buildings, rooms, cots), rate history tracking with effective-date support (room rent, meal rates, salaries), two-phase billing (generate → review → transmit), employee salary management, profit margin calculation with month-aware rate lookups, and cot occupancy visibility. Each phase builds on the foundational hosteler and food submission infrastructure (US1–US5) and can run in parallel with authentication hardening (US12) and mobile validation (US13).
+
+### Data Model Architecture
+
+#### New Core Entities
+
+1. **Building**: Organizational grouping of rooms
+   - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (text), `description` (text, nullable), `created_at`, `updated_at`
+   - Constraints: `(owner_id, name)` unique (one owner cannot have duplicate building names)
+
+2. **Room**: Rentable unit within a building
+   - Fields: `id` (uuid), `building_id` (uuid, FK), `room_number` (text), `floor` (enum: 'ground'|'first'|'second'|null), `room_type_id` (uuid, FK), `current_rent` (numeric, decimal(10,2)), `created_at`, `updated_at`
+   - Constraints: `(building_id, room_number)` unique
+   - Note: `current_rent` denotes the active rent; historical changes are tracked in `room_rent_rate_history`
+
+3. **RoomType**: Classification for groups of identical rooms
+   - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (text, e.g., "2-sharing AC"), `description` (text, nullable), `base_rent` (numeric, decimal(10,2)), `cot_count` (integer), `created_at`, `updated_at`
+   - Constraints: `(owner_id, name)` unique
+   - Note: `base_rent` is a reference value; actual room rent is stored separately per room
+
+4. **Cot**: Bed/sleeping unit within a room
+   - Fields: `id` (uuid), `room_id` (uuid, FK), `cot_id_label` (text, e.g., "L1", "U2"), `cot_type` (enum: 'lower_cot'|'upper_cot'), `hosteler_id` (uuid, FK, nullable), `created_at`, `updated_at`
+   - Constraints: `(room_id, cot_id_label)` unique
+   - Note: When a hosteler is deactivated or deleted, `hosteler_id` is set to null
+
+5. **RoomRentRateHistory**: Immutable audit trail of room rent changes
+   - Fields: `id` (uuid), `room_id` (uuid, FK), `old_rent` (numeric, decimal(10,2), nullable), `new_rent` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+   - Constraints: `(room_id, effective_date)` unique (one rate change per room per date)
+   - Note: Immutable record; never updated; only inserted for audit trail
+
+6. **MealRateRateHistory**: Immutable audit trail of meal rate changes
+   - Fields: `id` (uuid), `meal_type` (enum: 'breakfast'|'lunch'|'dinner'), `old_rate` (numeric, decimal(10,2), nullable), `new_rate` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+   - Constraints: `(meal_type, effective_date)` unique (one rate change per meal per date)
+   - Note: Single table covers all three meal types; queries filter by `meal_type`
+
+7. **Employee**: Hostel staff member record
+   - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (text), `job_description` (text), `current_salary` (numeric, decimal(10,2)), `active` (boolean, default true), `created_at`, `updated_at`
+   - Note: `current_salary` is the active salary; historical changes tracked in `employee_salary_history`
+
+8. **EmployeeSalaryHistory**: Immutable audit trail of employee salary changes
+   - Fields: `id` (uuid), `employee_id` (uuid, FK), `old_salary` (numeric, decimal(10,2), nullable), `new_salary` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+   - Constraints: `(employee_id, effective_date)` unique
+   - Note: Immutable; never updated
+
+9. **MonthlyBill**: Two-phase billing record (generated, then transmitted)
+   - Fields: `id` (uuid), `hosteler_id` (uuid, FK), `month` (date, first day of month), `status` (enum: 'generated'|'transmitted'), `room_rent_total` (numeric, decimal(10,2)), `meal_charges` (jsonb: `{ breakfast: decimal, lunch: decimal, dinner: decimal }`), `grand_total` (numeric, decimal(10,2)), `generated_at` (timestamp), `transmitted_at` (timestamp, nullable), `created_at`, `updated_at`
+   - Constraints: `(hosteler_id, month)` unique (one bill per hosteler per month)
+   - Note: On regeneration, old `status='generated'` bills are replaced; `status='transmitted'` bills are soft-replaced (new bill created in 'generated' status)
+
+10. **LineItemExpense**: One-time expenses added to profit dashboard
+    - Fields: `id` (uuid), `owner_id` (uuid, FK), `month` (date, first day of month), `description` (text), `amount` (numeric, decimal(10,2)), `expense_date` (date, nullable, within the month), `created_at`, `updated_at`
+    - Constraints: None (multiple expenses per month allowed)
+
+11. **MessFacilityAssignment**: Configuration for each hosteler (availing mess or not)
+    - Fields: `id` (uuid), `hosteler_id` (uuid, FK), `availing_mess` (boolean, default true), `created_at`, `updated_at`
+    - Constraints: `hosteler_id` unique (one assignment per hosteler)
+    - Note: Embedded in hosteler form during registration; can be updated later
+
+#### Existing Entity Extensions
+
+1. **Hostelers** table: Add columns
+   - `building_id` (uuid, FK, nullable)
+   - `room_id` (uuid, FK, nullable)
+   - `cot_id` (uuid, FK, nullable)
+   - `availing_mess` (boolean, default true)
+   - Note: When registering a hosteler, owner assigns them to a specific building, room, and cot
+
+2. **FoodPreferences** table: Add columns
+   - `canceled_by_deletion` (boolean, default false)
+   - Note: Used to track when active-deletion cancels future-dated preferences; excluded from normal owner history/export
+
+3. **Settings** table: No changes needed (already supports deadline and meal rates)
+
+### Data Model Relationships Diagram
+
+```
+Building 1──N Room
+           │
+           └──N RoomType
+
+Room 1──N Cot
+    │
+    └──1 RoomType
+
+RoomType 1──N Room
+
+Room ──┬── RoomRentRateHistory (audit trail)
+       │
+       └── Cot (occupancy)
+
+Hosteler ──┬── Cot (assigned cot, nullable)
+           ├── Room (assigned room, nullable)
+           ├── Building (assigned building, nullable)
+           └── MessFacilityAssignment
+
+FoodPreferences ──── Hosteler
+                 (canceled_by_deletion flag)
+
+Employee ──┬── EmployeeSalaryHistory (audit trail)
+           └── Owner
+
+MonthlyBill ──── Hosteler
+
+LineItemExpense ──── Owner
+
+MealRateRateHistory ──── (global, not per-owner)
+                      (breakfast, lunch, dinner)
+```
+
+### Rate History & Effective-Date Lookup Patterns
+
+**Room Rent Lookup for a Specific Date**:
+```sql
+SELECT new_rent FROM room_rent_rate_history
+WHERE room_id = $room_id
+  AND effective_date <= $lookup_date
+ORDER BY effective_date DESC
+LIMIT 1;
+```
+
+**Meal Rate Lookup for a Specific Date**:
+```sql
+SELECT new_rate FROM meal_rate_rate_history
+WHERE meal_type = $meal_type
+  AND effective_date <= $lookup_date
+ORDER BY effective_date DESC
+LIMIT 1;
+```
+
+**Employee Salary Lookup for a Specific Date**:
+```sql
+SELECT new_salary FROM employee_salary_history
+WHERE employee_id = $employee_id
+  AND effective_date <= $lookup_date
+ORDER BY effective_date DESC
+LIMIT 1;
+```
+
+**Bill Calculation for Month**:
+For each day in the month:
+1. Look up meal rate effective for that day
+2. Count hosteler's meal preferences for that day
+3. Calculate daily meal charge: sum of (opted_count × day_rate) for each meal
+4. Look up room rent effective for that day
+5. Add daily room rent to total
+6. Sum all days in the month
+
+### Bill Transmission & Visibility
+
+**Generate Phase**:
+- Owner clicks "Generate Bill" → selects scope (All/Building/Individual) and month
+- System queries `food_preferences` for that month (excluding `canceled_by_deletion=true` rows)
+- For each hosteler with food preferences or active room assignment:
+  - Calculate room rent total: SUM(daily_room_rent) for each day in month
+  - Calculate meal charges: SUM(daily_meal_charges) for each day in month
+  - Create `monthly_bill` record with `status='generated'`
+  - Bill is NOT visible to hosteler
+
+**Review Phase**:
+- Owner can click on bill to view detailed breakdown (per-day charges, meal counts, room rent)
+- Owner can manually review for accuracy before transmission
+
+**Transmission Phase**:
+- Owner clicks "Transmit Bill" → sets `status='transmitted'`, `transmitted_at=now()`
+- Bill becomes immediately visible to hosteler via `GET /api/billing/bill/[id]`
+
+**Regeneration**:
+- If owner regenerates bills for same month:
+  - Existing `status='generated'` bills are replaced (delete and recreate)
+  - Existing `status='transmitted'` bills are preserved, but new `status='generated'` bill is created for that month
+  - Next transmit replaces the transmitted version
+
+### API Design Overview
+
+#### Building & Room Management
+
+**`POST /api/buildings`** — Create building
+- Body: `{ name, description? }`
+- Response: `{ id, owner_id, name, description, created_at }`
+- Validation: `(owner_id, name)` must be unique
+
+**`GET /api/buildings`** — List all buildings for owner
+- Query: none
+- Response: `{ buildings: [ { id, name, description, rooms: [ ... ] } ] }`
+- Note: Hierarchical response includes rooms within each building
+
+**`POST /api/buildings/[id]/rooms`** — Add room to building
+- Body: `{ room_number, floor?, room_type_id, rent }`
+- Response: `{ id, building_id, room_number, floor, room_type_id, current_rent, cots: [ ... ] }`
+- Validation: `(building_id, room_number)` unique
+
+**`POST /api/room-types`** — Define room type
+- Body: `{ name, description?, base_rent, cot_count }`
+- Response: `{ id, owner_id, name, description, base_rent, cot_count }`
+- Validation: `(owner_id, name)` unique
+
+**`POST /api/room-types/[id]/cots`** — Configure cots within room type
+- Body: `{ cot_id_label, cot_type }`
+- Response: `{ id, room_id, cot_id_label, cot_type, hosteler_id }`
+
+#### Rate Management
+
+**`POST /api/rooms/[id]/rent-change`** — Initiate room rent change with effective date
+- Body: `{ new_rent, effective_date }`
+- Response: `{ id, room_id, new_rent, effective_date, status: 'pending' }`
+- Note: Inserts into `room_rent_rate_history` on effective date passing; no update to historical records
+
+**`POST /api/meal-rates/change`** — Initiate meal rate change
+- Body: `{ meal_type, new_rate, effective_date }`
+- Response: `{ id, meal_type, new_rate, effective_date, status: 'pending' }`
+
+**`GET /api/meal-rates`** — Get current meal rates
+- Response: `{ breakfast: decimal, lunch: decimal, dinner: decimal }`
+
+#### Billing
+
+**`POST /api/billing/generate`** — Trigger bill generation
+- Body: `{ scope: 'all'|'building'|'hosteler', scope_id?, month }`
+- Response: `{ generated_count, bills: [ { hosteler_id, hosteler_name, total, status: 'generated' } ] }`
+- Behavior: Creates `monthly_bill` records with `status='generated'`
+
+**`GET /api/billing/bills`** — List all bills for selected month
+- Query: `?month=YYYY-MM-DD`
+- Response: `{ bills: [ { id, hosteler_name, total, status, generated_at, transmitted_at? } ] }`
+- Note: Shows both 'generated' and 'transmitted' to owner
+
+**`GET /api/billing/bills/[id]`** — View bill detail (owner or hosteler)
+- Owner: Always sees bill (any status)
+- Hosteler: Only sees `status='transmitted'` bills
+- Response: `{ id, hosteler_id, month, room_rent_total, meal_charges, grand_total, per_day_breakdown: [ ... ], status, generated_at, transmitted_at? }`
+
+**`PATCH /api/billing/bills/[id]`** — Transmit bill
+- Body: `{ action: 'transmit' }`
+- Response: `{ status: 'transmitted', transmitted_at }`
+- Behavior: Sets `status='transmitted'`, `transmitted_at=now()`
+
+#### Employee Management
+
+**`POST /api/employees`** — Add employee
+- Body: `{ name, job_description, salary }`
+- Response: `{ id, owner_id, name, job_description, current_salary }`
+
+**`POST /api/employees/[id]/salary-change`** — Update employee salary
+- Body: `{ new_salary, effective_date }`
+- Response: `{ id, employee_id, new_salary, effective_date }`
+- Behavior: Inserts into `employee_salary_history`
+
+**`GET /api/employees`** — List all employees
+- Response: `{ employees: [ { id, name, job_description, current_salary, pending_changes: [ ... ] } ] }`
+
+#### Profit Dashboard
+
+**`GET /api/profit-dashboard`** — Load profit dashboard for a month
+- Query: `?month=YYYY-MM-DD`
+- Response:
+  ```json
+  {
+    month: "2026-07-01",
+    income: { room_rent: decimal, meal_charges: decimal, total: decimal },
+    expenses: { salaries: decimal, line_items: decimal, total: decimal },
+    profit: decimal,
+    breakdowns: {
+      room_rent_by_hosteler: [ ... ],
+      meal_charges_by_type: { breakfast: decimal, lunch: decimal, dinner: decimal },
+      salaries_by_employee: [ ... ]
+    }
+  }
+  ```
+
+**`POST /api/profit-dashboard/expenses`** — Add line-item expense
+- Body: `{ description, amount, expense_date?, month }`
+- Response: `{ id, owner_id, description, amount, expense_date, month }`
+- Behavior: Recalculates dashboard profit immediately
+
+#### Available Cot Dashboard
+
+**`GET /api/cots/availability`** — Get cot occupancy status
+- Response:
+  ```json
+  {
+    buildings: [ 
+      {
+        id, name,
+        rooms: [
+          {
+            id, room_number, floor,
+            cots: [
+              { id, cot_id_label, cot_type, occupancy: 'occupied'|'free', hosteler_name?, hosteler_id? }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+### Implementation Phases (19–24)
+
+#### Phase 19: Building/Room/Cot Infrastructure (US14)
+
+**Goal**: Establish the foundational infrastructure for room inventory and cot assignment
+
+**Deliverables**:
+- Database migrations for `buildings`, `rooms`, `room_types`, `cots` tables
+- CRUD API routes: building/room/room-type/cot management
+- Owner UI: building hierarchy view, room management forms
+- Hosteler assignment UI: select building → room → cot during registration
+- Validation tests for room uniqueness, cot allocation
+
+**Dependencies**: None (can start immediately after Phase 18)
+
+**Estimated Scope**: 5 tasks
+
+#### Phase 20: Rate History Tracking (US15 & US16)
+
+**Goal**: Implement effective-date-based rate change tracking for room rent and meal rates
+
+**Deliverables**:
+- Database migrations for `room_rent_rate_history`, `meal_rate_rate_history` tables
+- API routes: rate change endpoints with effective-date pickers
+- Owner UI: room rent change forms, meal rate change forms
+- "Pending update on [date]" label display until effective date
+- Historical rate lookup queries and tests
+- Unit tests for prorating and date-based rate application
+
+**Dependencies**: Phase 19 (room structure required for room rent changes)
+
+**Estimated Scope**: 4 tasks
+
+#### Phase 21: Mess Facility Assignment (US17)
+
+**Goal**: Configure whether each hosteler avails mess facilities and set food preference defaults accordingly
+
+**Deliverables**:
+- Database column: `hostelers.availing_mess` (boolean, default true)
+- API: update mess facility status
+- Owner UI: toggle on hosteler registration and management
+- Food submission logic: apply defaults based on mess facility status
+- Unit tests for default application and override behavior
+
+**Dependencies**: Phase 1 (hosteler registration flow) — can integrate with Phase 19 or run independently
+
+**Estimated Scope**: 2 tasks
+
+#### Phase 22: Bill Generation & Transmission (US18)
+
+**Goal**: Implement two-phase billing (generate → review → transmit)
+
+**Deliverables**:
+- Database migrations for `monthly_bills` table
+- Billing calculation logic: room rent + meal charges with historical rate lookups
+- API routes: generate, list, view, transmit bills
+- Owner UI: bill generation dialog, bill review/transmission workflow
+- Hosteler UI: bill list and detail view (transmitted only)
+- Unit tests for billing calculation, rate application per-day
+- E2E tests: generate → review → transmit workflow, hosteler bill visibility
+
+**Dependencies**: Phase 20 (historical rate lookups required for accurate billing)
+
+**Estimated Scope**: 6 tasks
+
+#### Phase 23: Employee Management & Salary History (US19)
+
+**Goal**: Track employee records and salary changes with effective-date support
+
+**Deliverables**:
+- Database migrations for `employees`, `employee_salary_history` tables
+- CRUD API routes: employee management, salary changes
+- Owner UI: employee list, add employee, update salary forms
+- "Pending salary update on [date]" labels
+- Unit tests for salary history lookups
+
+**Dependencies**: None (independent feature)
+
+**Estimated Scope**: 3 tasks
+
+#### Phase 24: Profit Dashboard & Available Cots (US20 & US21)
+
+**Goal**: Provide owner visibility into financial performance and cot occupancy
+
+**Deliverables**:
+- Database queries for income (room rent + meal charges) and expenses (salaries + line items)
+- API routes: profit dashboard data, add expense
+- Owner UI: profit dashboard with month selector, income/expense/profit display, expense line items, detailed breakdowns
+- API route: cot availability dashboard
+- Owner UI: available cot dashboard with building/room/cot tree, occupancy status
+- Unit tests for profit calculations with historical rate/salary lookups
+- E2E tests: dashboard month switching, expense addition, cot occupancy accuracy
+
+**Dependencies**: Phase 20 (historical lookups), Phase 22 (billing records), Phase 23 (employee salaries)
+
+**Estimated Scope**: 5 tasks
+
+### Testing Strategy for US14–US21
+
+#### Unit Tests
+
+**Building/Room/Cot Infrastructure (Phase 19)**:
+- Room uniqueness validation per building
+- Cot label uniqueness per room
+- Cot assignment and deassignment logic
+
+**Rate History Tracking (Phase 20)**:
+- Rate change creation with effective-date validation
+- Historical rate lookup queries (SQL correctness)
+- Prorating logic: if rent changes mid-month, bills use the correct rent per day
+- Date-range boundary testing (midnight IST, first/last day of month)
+
+**Mess Facility Assignment (Phase 21)**:
+- Default food preference application based on availing_mess flag
+- Override scenarios (hosteler manually toggling meals despite defaults)
+
+**Bill Generation (Phase 22)**:
+- Bill calculation: room rent total + meal charges for a specific month
+- Calculation with mid-month rate changes (multi-rate days in one bill)
+- Hosteler inclusion/exclusion based on billable history (any food pref or active room assignment)
+- Meal count aggregation (days breakfast opted, days lunch opted, etc.)
+- Status transitions: generated → transmitted
+
+**Employee Salary History (Phase 23)**:
+- Salary history lookups for a specific date
+- Pending salary label generation until effective date
+
+**Profit Dashboard (Phase 24)**:
+- Income calculation: SUM(room rent) + SUM(meal charges) for a month using historical rates
+- Expense calculation: SUM(salaries) + SUM(line items) using historical salaries
+- Profit formula: Income − Expenses
+- Breakdown detail calculations: per-hosteler rent, per-meal-type charges, per-employee salary
+- Month-aware queries (past month lookups use historical rates, not current rates)
+
+#### Component/UI Tests
+
+**Building & Room Management UI (Phase 19)**:
+- Room creation form validation and submission
+- Building hierarchy rendering
+- Hosteler assignment flow
+
+**Rate Change Forms (Phase 20)**:
+- Date picker interaction and validation
+- Pending-change label visibility until effective date
+- Form submission success/error handling
+
+**Bill Generation UI (Phase 22)**:
+- Bill generation dialog: scope and month selection
+- Bill list rendering and status display
+- Bill detail view: per-day breakdown, meal charges, totals
+- Transmission workflow
+
+**Profit Dashboard UI (Phase 24)**:
+- Month selector and dashboard refresh
+- Income/expense/profit card rendering
+- Breakdown detail modal or expansion
+- Line-item expense form and addition
+
+#### E2E Tests
+
+**Building & Room Setup (Phase 19)**:
+- Create building → add rooms → configure cots → assign hosteler
+- Verify hierarchy queryable for later hosteler assignment
+
+**Rate Changes with Billing (Phase 20 + Phase 22)**:
+- Set future room rent change → advance effective date → generate bill → verify bill uses new rent
+
+**Mess Facility Defaults (Phase 21)**:
+- Register hosteler with "NOT availing" mess → submit preferences → verify defaults are OFF
+- Register hosteler with "YES availing" mess → submit preferences → verify defaults are ON
+- Update hosteler's mess status → submit new preferences → verify new defaults apply
+
+**Bill Generation & Transmission Workflow (Phase 22)**:
+- Seed month with hostelers and food preferences
+- Generate bill → verify bill is in "Awaiting Transmission" → bill NOT visible to hosteler
+- Transmit bill → verify bill is "Transmitted" → bill IS visible to hosteler
+- Regenerate bill → verify new bill replaces old in "generated" status
+
+**Employee Salary Tracking (Phase 23)**:
+- Add employee with salary
+- Create salary change with future effective date
+- Verify pending-change label displays until effective date
+
+**Profit Dashboard Month-Awareness (Phase 24)**:
+- Seed past month with specific room rent and meal rates
+- Seed current month with different rates
+- Load dashboard for past month
+- Verify dashboard shows past-month rates, not current rates
+- Add line-item expense → verify profit recalculates immediately
+- Verify breakdown details show correct per-hosteler/per-meal/per-employee amounts
+
+**Available Cot Dashboard (Phase 24)**:
+- Assign hostelers to cots → load dashboard → verify cots show "Occupied" with hosteler names
+- Deactivate hosteler → refresh dashboard → verify previously assigned cots show "Free"
+
+#### Android Mobile Layout Validation (Tablet-First for Owner Screens)
+
+**Owner Screens (768px+ Tablet Baseline)**:
+- Room management table: full width with proper column layout for editing
+- Rate change forms: spacious layout with readable input fields
+- Bill list: data-dense table for multiple hostelers
+- Profit dashboard: cards and charts using full tablet width
+- Available cot dashboard: hierarchical tree with adequate spacing
+
+**Hosteler Screens (375px Mobile Baseline)**:
+- No impact from owner-focused features; validate existing hosteler screens remain unaffected
+
+#### Automated Hover/Scroll/Overflow Detection
+
+- Add test to verify no page-level horizontal scrolling on owner screens at 1024px width
+- Validate button and form control target sizes for touch (44px minimum recommended)
+- Verify dense data tables remain readable without pinch zoom
+
+### Deployment & Migration Strategy
+
+#### Database Migrations (Idempotent, Guarded)
+
+**Migration 003: Building/Room Infrastructure**
+```sql
+-- buildings table
+CREATE TABLE IF NOT EXISTS buildings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now(),
+  UNIQUE(owner_id, name)
+);
+
+-- room_types table
+CREATE TABLE IF NOT EXISTS room_types (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  base_rent numeric(10, 2),
+  cot_count integer NOT NULL,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now(),
+  UNIQUE(owner_id, name)
+);
+
+-- rooms table
+CREATE TABLE IF NOT EXISTS rooms (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  building_id uuid NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+  room_number text NOT NULL,
+  floor text CHECK (floor IN ('ground', 'first', 'second', NULL)),
+  room_type_id uuid NOT NULL REFERENCES room_types(id) ON DELETE RESTRICT,
+  current_rent numeric(10, 2) NOT NULL,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now(),
+  UNIQUE(building_id, room_number)
+);
+
+-- cots table
+CREATE TABLE IF NOT EXISTS cots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  room_id uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  cot_id_label text NOT NULL,
+  cot_type text NOT NULL CHECK (cot_type IN ('lower_cot', 'upper_cot')),
+  hosteler_id uuid REFERENCES hostelers(id) ON DELETE SET NULL,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now(),
+  UNIQUE(room_id, cot_id_label)
+);
+
+-- Extend hostelers table
+ALTER TABLE hostelers ADD COLUMN IF NOT EXISTS building_id uuid REFERENCES buildings(id) ON DELETE SET NULL;
+ALTER TABLE hostelers ADD COLUMN IF NOT EXISTS room_id uuid REFERENCES rooms(id) ON DELETE SET NULL;
+ALTER TABLE hostelers ADD COLUMN IF NOT EXISTS cot_id uuid REFERENCES cots(id) ON DELETE SET NULL;
+ALTER TABLE hostelers ADD COLUMN IF NOT EXISTS availing_mess boolean DEFAULT true;
+```
+
+**Migration 004: Rate History Tracking**
+```sql
+CREATE TABLE IF NOT EXISTS room_rent_rate_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  room_id uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  old_rent numeric(10, 2),
+  new_rent numeric(10, 2) NOT NULL,
+  effective_date date NOT NULL,
+  created_by uuid NOT NULL REFERENCES auth.users(id),
+  created_at timestamp DEFAULT now(),
+  UNIQUE(room_id, effective_date)
+);
+
+CREATE TABLE IF NOT EXISTS meal_rate_rate_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  meal_type text NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner')),
+  old_rate numeric(10, 2),
+  new_rate numeric(10, 2) NOT NULL,
+  effective_date date NOT NULL,
+  created_by uuid NOT NULL REFERENCES auth.users(id),
+  created_at timestamp DEFAULT now(),
+  UNIQUE(meal_type, effective_date)
+);
+
+-- Extend food_preferences table
+ALTER TABLE food_preferences ADD COLUMN IF NOT EXISTS canceled_by_deletion boolean DEFAULT false;
+```
+
+**Migration 005: Billing & Expenses**
+```sql
+CREATE TABLE IF NOT EXISTS monthly_bills (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  hosteler_id uuid NOT NULL REFERENCES hostelers(id) ON DELETE CASCADE,
+  month date NOT NULL,
+  status text NOT NULL CHECK (status IN ('generated', 'transmitted')) DEFAULT 'generated',
+  room_rent_total numeric(10, 2) DEFAULT 0,
+  meal_charges jsonb, -- { breakfast: decimal, lunch: decimal, dinner: decimal }
+  grand_total numeric(10, 2) NOT NULL DEFAULT 0,
+  generated_at timestamp DEFAULT now(),
+  transmitted_at timestamp,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now(),
+  UNIQUE(hosteler_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS line_item_expenses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  month date NOT NULL,
+  description text NOT NULL,
+  amount numeric(10, 2) NOT NULL,
+  expense_date date,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+```
+
+**Migration 006: Employee Management**
+```sql
+CREATE TABLE IF NOT EXISTS employees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  job_description text,
+  current_salary numeric(10, 2) NOT NULL,
+  active boolean DEFAULT true,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS employee_salary_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  old_salary numeric(10, 2),
+  new_salary numeric(10, 2) NOT NULL,
+  effective_date date NOT NULL,
+  created_by uuid NOT NULL REFERENCES auth.users(id),
+  created_at timestamp DEFAULT now(),
+  UNIQUE(employee_id, effective_date)
+);
+```
+
+#### RLS (Row Level Security) Policies
+
+All owner-facing tables should be protected with RLS policies:
+
+```sql
+-- Example for buildings table
+ALTER TABLE buildings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Owner can view own buildings"
+  ON buildings FOR SELECT USING (owner_id = auth.uid());
+
+CREATE POLICY "Owner can create buildings"
+  ON buildings FOR INSERT WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "Owner can update own buildings"
+  ON buildings FOR UPDATE USING (owner_id = auth.uid());
+
+CREATE POLICY "Owner can delete own buildings"
+  ON buildings FOR DELETE USING (owner_id = auth.uid());
+```
+
+Apply similar policies to: `room_types`, `rooms`, `cots`, `monthly_bills`, `line_item_expenses`, `employees`, rate history tables.
+
+#### Test Data Seeding
+
+Update `supabase/seed.sql` to include:
+- Test building and rooms
+- Test room types and cots
+- Test meal rate history with past, current, and future rate changes
+- Test employee records with salary history
+- Test hostelers assigned to rooms and cots with mess facility settings
+
+#### Backward Compatibility
+
+- Existing hostelers remain unassigned to rooms/cots until explicitly configured
+- Existing settings (deadline, meal rates) remain effective; new rate history mechanism doesn't disturb past data
+- Bills can be generated retroactively for past months (historical rate lookups apply)
+
+### Feature Flags & Gradual Rollout
+
+**Optional**: Use feature flags to hide US14–US21 admin UI until all phases complete and testing passes:
+
+```typescript
+const BILLING_FEATURES_ENABLED = process.env.NEXT_PUBLIC_BILLING_FEATURES === 'true';
+```
+
+### Go-Live Checklist
+
+- [ ] All database migrations applied and verified on production Supabase
+- [ ] All API routes deployed and responding correctly
+- [ ] Owner UI screens validated at 768px tablet baseline
+- [ ] All E2E tests passing on production environment
+- [ ] Profit dashboard calculates correctly for historical months
+- [ ] Bill transmission workflow verified end-to-end
+- [ ] Cot assignment and occupancy tracking tested
+- [ ] Rate changes and historical lookups verified via test bills
+- [ ] Salary history and expense tracking tested in profit dashboard
+- [ ] Android mobile UI validation complete for affected screens
+- [ ] Build step (`npm run build:cloudflare`) passing without errors
+- [ ] Backup and restore procedures tested
+
+---
+
+## Technical Decisions & Rationale
+
+### Why Separate Rate History Tables?
+
+Each meal type (breakfast, lunch, dinner) is global, not per-room. Storing all three in one table (`meal_rate_rate_history`) with a `meal_type` column is simpler than three separate tables. Room rent is per-room, so its own table is appropriate.
+
+### Why Immutable Rate History Records?
+
+Rate history serves as an audit trail. Immutability ensures no accidental overwriting of historical data, and queries always reflect the true effective rates on any given date.
+
+### Why Two-Phase Billing?
+
+The owner needs a review step before hostelers see final amounts, reducing billing disputes and allowing corrections before transmission. This is a common pattern in SaaS billing systems.
+
+### Why Canceled Future Preferences Only in Deleted View?
+
+When an active hosteler is deleted, their future-dated preferences are canceled to stop billing. But these canceled records are valuable audit information — they show what the hosteler submitted before deletion. Keeping them in a dedicated deleted-hosteler audit view (visible only to owner) preserves the audit trail without polluting normal owner history/export/dashboard/billing queries.
+
+### Why No Payment Processing?
+
+Payment collection is out of scope for v1. The bill is a record-keeping and owner communication tool, not a payment mechanism. Future versions can integrate payment gateways.
+
+### Why Month as First Day of Month (not arbitrary date)?
+
+Using `month = 2026-07-01` (first day of month) as the key makes date arithmetic simpler and aligns with calendar month boundaries. Queries for "July billing" filter by `month >= '2026-07-01' AND month < '2026-08-01'`.
+
+---
+
+## Success Criteria for US14–US21
+
+- **SC-018**: Owner creates building, adds rooms with types/floors, configures cots within 5 minutes; structure is queryable for hosteler assignment
+- **SC-019**: Room rent change with future effective date shows "Pending" label; after effective date, label disappears and new rent applies to bills
+- **SC-020**: Meal rate change with future effective date shows "Pending" label; after effective date, label disappears and new rates apply to bills
+- **SC-021**: Bills generated for month with mid-month rate changes apply correct rate per day, not blanket rate
+- **SC-022**: Hosteler registered with "NOT availing mess" has OFF defaults; can manually toggle ON
+- **SC-023**: Hosteler registered with "YES availing mess" has ON defaults; can manually toggle OFF
+- **SC-024**: Owner generates bill, reviews in "Awaiting Transmission", transmits to make visible to hosteler within 2 minutes
+- **SC-025**: Bills in "Awaiting Transmission" do not appear in hosteler bill list; only transmitted bills visible
+- **SC-026**: Owner adds employees with salary; salary changes with future effective dates show "Pending" labels
+- **SC-027**: Profit dashboard for specific month uses rates/salaries effective for that month, not current rates
+- **SC-028**: Owner adds line-item expense to dashboard; total expenses and profit recalculate immediately
+- **SC-029**: Available-cot dashboard shows all buildings/rooms/cots with occupancy; occupied cots become free when hosteler deactivated/deleted
+- **SC-030**: Past month profit dashboard reflects historical rates/salaries from that month, not current rates
+
+
