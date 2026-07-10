@@ -10,7 +10,7 @@ async function handleGet(request: NextRequest) {
   if ('response' in authResult) return authResult.response;
 
   const supabase = createServiceClient();
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
 
   const { data: roomTypes, error } = await supabase
     .from('room_types')
@@ -30,7 +30,7 @@ async function handlePost(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
 
   let body;
   try {

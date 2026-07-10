@@ -8,7 +8,7 @@ async function handleGet(request: NextRequest) {
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
   const supabase = createServiceClient();
 
   // Fetch all buildings for owner

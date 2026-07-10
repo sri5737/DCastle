@@ -128,7 +128,7 @@ async function handlePost(request: NextRequest) {
   const building_id = body.building_id?.trim();
   const room_id = body.room_id?.trim();
   const cot_id = body.cot_id?.trim();
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
 
   // Validation
   if (!name || name.length < 2 || name.length > 100) {

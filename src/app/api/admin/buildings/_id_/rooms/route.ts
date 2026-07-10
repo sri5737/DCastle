@@ -14,7 +14,7 @@ async function handleGet(
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
   const buildingId = params.id;
 
   const supabase = createServiceClient();
@@ -87,7 +87,7 @@ async function handlePost(
   const authResult = await requireOwner();
   if ('response' in authResult) return authResult.response;
 
-  const ownerId = authResult.ownerId;
+  const ownerId = authResult.session.id;
   const buildingId = params.id;
 
   let body;
