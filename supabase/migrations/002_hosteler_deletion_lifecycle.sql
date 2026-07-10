@@ -73,3 +73,28 @@ CREATE INDEX IF NOT EXISTS idx_food_preferences_date_active
 
 CREATE INDEX IF NOT EXISTS idx_food_preferences_canceled_at
   ON food_preferences(canceled_at);
+
+-- ============================================================
+-- Fix phone uniqueness constraint for deleted hostelers
+-- ============================================================
+-- Drop the old global UNIQUE constraint on phone to allow deleted hostelers
+-- to reuse their phone numbers when rejoining the hostel (FR-001b)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'hostelers_phone_key'
+      AND conrelid = 'hostelers'::regclass
+  ) THEN
+    ALTER TABLE hostelers DROP CONSTRAINT hostelers_phone_key;
+  END IF;
+END $$;
+
+-- Create a partial unique index on phone for only active and pending hostelers
+-- This allows deleted hostelers (soft-deleted from active status) to reuse their
+-- phone numbers when they rejoin. Hard-deleted pending hostelers have no row, so
+-- their phone is naturally freed.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hostelers_phone_active_pending
+  ON hostelers(phone)
+  WHERE status IN ('active', 'pending');

@@ -1,12 +1,12 @@
 # Implementation Plan: Deekshana Castle PG Management App (v1.2)
 
-**Branch**: `001-dcastle-pg-management` | **Date**: 2026-07-05 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-dcastle-pg-management` | **Date**: 2026-07-10 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-dcastle-pg-management/spec.md`
 
 ## Summary
 
-A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, Android installability, and an Android mobile app experience as the primary layout target. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The updated 2026-07-05 auth/invite delta captures owner-assisted PIN reset via regenerated invites for active PIN-linked hostelers, structured invite/reset error taxonomy, and deterministic superseded-token rejection for stale invite pages. The honest-E2E planning delta preserves Constitution XI and FR-066 through FR-069 by requiring an audit and correction pass for completed and future stories before any story or phase can be considered accepted. The Constitution v1.6.0 Android mobile app experience delta adds FR-071 through FR-079 and makes Android Chrome at 375 px the primary design baseline for every completed owner, hosteler, and auth screen, with no page-level horizontal overflow, touch-friendly controls, reachable app-like navigation, stable browser/standalone viewport behavior, and installed/standalone PWA validation for applicable owner and hosteler flows.
+A mobile-first true Progressive Web App for Deekshana Castle PG that supports daily food submissions, live owner counts, invite-based activation, recurring login, hosteler lifecycle management, billing, Android installability, and an Android mobile app experience as the primary layout target. The v1.2 planning delta adds owner deletion of pending and active hostelers with owner-visible deleted records, immediate access revocation, preservation of past and same-day tracking and billing history, and cancellation of food preferences dated after the deletion effective date so those rows remain available only inside the deleted hosteler audit view and no longer affect normal owner history/export, future counts, or billing. The updated 2026-07-05 auth/invite delta captures owner-assisted PIN reset via regenerated invites for active PIN-linked hostelers, structured invite/reset error taxonomy, and deterministic superseded-token rejection for stale invite pages. The honest-E2E planning delta preserves Constitution XI and FR-066 through FR-069 by requiring an audit and correction pass for completed and future stories before any story or phase can be considered accepted. The Constitution v1.6.0 Android mobile app experience delta adds FR-071 through FR-079 and makes Android Chrome at 375 px the primary design baseline for every completed owner, hosteler, and auth screen, with no page-level horizontal overflow, touch-friendly controls, reachable app-like navigation, stable browser/standalone viewport behavior, and installed/standalone PWA validation for applicable owner and hosteler flows. The v1.3 planning delta (2026-07-10) clarifies that pending hosteler deletion is a complete hard delete — the row and all associated invite tokens are permanently removed from the database, no audit record is written, and no deleted-tab entry is created — and introduces explicit status-aware mobile number uniqueness validation at the API layer: adding a hosteler whose phone matches an active or pending row is rejected with a specific error; re-registration is permitted after a pending hard delete because the row no longer exists and the DB UNIQUE constraint is naturally freed.
 
 ## Technical Context
 
@@ -185,6 +185,24 @@ supabase/
 
 **Post-Design Gate Result**: ALL PASS. The refreshed 2026-07-05 planning artifacts remain constitution-compliant with no new violations.
 
+### v1.3 Post-Design Re-Check (2026-07-10)
+
+| # | Principle | Status | Evidence |
+|---|-----------|--------|----------|
+| I | Mobile-First | PASS | Pending-delete confirmation dialog changes are UI text only; add-hosteler 409 error is inline on the phone field — no layout impact at 375 px |
+| II | Edge Runtime Compatibility | PASS | Hard delete is a plain SQL `DELETE`; API-layer phone uniqueness check is a single `SELECT` — no Node.js packages required |
+| III | Security & Data Isolation | PASS | Hard delete removes all traces of pending hosteler from DB; API-layer pre-check validates status before insert; DB UNIQUE constraint remains as safety net |
+| IV | Server-Side Deadline Enforcement | PASS | Pending delete has no food preferences to cancel; no deadline interaction |
+| V | Zero-Cost Infrastructure | PASS | No new paid dependencies introduced |
+| VI | TypeScript Strict Mode & Simplicity | PASS | Pending hard delete simplifies the path (DELETE row vs. soft-delete update); uniqueness check is a single pre-insert query |
+| VII | Unit Testing Coverage | PASS | New behavior requires: unit test for pending hard-delete route guard, unit tests for uniqueness check (active conflict, pending conflict, no conflict, freed-pending allowed) |
+| VIII | CI/CD Pipeline | PASS | No pipeline changes; existing gates remain |
+| IX | Idempotent Database Migrations | PASS | No schema migration needed; `ON DELETE CASCADE` for invite_tokens may need verification in existing migration |
+| X | True Progressive Web App | PASS | No PWA scope change |
+| XI | Honest End-to-End Validation | PASS | E2E test for US5 must verify pending hard delete leaves no deleted-tab entry, and add-hosteler 409 fires correctly for active/pending phone conflicts |
+
+**v1.3 Post-Design Gate Result**: ALL PASS. Pending hard delete and status-aware phone uniqueness are additive API-layer behavioral changes fully contained within the existing architecture.
+
 ## Complexity Tracking
 
 > No constitution violations detected.
@@ -192,6 +210,107 @@ supabase/
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | — | — | — |
+
+---
+
+## Phase 5 Amendment: Pending Hosteler Hard Delete & Mobile Number Uniqueness (v1.3)
+
+**Updated**: 2026-07-10 | Amends: Phase 5 (US5) | **Spec**: [spec.md](spec.md) § US5 Scenarios 7, 8, 9
+
+### Context
+
+The v1.2 plan modeled both active and pending deletion as soft deletes into `status = 'deleted'`, placing all deleted records in the owner's deleted tab. The v1.3 spec update introduces two clarifications that alter the pending-delete path and the add-hosteler mobile validation:
+
+1. **Pending hosteler deletion is a complete hard delete**: the row and all associated invite tokens are permanently removed from the database. No audit record is created. The owner's deleted tab will not show pending-deleted hostelers. The mobile number is freed immediately.
+2. **Mobile number uniqueness is enforced at the API layer with status-aware semantics**: adding a hosteler with a phone matching an active or pending row is rejected with an explicit error; adding a hosteler with a phone previously associated with a hard-deleted pending hosteler is allowed (the row no longer exists, so no conflict arises).
+
+### Data Model Implications
+
+**No schema change is required for pending hard delete.**
+
+- The `hostelers.phone` column retains its `UNIQUE` and `NOT NULL` constraints.
+- Because a pending hard delete removes the row entirely, the DB-level UNIQUE constraint is naturally freed. A re-registration with the same phone succeeds without any special logic.
+- The `deleted_from_status` and `deletion_effective_date` columns remain unchanged and continue to apply only to active-deletion soft-delete records.
+- Pending-deleted rows never reach `status = 'deleted'`; they are fully removed before any deletion metadata would be written.
+- A DB-level UNIQUE constraint on `phone` continues to serve as the safety net for all non-pending-delete cases (inactive and deleted-from-active rows retain their phone values and their UNIQUE slots).
+- **No new migration is needed.** The DB structure already supports hard delete for pending rows via a plain `DELETE FROM hostelers WHERE id = $1 AND status = 'pending'`.
+- The `invite_tokens` table must have `ON DELETE CASCADE` on `hosteler_id`, or the route must explicitly delete invite tokens before deleting the hosteler row. Verify in the existing `002_hosteler_deletion_lifecycle.sql` migration.
+
+### API Design: Pending Hosteler Hard Delete
+
+**`PATCH /api/hostelers/[id]`** — `action: "delete"` on a pending hosteler:
+
+| Aspect | Decision |
+|--------|----------|
+| DB operation | `DELETE FROM hostelers WHERE id = $1 AND status = 'pending'` (hard delete — no soft delete) |
+| Invite tokens | All invite tokens for the hosteler are deleted (cascade or explicit delete before row delete) |
+| Response | `{ "deleted": true }` — no hosteler object returned (row is gone) |
+| Deleted tab | Not affected — pending hard deletes produce no deleted-tab entry |
+| Auth user | Pending hostelers have no activated `auth_user_id`; no Supabase Auth user cleanup is required |
+| PIN attempts | No PIN attempts exist for pending hostelers — no cleanup required |
+| Food preferences | No food preferences exist for pending hostelers — no cancellation logic required |
+| Idempotency | If the row is not found (already deleted or never existed), return HTTP 404 |
+
+The route must re-verify `status = 'pending'` server-side before issuing the DELETE. If the status is anything other than `pending`, the request must be rejected with HTTP 400 to prevent accidental hard delete of non-pending hostelers.
+
+### API Design: Mobile Number Uniqueness Validation
+
+**`POST /api/hostelers`** — add hosteler validation:
+
+| Case | DB state | API behavior |
+|------|----------|--------------|
+| Phone matches `status = 'active'` row | Row exists | Reject HTTP 409: `"This mobile number is already registered to an active hosteler."` |
+| Phone matches `status = 'pending'` row | Row exists | Reject HTTP 409: `"This mobile number is already registered to a pending hosteler."` |
+| Phone matches hard-deleted pending hosteler | No row (hard delete removed it) | Allow — no conflict; natural re-registration |
+| Phone matches `status = 'inactive'` row | Row exists | DB UNIQUE constraint blocks insert; return generic HTTP 409 |
+| Phone matches `status = 'deleted'` (from active) row | Row exists | DB UNIQUE constraint blocks insert; return generic HTTP 409 |
+| No existing row for phone | No row | Allow — insert proceeds normally |
+
+**Explicit API-layer check** runs before the DB insert:
+
+1. Query `hostelers` where `phone = $phone AND status IN ('active', 'pending')`.
+2. If a row is found, return HTTP 409 with the status-aware error message.
+3. If no row is found, proceed with the insert.
+4. The DB UNIQUE constraint catches any remaining race conditions or inactive/deleted-phone collisions, returning a generic HTTP 409 in those paths.
+
+This pre-check ensures the owner receives a clear, actionable error for the operationally meaningful cases (active and pending conflicts) while the DB constraint remains the safety net for all other collision scenarios.
+
+### UI Implications
+
+**Pending delete confirmation dialog**:
+- Must explicitly state the action is permanent, irreversible, and leaves no record.
+- Recommended dialog message: *"This hosteler will be permanently deleted. Their invite link will be invalidated and no record will be retained. This action cannot be undone."*
+- A single destructive-styled "Delete permanently" confirm button is sufficient; no secondary confirmation step is required.
+- Unlike active-delete, there is no preservation summary — there is nothing to preserve.
+
+**Deleted tab**:
+- Shows only records from active-hosteler soft deletes (`deleted_from_status = 'active'`).
+- Never shows pending-deleted hostelers (they no longer exist in the DB).
+- The `deleted` count returned by `GET /api/hostelers` counts only soft-deleted rows (`status = 'deleted'`), which excludes all hard-deleted pending records.
+
+**Add hosteler form**:
+- On HTTP 409 with a status-aware error, display the exact error message inline on the phone field.
+- No special UI handling is needed for re-registration of hard-deleted-pending numbers — the form behaves as a normal successful insert.
+
+### Risks & Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Accidental hard delete of a non-pending hosteler | Route must re-verify `status = 'pending'` server-side before issuing DELETE; return 400 if mismatch |
+| Race condition: two registrations with the same phone submitted simultaneously | DB UNIQUE constraint catches any race after the API-layer pre-check; conflicting commits cannot both succeed |
+| Cascade delete not configured for `invite_tokens` | Explicitly delete invite tokens before the hosteler row in the route handler, or confirm `ON DELETE CASCADE` is present in the existing migration |
+| Soft-delete code paths accidentally executing for pending | The PATCH handler must branch on `hosteler.status`: hard delete path for `'pending'`, soft delete path for `'active'` |
+
+### Artifact Updates Required
+
+| Artifact | Change needed |
+|----------|---------------|
+| `contracts/hostelers.md` | Update `PATCH /api/hostelers/[id]` pending-delete response to `{ "deleted": true }` instead of a hosteler object with `status: 'deleted'`; add note that no deleted-tab entry is created |
+| `contracts/hostelers.md` | Update `POST /api/hostelers` Response 409 to document the status-aware error message variants for active vs. pending conflicts |
+| `data-model.md` | Annotate `pending -> deleted` state transition as a hard delete (row removed), not a transition to `status = 'deleted'` |
+| `data-model.md` | Add a note that `deleted_from_status` and `deletion_effective_date` are only written for active-deletion soft-delete records |
+
+**Checkpoint**: Pending hosteler DELETE removes the row entirely with no deleted-tab entry; active-deletion soft-delete path is unchanged; add-hosteler API returns status-aware HTTP 409 for active/pending phone conflicts; hard-deleted pending numbers can be re-registered without error; DB UNIQUE constraint remains as the safety net for all other cases.
 
 ---
 

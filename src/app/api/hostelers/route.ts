@@ -44,6 +44,12 @@ async function handleGet(request: NextRequest) {
 
   if (status && validStatuses.includes(status)) {
     query = query.eq('status', status);
+    // Deleted tab must only surface records deleted from active status (FR-029a/FR-029c).
+    // Hard-deleted pending hostelers have no row, so no additional filter is needed to exclude them,
+    // but soft-deleted-from-pending rows (legacy) must also be hidden from the deleted tab.
+    if (status === 'deleted') {
+      query = query.eq('deleted_from_status', 'active');
+    }
   }
 
   const { data: hostelers, error } = await query;
@@ -53,9 +59,10 @@ async function handleGet(request: NextRequest) {
   }
 
   // Get counts
+  // deleted count reflects only active-deletion records (matches the deleted tab filter).
   const { data: allHostelers } = await supabase
     .from('hostelers')
-    .select('status');
+    .select('status, deleted_from_status');
 
   const counts = {
     active: 0,
@@ -69,7 +76,7 @@ async function handleGet(request: NextRequest) {
       if (h.status === 'active') counts.active++;
       else if (h.status === 'pending') counts.pending++;
       else if (h.status === 'inactive') counts.inactive++;
-      else if (h.status === 'deleted') counts.deleted++;
+      else if (h.status === 'deleted' && h.deleted_from_status === 'active') counts.deleted++;
     }
   }
 
@@ -132,6 +139,33 @@ async function handlePost(request: NextRequest) {
 
   const supabase = createServiceClient();
 
+  // Phone uniqueness pre-check: reject if phone matches any active or pending hosteler (FR-001a).
+  // Hard-deleted pending hostelers have no row, so their phone is naturally free.
+  const { data: existingHosteler, error: phoneCheckError } = await supabase
+    .from('hostelers')
+    .select('id')
+    .eq('phone', phone)
+    .in('status', ['active', 'pending'])
+    .maybeSingle();
+
+  if (phoneCheckError) {
+    return NextResponse.json({ error: 'Failed to check phone uniqueness' }, { status: 500 });
+  }
+
+  if (existingHosteler) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'phone_already_registered',
+          message: 'This mobile number is already registered to an active hosteler.',
+          recovery_action:
+            'Deactivate or delete the existing hosteler before re-registering this phone number.',
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   // Create hosteler
   const { data: hosteler, error: hostelerError } = await supabase
     .from('hostelers')
@@ -140,9 +174,15 @@ async function handlePost(request: NextRequest) {
     .single();
 
   if (hostelerError) {
-    if (hostelerError.code === '23505') {
+    // Check for phone uniqueness constraint violations (legacy DB schema)
+    if (hostelerError.message?.includes('duplicate') || hostelerError.message?.includes('unique')) {
       return NextResponse.json(
-        { error: 'A hosteler with this phone number already exists' },
+        {
+          error: {
+            code: 'phone_already_exists_in_database',
+            message: 'This phone number is already registered. If this person was previously deleted, the system needs to be updated to allow re-registration.',
+          },
+        },
         { status: 409 }
       );
     }

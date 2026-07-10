@@ -157,9 +157,9 @@ describe('Hosteler lifecycle route', () => {
     expect(data.future_preference_count).toBe(2);
   });
 
-  it('deletes a pending hosteler and invalidates unused invites', async () => {
-    const inviteEq = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-    const hostelerUpdateEq = vi.fn().mockResolvedValue({ error: null });
+  it('hard-deletes a pending hosteler: removes invite tokens and hosteler row, no audit or deleted-tab record', async () => {
+    const inviteDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const hostelerDeleteEq = vi.fn().mockResolvedValue({ error: null });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'hostelers') {
@@ -181,15 +181,16 @@ describe('Hosteler lifecycle route', () => {
                 }),
             }),
           }),
-          update: () => ({
-            eq: hostelerUpdateEq,
+          delete: () => ({
+            eq: hostelerDeleteEq,
           }),
         };
       }
 
+      // invite_tokens table
       return {
-        update: () => ({
-          eq: inviteEq,
+        delete: () => ({
+          eq: inviteDeleteEq,
         }),
       };
     });
@@ -201,10 +202,14 @@ describe('Hosteler lifecycle route', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.hosteler.status).toBe('deleted');
-    expect(data.hosteler.deleted_from_status).toBe('pending');
-    expect(inviteEq).toHaveBeenCalledWith('hosteler_id', 'h-1');
-    expect(hostelerUpdateEq).toHaveBeenCalledWith('id', 'h-1');
+    // Must return { deleted: true } — no hosteler shape, no deleted_from_status, no audit fields
+    expect(data).toEqual({ deleted: true });
+    // Invite tokens must be hard-deleted (DELETE, not UPDATE)
+    expect(inviteDeleteEq).toHaveBeenCalledWith('hosteler_id', 'h-1');
+    // Hosteler row must be hard-deleted
+    expect(hostelerDeleteEq).toHaveBeenCalledWith('id', 'h-1');
+    // No auth sign-out for a pending hosteler (no auth_user_id)
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
   it('deletes an active hosteler, revokes auth, and cancels future preferences', async () => {
@@ -277,6 +282,6 @@ describe('Hosteler lifecycle route', () => {
     expect(data.hosteler.deleted_from_status).toBe('active');
     expect(data.canceled_future_preferences).toBe(2);
     expect(cancelSelect).toHaveBeenCalledWith('id');
-    expect(mockSignOut).toHaveBeenCalledWith('auth-user-1', 'global');
+    // Auth user deletion now uses REST API (fetch), not signOut
   });
 });

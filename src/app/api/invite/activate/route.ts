@@ -256,36 +256,125 @@ async function handlePost(request: NextRequest) {
   }
 
   // Create Supabase Auth user for the hosteler
-  const createUserPayload: Record<string, unknown> = {
-    email: `${hosteler.phone}@hosteler.dcastle.local`,
-    email_confirm: true,
-    phone: hosteler.phone,
-    phone_confirm: true,
-    user_metadata: { hosteler_id: hosteler.id, name: hosteler.name },
-  };
+  // Check if an auth user already exists with this email (from incomplete deletion)
+  // If it does, update it instead of trying to delete and recreate
+  const authEmail = `${hosteler.phone}@hosteler.dcastle.local`;
+  
+  let authUser: any;
+  let authError: any;
 
-  // For PIN-based activation, set the PIN as the Supabase Auth password
-  // so that signInWithPassword works in the PIN verify flow
-  if (method === 'pin' && pin) {
-    createUserPayload.password = pin;
+  try {
+    // Query for existing auth user with this email
+    const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+    if (!listError && existingUsers?.users) {
+      const existingAuthUser = existingUsers.users.find(u => u.email === authEmail);
+      if (existingAuthUser) {
+        console.warn(`Found existing auth user for ${authEmail}, updating instead of recreating`, {
+          existingUserId: existingAuthUser.id,
+        });
+        
+        // Update the existing auth user with new metadata and password
+        const updatePayload: Record<string, unknown> = {
+          email_confirm: true,
+          phone_confirm: true,
+          user_metadata: { hosteler_id: hosteler.id, name: hosteler.name },
+        };
+        
+        // For PIN-based activation, update the password using the proper format
+        if (method === 'pin' && pin) {
+          updatePayload.password = getHostelerAuthPassword(hosteler.phone, pin);
+        }
+        
+        const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(
+          existingAuthUser.id,
+          updatePayload as Parameters<typeof supabase.auth.admin.updateUserById>[1]
+        );
+        
+        if (updateError) {
+          console.error('Failed to update existing auth user:', updateError);
+          authError = updateError;
+        } else {
+          authUser = updatedUser?.user;
+          console.warn('Successfully updated existing auth user', {
+            authUserId: authUser?.id,
+            authUserEmail: authUser?.email,
+          });
+        }
+      }
+    } else if (listError) {
+      console.warn('Could not list existing auth users, will attempt create:', listError);
+    }
+  } catch (listError) {
+    console.warn('Error checking for existing auth users, will attempt create:', listError);
   }
 
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser(
-    createUserPayload as Parameters<typeof supabase.auth.admin.createUser>[0]
-  );
+  // If no existing user was found or updated, create a new one
+  if (!authUser && !authError) {
+    const createUserPayload: Record<string, unknown> = {
+      email: authEmail,
+      email_confirm: true,
+      phone: hosteler.phone,
+      phone_confirm: true,
+      user_metadata: { hosteler_id: hosteler.id, name: hosteler.name },
+    };
+
+    // For PIN-based activation, set the PIN as the Supabase Auth password
+    // so that signInWithPassword works in the PIN verify flow
+    if (method === 'pin' && pin) {
+      createUserPayload.password = getHostelerAuthPassword(hosteler.phone, pin);
+    }
+
+    const { data: newAuthUser, error: createError } = await supabase.auth.admin.createUser(
+      createUserPayload as Parameters<typeof supabase.auth.admin.createUser>[0]
+    );
+    
+    authUser = newAuthUser?.user;
+    authError = createError;
+    if (!authError) {
+      console.warn('Successfully created new auth user', {
+        authUserId: authUser?.id,
+        authUserEmail: authUser?.email,
+      });
+    }
+  }
 
   if (authError) {
+    console.error('Auth user creation/update failed:', {
+      error: authError,
+      email: authEmail,
+      code: authError?.status,
+      message: authError?.message,
+    });
     return inviteError(500, 'activation_failed', 'Failed to create auth user', 'try_again_or_contact_owner');
   }
 
   // Update hosteler with auth info
-  updateData.auth_user_id = authUser.user.id;
+  updateData.auth_user_id = authUser.id;
+  
+  // Clear this auth_user_id from any other hosteler records (e.g., old deleted rows)
+  // to avoid unique constraint violations when re-activating
+  const { error: clearError } = await supabase
+    .from('hostelers')
+    .update({ auth_user_id: null })
+    .eq('auth_user_id', authUser.id)
+    .neq('id', hosteler.id);
+  
+  if (clearError) {
+    console.warn('Could not clear orphaned auth_user_id references:', clearError);
+    // Don't fail on this - proceed with the update
+  }
+  
   const { error: updateError } = await supabase
     .from('hostelers')
     .update(updateData)
     .eq('id', hosteler.id);
 
   if (updateError) {
+    console.error('Hosteler update failed:', {
+      error: updateError,
+      updateData,
+      hosteler_id: hosteler.id,
+    });
     return inviteError(500, 'activation_failed', 'Failed to activate hosteler', 'try_again_or_contact_owner');
   }
 

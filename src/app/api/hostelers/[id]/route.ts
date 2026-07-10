@@ -204,44 +204,42 @@ async function handlePatch(
   const deletionEffectiveDate = getTodayIST();
 
   if (hosteler.status === 'pending') {
-    const { error: inviteInvalidateError } = await supabase
+    // Hard delete: remove invite tokens first (or rely on CASCADE), then delete the row.
+    // No audit record or deleted-tab entry is written for pending deletions (FR-029a).
+    const { error: inviteDeleteError } = await supabase
       .from('invite_tokens')
-      .update({ used: true })
+      .delete()
       .eq('hosteler_id', id);
 
-    if (inviteInvalidateError) {
+    if (inviteDeleteError) {
       return NextResponse.json(
-        { error: 'Failed to invalidate pending hosteler invite tokens' },
+        { error: 'Failed to remove pending hosteler invite tokens' },
         { status: 500 }
       );
     }
 
-    const { error: updateError } = await supabase
+    const { error: deleteError } = await supabase
       .from('hostelers')
-      .update({
-        status: 'deleted',
-        deleted_at: deletedAt,
-        deleted_from_status: 'pending',
-        deletion_effective_date: deletionEffectiveDate,
-        updated_at: deletedAt,
-      })
+      .delete()
       .eq('id', id);
 
-    if (updateError) {
+    if (deleteError) {
       return NextResponse.json({ error: 'Failed to delete hosteler' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      hosteler: {
-        id: hosteler.id,
-        name: hosteler.name,
-        status: 'deleted',
-        deleted_from_status: 'pending',
-        deleted_at: deletedAt,
-        deletion_effective_date: deletionEffectiveDate,
-      },
-      canceled_future_preferences: 0,
-    });
+    // Also clean up auth user if it exists (shouldn't normally happen for pending, but be safe)
+    if (hosteler.auth_user_id) {
+      try {
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(hosteler.auth_user_id);
+        if (deleteError) {
+          console.warn('Could not clean up auth user for deleted pending hosteler:', deleteError);
+        }
+      } catch (e) {
+        console.warn('Error cleaning up auth user for deleted pending hosteler:', e);
+      }
+    }
+
+    return NextResponse.json({ deleted: true });
   }
 
   const { count: futurePreferenceCount } = await supabase
@@ -301,7 +299,17 @@ async function handlePatch(
   }
 
   if (hosteler.auth_user_id) {
-    await supabase.auth.admin.signOut(hosteler.auth_user_id, 'global');
+    // Delete the auth user from Supabase Auth to fully clean up
+    // When the hosteler rejoins later, a new auth user will be created during re-activation
+    try {
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(hosteler.auth_user_id);
+      if (deleteError) {
+        console.error('Failed to delete auth user via SDK:', deleteError);
+      }
+    } catch (deleteError) {
+      // Log but don't fail the deletion if auth cleanup fails
+      console.error('Error deleting auth user via SDK:', deleteError);
+    }
   }
 
   return NextResponse.json({

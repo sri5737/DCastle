@@ -90,6 +90,7 @@ export default function HostelerManagementPage() {
   const [phone, setPhone] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
   const [addError, setAddError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [adding, setAdding] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -128,6 +129,7 @@ export default function HostelerManagementPage() {
   async function handleAddHosteler(e: React.FormEvent) {
     e.preventDefault();
     setAddError('');
+    setPhoneError('');
     setAdding(true);
     emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-start', metadata: { phone } });
 
@@ -141,7 +143,11 @@ export default function HostelerManagementPage() {
     const data = await res.json();
     if (!res.ok) {
       emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-failure', metadata: { status: res.status } });
-      setAddError(data.error || 'Failed to add hosteler');
+      if (res.status === 409 && data.error?.code === 'phone_already_registered') {
+        setPhoneError(data.error.message);
+      } else {
+        setAddError(data.error?.message || data.error || 'Failed to add hosteler');
+      }
       setAdding(false);
       return;
     }
@@ -164,6 +170,7 @@ export default function HostelerManagementPage() {
     setName('');
     setPhone('');
     setRoomNumber('');
+    setPhoneError('');
     setAdding(false);
     fetchHostelers();
   }
@@ -333,29 +340,38 @@ export default function HostelerManagementPage() {
     });
 
     const data = await res.json();
-    setActionLoading(null);
 
     if (!res.ok) {
+      setActionLoading(null);
       alert(data.error || 'Failed to delete hosteler');
       setShowDeleteDialog(true);
       return;
     }
 
-    const updatedHosteler: HostelerItem = {
-      ...target,
-      status: 'deleted',
-      deleted_from_status: target.status === 'pending' ? 'pending' : 'active',
-      deleted_at: data.hosteler.deleted_at,
-      deletion_effective_date: data.hosteler.deletion_effective_date,
-      canceled_future_preference_count: data.canceled_future_preferences,
-    };
-    const nextAllHostelers = applyHostelerUpsert(allHostelers, updatedHosteler);
-    setAllHostelers(nextAllHostelers);
-    setCounts(recalculateCounts(nextAllHostelers));
+    // For pending hostelers: hard delete (no row created), so remove from list immediately
+    if (target.status === 'pending') {
+      const nextAllHostelers = allHostelers.filter((h) => h.id !== target.id);
+      setAllHostelers(nextAllHostelers);
+      setCounts(recalculateCounts(nextAllHostelers));
+    } else {
+      // For active hostelers: soft delete (archived), so update status to deleted
+      const updatedHosteler: HostelerItem = {
+        ...target,
+        status: 'deleted',
+        deleted_from_status: 'active',
+        deleted_at: data.hosteler.deleted_at,
+        deletion_effective_date: data.hosteler.deletion_effective_date,
+        canceled_future_preference_count: data.canceled_future_preferences,
+      };
+      const nextAllHostelers = applyHostelerUpsert(allHostelers, updatedHosteler);
+      setAllHostelers(nextAllHostelers);
+      setCounts(recalculateCounts(nextAllHostelers));
+    }
+
+    setActionLoading(null);
     setShowDeleteDialog(false);
     setDeleteTarget(null);
     setDeletePreview(null);
-    fetchHostelers();
   }
 
   async function handleViewAudit(hosteler: HostelerItem) {
@@ -410,34 +426,46 @@ export default function HostelerManagementPage() {
           <CardTitle>Add New Hosteler</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAddHosteler} className="flex flex-col sm:flex-row gap-3">
-            <Input
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              minLength={2}
-              maxLength={100}
-              aria-label="Hosteler name"
-            />
-            <Input
-              placeholder="Phone (10 digits)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              pattern="[6-9]\d{9}"
-              maxLength={10}
-              aria-label="Phone number"
-            />
-            <Input
-              placeholder="Room No."
-              value={roomNumber}
-              onChange={(e) => setRoomNumber(e.target.value)}
-              required
-              maxLength={10}
-              aria-label="Room number"
-            />
-            <Button type="submit" disabled={adding}>
+          <form onSubmit={handleAddHosteler} className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              <Input
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                minLength={2}
+                maxLength={100}
+                aria-label="Hosteler name"
+                className="flex-1 min-w-0"
+              />
+              <div className="flex flex-col gap-1 flex-1 min-w-0">
+                <Input
+                  placeholder="Phone (10 digits)"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); if (phoneError) setPhoneError(''); }}
+                  required
+                  pattern="[6-9]\d{9}"
+                  maxLength={10}
+                  aria-label="Phone number"
+                  aria-describedby={phoneError ? 'phone-error' : undefined}
+                  aria-invalid={!!phoneError}
+                  className="min-w-0"
+                />
+                {phoneError && (
+                  <p id="phone-error" className="text-sm text-destructive" role="alert">{phoneError}</p>
+                )}
+              </div>
+              <Input
+                placeholder="Room No."
+                value={roomNumber}
+                onChange={(e) => setRoomNumber(e.target.value)}
+                required
+                maxLength={10}
+                aria-label="Room number"
+                className="flex-1 min-w-0"
+              />
+            </div>
+            <Button type="submit" disabled={adding} className="w-full sm:w-auto">
               {adding ? 'Adding...' : 'Add Hosteler'}
             </Button>
           </form>
@@ -587,7 +615,7 @@ export default function HostelerManagementPage() {
             </DialogTitle>
             <DialogDescription>
               {deleteTarget?.status === 'pending'
-                ? `${deleteTarget.name}'s invite will be invalidated immediately and the record will move to the deleted audit view.`
+                ? 'This hosteler will be permanently deleted. Their invite link will be invalidated immediately. No record of this hosteler will be retained. This cannot be undone.'
                 : deletePreview?.message}
             </DialogDescription>
           </DialogHeader>
