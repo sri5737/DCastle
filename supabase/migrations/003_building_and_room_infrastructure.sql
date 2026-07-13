@@ -93,6 +93,8 @@ CREATE INDEX IF NOT EXISTS idx_hostelers_cot_id ON hostelers(cot_id);
 -- Buildings: Owners can only see/modify their own buildings
 ALTER TABLE buildings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "buildings_owner_access" ON buildings;
+
 CREATE POLICY "buildings_owner_access" ON buildings
   USING (auth.uid() = owner_id)
   WITH CHECK (auth.uid() = owner_id);
@@ -100,12 +102,16 @@ CREATE POLICY "buildings_owner_access" ON buildings
 -- Room Types: Owners can only see/modify their own room types
 ALTER TABLE room_types ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "room_types_owner_access" ON room_types;
+
 CREATE POLICY "room_types_owner_access" ON room_types
   USING (auth.uid() = owner_id)
   WITH CHECK (auth.uid() = owner_id);
 
 -- Rooms: Owners can only see/modify rooms in their own buildings
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rooms_owner_access" ON rooms;
 
 CREATE POLICY "rooms_owner_access" ON rooms
   USING (
@@ -121,6 +127,8 @@ CREATE POLICY "rooms_owner_access" ON rooms
 
 -- Cots: Owners can only see/modify cots in their own buildings
 ALTER TABLE cots ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "cots_owner_access" ON cots;
 
 CREATE POLICY "cots_owner_access" ON cots
   USING (
@@ -140,6 +148,8 @@ CREATE POLICY "cots_owner_access" ON cots
 
 -- Hosteler Room Assignments: Owners can only see/modify assignments in their own buildings
 ALTER TABLE hosteler_room_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "hosteler_room_assignments_owner_access" ON hosteler_room_assignments;
 
 CREATE POLICY "hosteler_room_assignments_owner_access" ON hosteler_room_assignments
   USING (
