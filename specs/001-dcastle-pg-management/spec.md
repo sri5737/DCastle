@@ -453,7 +453,7 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - **FR-001**: The owner MUST be able to register a new hosteler by providing their full name, phone number, and room number.
 - **FR-001a**: When registering a new hosteler, the system MUST validate that the provided mobile number is not already in use by a hosteler in active or pending status. If the mobile number is already registered to an active or pending hosteler, registration MUST be rejected and the owner MUST be shown a clear error message indicating the conflict.
 - **FR-001b**: The system MUST permit registering a new hosteler using a mobile number that was previously associated with a permanently deleted (hard-deleted pending) hosteler record, to allow the person to rejoin the hostel. Because the pending hosteler row is completely removed with no residual record, the mobile number is fully free for re-registration.
-- **FR-002**: The system MUST generate a unique, single-use invite link for each registered hosteler and for owner-triggered credential recovery when the owner regenerates an invite.
+- **FR-002**: The system MUST generate a unique, single-use invite link for each registered hosteler and for owner-triggered credential recovery when the owner regenerates an invite. **Duplicate Activation Handling**: If a hosteler attempts to use the same invite link after already activating via that link, the system MUST reject the attempt with HTTP 409 and error code `invite_used`, displaying the message "This invite link has already been used. If you need to reset your credentials, ask your PG owner to generate a new invite."
 - **FR-003**: Invite links MUST expire 7 days after generation.
 - **FR-004**: A new hosteler MUST be able to activate their account via the invite link using either a Google account or a 4-digit PIN linked to their phone number.
 - **FR-004a**: Activation MUST link only the credential path actually completed during activation. In v1, the system MUST NOT require the hosteler to add the second credential type later in order to use the app.
@@ -493,7 +493,7 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 
 **Hosteler Management**
 
-- **FR-025**: The owner MUST be able to view all hostelers, filterable by status: active, pending, inactive, or deleted.
+- **FR-025**: The owner MUST be able to view all hostelers, filterable by status: active, pending, inactive, or deleted. **Default Sort Order**: Within each status tab, hostelers MUST be sorted by room number in ascending order (e.g., 101, 102, 103...) to align with how owners naturally reference hostelers during daily operations.
 - **FR-026**: Each hosteler row MUST display the hosteler's name, room number, phone number, and current status.
 - **FR-027**: The owner MUST be able to deactivate any active hosteler. If the hosteler has food preferences recorded for future dates at the time of deactivation, the owner MUST be shown a confirmation dialog: "This hosteler has submitted preferences for [N] future dates. These will remain and be included in billing. Deactivate anyway?" Deactivation only proceeds upon explicit owner confirmation. Upon deactivation, the hosteler's active sessions MUST be invalidated immediately; any subsequent API call from the deactivated hosteler MUST return HTTP 401 with an "Account deactivated" message.
 - **FR-028**: The owner MUST be able to reactivate any inactive hosteler.
@@ -521,9 +521,9 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 
 **Monthly Billing**
 
-- **FR-035**: The owner MUST be able to trigger bill generation for any selected month and year.
+- **FR-035**: The owner MUST be able to trigger bill generation for any selected month and year. **Session Handling**: Bill generation is a server-side operation initiated by an authenticated owner. If the owner's session expires during bill generation, the calculation MUST continue and complete server-side. Upon successful completion, the bill is persisted. On the owner's next login, they will see the completed bill in the summary. If the client receives a session-expired response during generation, the owner MUST check after re-login to confirm bill status.
 - **FR-036**: Bill generation MUST calculate each hosteler's total as: (days breakfast opted × breakfast rate) + (days lunch opted × lunch rate) + (days dinner opted × dinner rate).
-- **FR-037**: If a meal rate changed during the selected month, the system MUST apply the rate that was effective on each individual day.
+- **FR-037**: If a meal rate changed during the selected month, the system MUST apply the rate that was effective on each individual day. **Proration Rule**: When a rate change is effective on date D, the NEW rate applies from day D onward; the OLD rate applies for all days before D. There is no prorated splitting of charges within a single day. **Multi-Rate Handling**: If multiple rate changes occur within the same month, bill generation MUST look up the rate effective on each specific day and apply that day's rate to the meal count for that day.
 - **FR-037a**: Bill generation MUST include every hosteler who has preserved, non-canceled billable meal history in the selected month, including active hostelers plus inactive or deleted-from-active hostelers whose retained history falls inside that month.
 - **FR-038**: The owner MUST be able to view a bill summary table showing all hostelers' meal counts and total amounts for the selected month.
 - **FR-039**: The owner MUST be able to view a per-day breakdown for any individual hosteler's bill.
