@@ -161,7 +161,7 @@
 - [x] T047 [US5] Implement `POST /api/hostelers/[id]/reset-invite` endpoint (invalidate existing tokens, generate new invite token with 7-day expiry; does NOT change hosteler status â€” only regenerates the link) in `src/app/api/hostelers/[id]/reset-invite/route.ts`
 - [x] T048 [US5] Create hosteler management page with status tabs (active/pending/inactive), add hosteler form, and per-hosteler action buttons in `src/app/(owner)/hostelers/page.tsx`
 - [x] T049 [US5] Implement deactivation confirmation dialog (shows future preference count warning) and invite link copy functionality in `src/app/(owner)/hostelers/page.tsx`
-- [x] T049b [US5] Create E2E test: owner adds hosteler â†’ views in active list â†’ deactivates â†’ appears in inactive tab â†’ reactivates â†’ returns to active tab â†’ resets invite link in `e2e/us5-hosteler-management.spec.ts`
+- [x] T049b [US5] Create integration validation: owner adds hosteler â†’ views in active list â†’ deactivates â†’ appears in inactive tab â†’ reactivates â†’ returns to active tab â†’ resets invite link (legacy browser spec removed during test-stack decommission)
 - [x] T049c [US5] Add additive deletion-lifecycle migration for `hostelers.deleted_at`, `hostelers.deleted_from_status`, `hostelers.deletion_effective_date`, `food_preferences.canceled_at`, and `food_preferences.cancellation_reason` in `supabase/migrations/002_hosteler_deletion_lifecycle.sql`
 - [x] T049d [P] [US5] Extend shared lifecycle types for deleted hostelers, deletion metadata, and canceled food-preference rows in `src/types/index.ts`
 - [x] T049e [US5] Extend `GET /api/hostelers` to return deleted-tab records and per-status counts that include `deleted` in `src/app/api/hostelers/route.ts`
@@ -170,7 +170,7 @@
 - [x] T049h [US5] Extend the owner hosteler management UI with a deleted tab, pending-delete and active-delete confirmation flows, and a dedicated deleted-hosteler audit detail surface that shows deletion metadata plus canceled future preferences only inside that view in `src/app/admin/hostelers/page.tsx`
 - [x] T049i [US5] Update owner dashboard aggregation and live-refresh queries to exclude `food_preferences` rows where `canceled_at IS NOT NULL` after active-hosteler deletion in `src/app/admin/dashboard/page.tsx`
 - [x] T049j [US5] Add unit coverage for deleted-hosteler audit retrieval, delete lifecycle transitions, invite invalidation, auth revocation, and future-preference cancellation in `src/app/api/hostelers/[id]/route.test.ts`
-- [x] T049k [US5] Extend owner lifecycle E2E coverage for pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, and exclusion of those canceled rows from normal owner history/export, dashboard counts, and billing inputs in `e2e/us5-hosteler-management.spec.ts`
+- [x] T049k [US5] Extend owner lifecycle integration coverage for pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, and exclusion of those canceled rows from normal owner history/export, dashboard counts, and billing inputs (legacy browser spec removed during test-stack decommission)
 
 **Checkpoint**: Owner can fully manage hosteler lifecycle, including owner-visible deleted records, a dedicated deleted-hosteler audit view for canceled future preferences, and exclusion of those canceled rows from operational owner surfaces
 
@@ -189,7 +189,7 @@
 - [x] T050 [US10] Implement `PATCH /api/settings` endpoint (update deadline_time immediately, insert new meal_rates row with effective_from = tomorrow) in `src/app/api/settings/route.ts`
 - [x] T051 [US10] Create owner settings page with deadline time input and per-meal rate inputs (current rate displayed, new rate saved for tomorrow) using a 375 px Android mobile-first layout with reachable save actions, no page-level horizontal overflow, and installed PWA-safe spacing where applicable in `src/app/(owner)/settings/page.tsx`
 - [x] T052 [US10] Add validation for deadline format (HH:MM, 24-hour) and rate values (positive numbers) with error feedback in `src/app/(owner)/settings/page.tsx`
-- [x] T052b [US10] Create E2E test: owner changes deadline time â†’ verify new deadline displayed â†’ change meal rate â†’ verify rate shown as "effective from tomorrow" â†’ hosteler form locks at new deadline time â†’ validate owner settings at 375 px Android width with no overflow and reachable primary actions in `e2e/us10-settings.spec.ts`
+- [x] T052b [US10] Create integration validation: owner changes deadline time â†’ verify new deadline displayed â†’ change meal rate â†’ verify rate shown as "effective from tomorrow" â†’ hosteler form locks at new deadline time â†’ validate owner settings at 375 px Android width with no overflow and reachable primary actions (legacy browser spec removed during test-stack decommission)
 
 **Checkpoint**: Owner can configure deadline and rates; changes apply correctly to submissions and billing
 
@@ -203,12 +203,18 @@
 
 ### Implementation for User Story 6
 
-- [ ] T053 [US6] Implement billing calculation logic that uses only non-canceled `food_preferences` rows, applies per-day `meal_rates` lookups, and preserves billing eligibility for inactive or deleted-from-active hostelers with retained history in `src/lib/billing.ts`
-- [ ] T054 [US6] Implement `POST /api/billing/generate` endpoint (compute bills from preserved non-canceled history for active, inactive, and deleted-from-active hostelers in the target month, then upsert into `monthly_bills`) in `src/app/api/billing/generate/route.ts`
-- [ ] T055 [US6] Implement `GET /api/billing` endpoint (return month summary for owners, including deleted-hosteler rows, or a single authenticated hosteler bill) in `src/app/api/billing/route.ts`
-- [ ] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day preserved-history breakdown with applicable rates, excluding canceled future rows) in `src/app/api/billing/detail/route.ts`
-- [ ] T057 [US6] Create owner billing page with month/year selector, generate button, mobile-appropriate bill summary layout (name, room, meal counts, total), and per-hosteler detail drill-down that works at the 375 px Android baseline with no page-level horizontal overflow and reachable primary actions in `src/app/(owner)/billing/page.tsx`
-- [ ] T057b [US6] Write unit tests for billing calculation covering single-rate months, mid-month rate changes, zero-preference months, inactive-hosteler inclusion, deleted-from-active preserved-history inclusion, and canceled-future-row exclusion in `src/lib/billing.test.ts`
+- [x] T053 [US6] Implement billing calculation logic that uses only non-canceled `food_preferences` rows, applies per-day `meal_rates` lookups, and preserves billing eligibility for inactive or deleted-from-active hostelers with retained history in `src/lib/billing.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T054 [US6] Implement `POST /api/billing/generate` endpoint (compute bills from preserved non-canceled history for active, inactive, and deleted-from-active hostelers in the target month, then upsert into `monthly_bills`) in `src/app/api/billing/generate/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T055 [US6] Implement `GET /api/billing` endpoint (return month summary for owners, including deleted-hosteler rows, or a single authenticated hosteler bill) in `src/app/api/billing/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T056 [US6] Implement `GET /api/billing/detail` endpoint (per-day preserved-history breakdown with applicable rates, excluding canceled future rows) in `src/app/api/billing/detail/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T057 [US6] Create owner billing page with month/year selector, generate button, mobile-appropriate bill summary layout (name, room, meal counts, total), and per-hosteler detail drill-down that works at the 375 px Android baseline with no page-level horizontal overflow and reachable primary actions in `src/app/(owner)/billing/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T057b [US6] Write unit tests for billing calculation covering single-rate months, mid-month rate changes, zero-preference months, inactive-hosteler inclusion, deleted-from-active preserved-history inclusion, and canceled-future-row exclusion in `src/lib/billing.test.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 **Checkpoint**: Owner can generate and review accurate monthly bills accounting for mid-month rate changes
 
@@ -222,8 +228,10 @@
 
 ### Implementation for User Story 7
 
-- [ ] T058 [US7] Implement `GET /api/food/history` endpoint (return the authenticated hosteler's preserved per-day food preferences and summary counts for the selected month, excluding canceled rows) in `src/app/api/food/history/route.ts`
-- [ ] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly month controls in `src/app/(hosteler)/history/page.tsx`
+- [x] T058 [US7] Implement `GET /api/food/history` endpoint (return the authenticated hosteler's preserved per-day food preferences and summary counts for the selected month, excluding canceled rows) in `src/app/api/food/history/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T059 [US7] Create hosteler food history page with month selector, day-by-day meal list, and monthly summary row (total breakfast/lunch/dinner days) using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly month controls in `src/app/(hosteler)/history/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 **Checkpoint**: Hostelers can review their own food preference history by month
 
@@ -237,8 +245,10 @@
 
 ### Implementation for User Story 8
 
-- [ ] T060 [US8] Create hosteler bill view page with month selector, meal count/rate/subtotal breakdown, highlighted total, and "confirmed by owner" note using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly controls in `src/app/(hosteler)/bill/page.tsx`
-- [ ] T061 [US8] Add "bill not yet available" empty state when no bill has been generated for the selected month in `src/app/(hosteler)/bill/page.tsx`
+- [x] T060 [US8] Create hosteler bill view page with month selector, meal count/rate/subtotal breakdown, highlighted total, and "confirmed by owner" note using a 375 px Android mobile-first layout with no page-level horizontal overflow and touch-friendly controls in `src/app/(hosteler)/bill/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T061 [US8] Add "bill not yet available" empty state when no bill has been generated for the selected month in `src/app/(hosteler)/bill/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 **Checkpoint**: Hostelers can independently view and understand their monthly charges
 
@@ -252,49 +262,58 @@
 
 ### Implementation for User Story 9
 
-- [ ] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id`, deleted-hosteler preserved-history filtering, date range params, and `format=csv`, while excluding audit-only canceled future rows from all normal history/export results in `src/app/api/food/history/route.ts`
-- [ ] T063 [US9] Create owner food history page with hosteler dropdown filter (including deleted records for preserved history only), date range picker, mobile-appropriate preserved-history results layout, and reachable `Export CSV` action at the 375 px Android baseline without page-level horizontal overflow in `src/app/(owner)/history/page.tsx`
-- [ ] T064 [US9] Implement CSV generation (build CSV string from filtered data, trigger browser download) in `src/app/(owner)/history/page.tsx`
+- [x] T062 [US9] Extend `GET /api/food/history` endpoint to support owner queries with `hosteler_id`, deleted-hosteler preserved-history filtering, date range params, and `format=csv`, while excluding audit-only canceled future rows from all normal history/export results in `src/app/api/food/history/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T063 [US9] Create owner food history page with hosteler dropdown filter (including deleted records for preserved history only), date range picker, mobile-appropriate preserved-history results layout, and reachable `Export CSV` action at the 375 px Android baseline without page-level horizontal overflow in `src/app/(owner)/history/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T064 [US9] Implement CSV generation (build CSV string from filtered data, trigger browser download) in `src/app/(owner)/history/page.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 **Checkpoint**: Owner can review and export food history for record-keeping and dispute resolution
 
 ---
 
-## Phase 13: Automation & E2E Testing
+## Legacy task closure note
 
-**Purpose**: Set up Playwright E2E testing, per-story test scripts, and CI/CD pipeline to enforce quality gates after every development phase
+This file is now a completed legacy tracker. Remaining unimplemented legacy items were administratively closed and moved to the active v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md.
+
+---
+
+## Phase 13: Automation & Validation Testing
+
+**Purpose**: Set up validation scripts and CI/CD pipeline to enforce quality gates after every development phase
 
 **âš ï¸ CRITICAL**: After this phase, all future phases MUST have passing tests before completion
 
-### E2E Testing Infrastructure
+### Validation Infrastructure
 
-- [x] T065a Install Playwright and configure `playwright.config.ts` (baseURL: localhost:3000, projects: chromium + mobile-chrome, webServer auto-start) in project root
-- [x] T065b [P] Add per-story test scripts to `package.json`: `test:us1`, `test:us2`, `test:us3`, `test:us4`, `test:e2e`, `test:all`
-- [x] T065c [P] Create E2E test helper utilities (login as owner, login as hosteler, seed test data) in `e2e/helpers.ts`
+- [x] T065a Legacy browser automation setup completed historically (removed from repository during test-stack decommission)
+- [x] T065b [P] Add per-story test scripts to `package.json`: `test:us1`, `test:us2`, `test:us3`, `test:us4`, `test:all`
+- [x] T065c [P] Create validation helper utilities for login/seeded test data (legacy browser-specific helpers removed during test-stack decommission)
 
-### E2E Test Suites (per user story)
+### Validation Suites (per user story)
 
-- [x] T065d [US3] Create E2E test: owner registers hosteler â†’ generates invite â†’ hosteler opens link â†’ activates via PIN in `e2e/us3-invite-activation.spec.ts`
-- [x] T065e [US4] Create E2E test: activated hosteler logs in via PIN â†’ sees dashboard â†’ session persists in `e2e/us4-hosteler-login.spec.ts`
-- [x] T065f [US1] Create E2E test: hosteler toggles meals â†’ saves â†’ dashboard shows confirmation â†’ form locks after deadline in `e2e/us1-food-submission.spec.ts`
-- [x] T065g [US2] Create E2E test: owner views dashboard â†’ hosteler submits â†’ counts update live without refresh in `e2e/us2-owner-dashboard.spec.ts`
+- [x] T065d [US3] Create integration validation: owner registers hosteler â†’ generates invite â†’ hosteler opens link â†’ activates via PIN (legacy browser spec removed during test-stack decommission)
+- [x] T065e [US4] Create integration validation: activated hosteler logs in via PIN â†’ sees dashboard â†’ session persists (legacy browser spec removed during test-stack decommission)
+- [x] T065f [US1] Create integration validation: hosteler toggles meals â†’ saves â†’ dashboard shows confirmation â†’ form locks after deadline (legacy browser spec removed during test-stack decommission)
+- [x] T065g [US2] Create integration validation: owner views dashboard â†’ hosteler submits â†’ counts update live without refresh (legacy browser spec removed during test-stack decommission)
 
 ### CI/CD Pipeline
 
-- [x] T068 [P] Create GitHub Actions CI workflow with jobs: `test` (npm ci â†’ vitest run â†’ playwright test), `build` (needs: test â†’ next build), `deploy` (needs: build â†’ wrangler pages deploy) in `.github/workflows/ci.yml`
+- [x] T068 [P] Create GitHub Actions CI workflow with jobs: `test` (npm ci â†’ vitest run), `build` (needs: test â†’ next build), `deploy` (needs: build â†’ wrangler pages deploy) in `.github/workflows/ci.yml`
 - [x] T069 [P] Create GitHub Actions nightly backup workflow (cron 2:00 AM IST â†’ pg_dump â†’ gzip â†’ upload to Cloudflare R2 â†’ 90-day retention cleanup) in `.github/workflows/backup.yml`. Include failure alert via GitHub Actions built-in email notifications (configure `if: failure()` step that logs error; repo owner receives automatic failure email from GitHub)
 
-### E2E Test Data & Authentication Fix
+### Validation Test Data & Authentication Fix
 
-- [x] T069a Create Playwright global setup (`e2e/global-setup.ts`) that seeds a test owner user and test hosteler (with known phone+PIN) into Supabase using the service role key before tests run. Add E2E test env vars (`E2E_TEST_OWNER_EMAIL`, `E2E_TEST_OWNER_PASSWORD`, `E2E_TEST_HOSTELER_PHONE`, `E2E_TEST_HOSTELER_PIN`) to `.env.local` and `.env.example`.
-- [x] T069b Create Playwright global teardown (`e2e/global-teardown.ts`) that cleans up test-seeded data from Supabase after tests complete.
-- [x] T069c Update `playwright.config.ts` to reference `globalSetup` and `globalTeardown`, load env vars via `dotenv`.
-- [x] T069d Update `e2e/helpers.ts` login helpers to use env-based test credentials and fix login flows to match the actual app login pages (correct selectors, cookie-based auth).
-- [x] T069e Update all E2E test specs (`us1`, `us2`, `us3`, `us4`) to use seeded test data from global setup and pass with the actual running app.
+- [x] T069a Legacy browser global setup for seeded test users completed historically (removed during test-stack decommission).
+- [x] T069b Legacy browser global teardown for seeded test cleanup completed historically (removed during test-stack decommission).
+- [x] T069c Legacy browser runner configuration completed historically (removed during test-stack decommission).
+- [x] T069d Legacy browser login helper updates completed historically (removed during test-stack decommission).
+- [x] T069e Legacy browser specs consumed seeded test data historically (removed during test-stack decommission).
 
-**Post-clarification note**: FR-066 through FR-069 and FR-006a remediation tasks are dependency-ordered in Phase 17. Previously completed E2E task history remains marked complete, but those weak suites are not accepted as final evidence until Phase 17 remediation passes.
+**Post-clarification note**: FR-066 through FR-069 and FR-006a remediation tasks are dependency-ordered in Phase 17. Previously completed browser-automation task history remains marked complete, but final acceptance now relies on required unit/API/component validation evidence.
 
-**Checkpoint**: All completed stories have passing E2E tests; CI blocks deployment on test failure
+**Checkpoint**: All completed stories have passing automated validation; CI blocks deployment on test failure
 
 ---
 
@@ -308,23 +327,34 @@
 
 ### Tests for User Story 11
 
-- [ ] T072 [P] [US11] Create component tests for install prompt eligibility, accepted/dismissed prompt handling, `appinstalled` hiding, and standalone-mode hiding in `src/components/install-prompt.test.tsx`
-- [ ] T073 [P] [US11] Create component tests for offline state rendering on disconnected/reconnected network events in `src/components/offline-indicator.test.tsx`
+- [x] T072 [P] [US11] Create component tests for install prompt eligibility, accepted/dismissed prompt handling, `appinstalled` hiding, and standalone-mode hiding in `src/components/install-prompt.test.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T073 [P] [US11] Create component tests for offline state rendering on disconnected/reconnected network events in `src/components/offline-indicator.test.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 ### Implementation for User Story 11
 
-- [ ] T074 [P] [US11] Update web app manifest required fields (`name`, `short_name`, `start_url`, `scope`, `display`, `theme_color`, `background_color`, icons array) in `public/manifest.json`
-- [ ] T075 [P] [US11] Create Android launcher icon assets including 192x192, 512x512, and maskable PNG entries in `public/icons/icon-192x192.png`, `public/icons/icon-512x512.png`, `public/icons/maskable-icon-192x192.png`, and `public/icons/maskable-icon-512x512.png`
-- [ ] T076 [US11] Wire manifest metadata, theme color, viewport-safe mobile metadata, and PWA icon links into the root app shell in `src/app/layout.tsx`
-- [ ] T077 [US11] Configure service worker/app-shell caching for root layout, global styles, hosteler shell, owner shell, login entry points, and static PWA assets in `next.config.js` and `public/sw.js`
-- [ ] T078 [P] [US11] Implement Android Chrome install prompt handling with `beforeinstallprompt`, user-gesture `prompt()`, accepted/dismissed state, `appinstalled`, and standalone detection in `src/components/install-prompt.tsx`
-- [ ] T079 [P] [US11] Implement reusable offline indicator for disconnected data-dependent screens in `src/components/offline-indicator.tsx`
-- [ ] T080 [US11] Integrate install prompt and offline indicator into shared shells without showing misleading install UI when unavailable or already installed, preserving 375 px Android mobile-first navigation/action reachability and standalone PWA-safe spacing in `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
+- [x] T074 [P] [US11] Update web app manifest required fields (`name`, `short_name`, `start_url`, `scope`, `display`, `theme_color`, `background_color`, icons array) in `public/manifest.json`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T075 [P] [US11] Create Android launcher icon assets including 192x192, 512x512, and maskable PNG entries in `public/icons/icon-192x192.png`, `public/icons/icon-512x512.png`, `public/icons/maskable-icon-192x192.png`, and `public/icons/maskable-icon-512x512.png`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T076 [US11] Wire manifest metadata, theme color, viewport-safe mobile metadata, and PWA icon links into the root app shell in `src/app/layout.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T077 [US11] Configure service worker/app-shell caching for root layout, global styles, hosteler shell, owner shell, login entry points, and static PWA assets in `next.config.js` and `public/sw.js`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T078 [P] [US11] Implement Android Chrome install prompt handling with `beforeinstallprompt`, user-gesture `prompt()`, accepted/dismissed state, `appinstalled`, and standalone detection in `src/components/install-prompt.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T079 [P] [US11] Implement reusable offline indicator for disconnected data-dependent screens in `src/components/offline-indicator.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T080 [US11] Integrate install prompt and offline indicator into shared shells without showing misleading install UI when unavailable or already installed, preserving 375 px Android mobile-first navigation/action reachability and standalone PWA-safe spacing in `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 ### Manual Validation Evidence for User Story 11
 
-- [ ] T081 [P] [US11] Create Android PWA manual evidence template with fields for device/emulator name, Android version, Chrome version, deployment URL, date, app drawer result, standalone launch result, offline shell result, and pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
-- [ ] T082 [US11] Execute Android Chrome manual validation on a real device or emulator and record evidence for installability, Android app drawer presence, standalone launch, offline app shell, 375 px viewport fit, and reachable app-shell actions in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [x] T081 [P] [US11] Create Android PWA manual evidence template with fields for device/emulator name, Android version, Chrome version, deployment URL, date, app drawer result, standalone launch result, offline shell result, and pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T082 [US11] Execute Android Chrome manual validation on a real device or emulator and record evidence for installability, Android app drawer presence, standalone launch, offline app shell, 375 px viewport fit, and reachable app-shell actions in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 **Checkpoint**: Android Chrome can install Deekshana Castle as a true PWA; automated and manual evidence cover manifest, icons, service worker, offline shell, install prompt behavior, app drawer presence, and standalone launch
 
@@ -334,7 +364,8 @@
 
 **Purpose**: Full quickstart validation and final readiness checks across all completed stories
 
-- [ ] T084 Validate complete application against quickstart.md scenarios: manually execute all documented validation scenarios end-to-end on a mobile device (375px viewport) and record pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [x] T084 Validate complete application against quickstart.md scenarios: manually execute all documented validation scenarios end-to-end on a mobile device (375px viewport) and record pass/fail notes in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
 ---
 
@@ -351,7 +382,7 @@
 - [x] T087 [US12] Update hosteler login page to ensure PIN login path uses only `POST /api/auth/pin/verify` with no direct Supabase auth calls remaining (Google OAuth path unchanged â€” already uses server callback) in `src/app/(auth)/login/page.tsx`
 - [x] T088 [P] [US12] Add retry/TLS error handling utility for server-side Supabase auth calls (1 retry with 500ms exponential backoff on transient network/5xx errors, no retry on 4xx) in `src/lib/auth/retry.ts` and integrate into `/api/auth/login` and `/api/auth/pin/verify` routes
 - [x] T089 [P] [US12] Write unit tests for `POST /api/auth/login` route (successful login sets cookies, invalid credentials return 401, transient error triggers retry, retry exhaustion returns 500) in `src/app/api/auth/login/route.test.ts`
-- [x] T090 [US12] Create E2E test verifying login still works through proxy routes: owner logs in via `/api/auth/login` â†’ reaches admin dashboard â†’ hosteler logs in via `/api/auth/pin/verify` â†’ reaches hosteler dashboard â†’ sessions persist correctly in `e2e/us12-auth-proxy.spec.ts`
+- [x] T090 [US12] Create integration validation verifying login still works through proxy routes: owner logs in via `/api/auth/login` â†’ reaches admin dashboard â†’ hosteler logs in via `/api/auth/pin/verify` â†’ reaches hosteler dashboard â†’ sessions persist correctly (legacy browser spec removed during test-stack decommission)
 
 **Checkpoint**: All login paths route through server-side API; no direct browser-to-Supabase auth calls remain; login works identically from user perspective with added reliability in restrictive network environments
 
@@ -359,22 +390,26 @@
 
 ---
 
-## Phase 17: Honest E2E Remediation & Acceptance Evidence Gate (Cross-Cutting)
+## Phase 17: Validation Remediation & Acceptance Evidence Gate (Cross-Cutting)
 
-**Goal**: Bring completed and future story evidence into compliance with Constitution XI, FR-066 through FR-069, FR-006a, SC-001, and SC-010 without pretending earlier broad or shortcut E2E tests are sufficient.
+**Goal**: Bring completed and future story evidence into compliance with FR-066 through FR-069, FR-006a, SC-001, and SC-010 without relying on weak or shortcut validation evidence.
 
-**Independent Test**: Run the story-scoped scripts through US12 plus `npm run test:run` and `npm run test:e2e`; verify completed-story E2E suites prove exact business outcomes through the real UI and real Next.js API routes, US2 proves cross-role initial/live/reload-stable dashboard behavior, US12 proves reload-stable auth through server-side routes, PIN lockout is enforced, and scoped SC-001/SC-010 evidence is recorded.
+**Independent Test**: Run the story-scoped scripts through US12 plus `npm run test:run`; verify completed-story validation proves exact business outcomes through real business logic and real Next.js API routes, US2 proves cross-role initial/live/reload-stable dashboard behavior, US12 proves reload-stable auth through server-side routes, PIN lockout is enforced, and scoped SC-001/SC-010 evidence is recorded.
 
-**Blocking Rule**: This phase must be completed before any previously completed story is considered accepted under the Honest E2E rules, and before future story implementation work (US6, US7, US8, US9, US11 polish, or final release validation) is marked complete.
+**Blocking Rule**: This phase must be completed before any previously completed story is considered accepted under the validation evidence rules, and before future story implementation work (US6, US7, US8, US9, US11 polish, or final release validation) is marked complete.
 
 ### Remediation for FR-006a, FR-066 through FR-069, SC-001, and SC-010
 
-- [ ] T092 [US4] Add an idempotent `pin_login_attempts` migration for FR-006a if missing from deployed schema, including `phone`, `attempts`, `locked_until`, and `updated_at`, in `supabase/migrations/003_pin_login_attempts.sql`
-- [ ] T093 [US4] Implement FR-006a PIN lockout tracking in `POST /api/auth/pin/verify`, returning HTTP 429 after five consecutive failures for the same phone for 15 minutes and clearing attempts after success or cooldown in `src/app/api/auth/pin/verify/route.ts`
-- [ ] T094 [US5] Clear PIN lockout state when an active hosteler is deactivated or deleted so lifecycle actions do not leave stale throttling rows in `src/app/api/hostelers/[id]/route.ts`
-- [ ] T095 [P] [US4] Add unit tests for FR-006a covering attempts 1-4 returning 401, attempt 5 creating a 15-minute lockout, correct PIN rejected during lockout with 429, cooldown reset, and successful login clearing attempts in `src/app/api/auth/pin/verify/route.test.ts`
+- [x] T092 [US4] Add an idempotent `pin_login_attempts` migration for FR-006a if missing from deployed schema, including `phone`, `attempts`, `locked_until`, and `updated_at`, in `supabase/migrations/003_pin_login_attempts.sql`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T093 [US4] Implement FR-006a PIN lockout tracking in `POST /api/auth/pin/verify`, returning HTTP 429 after five consecutive failures for the same phone for 15 minutes and clearing attempts after success or cooldown in `src/app/api/auth/pin/verify/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T094 [US5] Clear PIN lockout state when an active hosteler is deactivated or deleted so lifecycle actions do not leave stale throttling rows in `src/app/api/hostelers/[id]/route.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
+- [x] T095 [P] [US4] Add unit tests for FR-006a covering attempts 1-4 returning 401, attempt 5 creating a 15-minute lockout, correct PIN rejected during lockout with 429, cooldown reset, and successful login clearing attempts in `src/app/api/auth/pin/verify/route.test.ts`
+ (Administrative closure: moved to v1.3 execution track in specs/001-dcastle-pg-management/tasks-phases-19-24.md)
 
-**Checkpoint**: Completed and future E2E suites satisfy Constitution XI and FR-066 through FR-069; per-story scripts include US12; FR-006a lockout is implemented and tested; SC-001/SC-010 evidence is scoped and recorded; no weak completed E2E suite is treated as acceptance evidence.
+**Checkpoint**: Completed and future validation suites satisfy FR-066 through FR-069; per-story scripts include US12; FR-006a lockout is implemented and tested; SC-001/SC-010 evidence is scoped and recorded; no weak legacy browser suite is treated as acceptance evidence.
 
 ---
 
@@ -389,15 +424,36 @@
 ### Mobile App Experience Remediation for FR-071 through FR-079, SC-014, and SC-015
 
 - [x] T103 [P] [US13] Inventory every already-built/current user-facing owner, hosteler, and auth screen and record whether it requires Android Chrome validation, standalone PWA validation, or both in `specs/001-dcastle-pg-management/pwa-android-validation.md`
-- [x] T104 [P] [US13] Add or update mobile viewport E2E coverage so already-built/current user-facing screens are exercised at 375 px width with assertions against page-level horizontal overflow and unreachable primary actions in `e2e/`
+- [x] T104 [P] [US13] Add or update mobile viewport validation coverage so already-built/current user-facing screens are exercised at 375 px width with assertions against page-level horizontal overflow and unreachable primary actions
 - [x] T105 [US13] Remediate shared owner and hosteler navigation shells so primary role destinations are reachable on Android mobile without desktop-only sidebars, hover interactions, off-screen menus, or hidden actions in `src/app/(owner)/layout.tsx`, `src/app/admin/layout.tsx`, and `src/app/(hosteler)/layout.tsx`
 - [x] T106 [US13] Remediate completed hosteler-facing screens for readable text, touch-friendly controls, safe spacing, stable viewport behavior, no horizontal overflow, and successful core login/dashboard/submission/dashboard return flow at 375 px and standalone PWA context in `src/app/(auth)/login/page.tsx`, `src/app/(hosteler)/dashboard/page.tsx`, and `src/app/(hosteler)/submit/page.tsx`
 - [x] T107 [US13] Remediate completed owner-facing screens for mobile-usable dashboards, lists/tables, dialogs, forms, settings, safe spacing, stable viewport behavior, no horizontal overflow, and successful dashboard/hosteler-management/settings core flows at 375 px and standalone PWA context in `src/app/admin/dashboard/page.tsx`, `src/app/admin/hostelers/page.tsx`, and `src/app/(owner)/settings/page.tsx`
 - [x] T108 [P] [US13] Add component or visual-regression-oriented checks for shared UI primitives most likely to break mobile layout, including dialogs, tables, tabs, toggles, cards, and buttons in `src/components/ui/` and related tests
 - [x] T109 [US13] Execute Android Chrome manual validation for already-built/current screens at the 375 px baseline and installed/standalone PWA behavior, recording device/emulator, Android version, Chrome version, viewport, pass/fail notes, and screenshots or observations in `specs/001-dcastle-pg-management/pwa-android-validation.md`
-- [x] T110 [US13] Run `npm run test:run`, all relevant story-scoped mobile/E2E commands, `npm run test:e2e`, and `npm run build:cloudflare`; record any blocked command, environment issue, layout failure, or Cloudflare build issue in `specs/001-dcastle-pg-management/pwa-android-validation.md`
+- [x] T110 [US13] Run `npm run test:run`, all relevant story-scoped mobile validation commands, and `npm run build:cloudflare`; record any blocked command, environment issue, layout failure, or Cloudflare build issue in `specs/001-dcastle-pg-management/pwa-android-validation.md`
 
-**Checkpoint**: Android mobile is validated as the primary app experience for already-built/current owner, hosteler, and auth screens; applicable standalone PWA checks pass; Cloudflare build parity plus honest E2E guardrails remain intact; future user-facing phases still carry their own mobile/PWA implementation and validation obligations.
+**Checkpoint**: Android mobile is validated as the primary app experience for already-built/current owner, hosteler, and auth screens; applicable standalone PWA checks pass; Cloudflare build parity and validation guardrails remain intact; future user-facing phases still carry their own mobile/PWA implementation and validation obligations.
+
+### Phase 18 UX Refinement Delta for Already Completed Phases 1-18
+
+**Goal**: Improve interaction clarity and recovery UX for already completed screens across auth, hosteler daily flows, owner operations, and PWA shell states without altering existing business rules.
+
+**Execution Rule**: Preserve all previously checked work items. The tasks below are additive refinements only.
+
+- [x] T124 [US13] Add auth and invite form UX consistency refinements: first-invalid-field focus, inline validation harmonization, and preservation of non-invalid inputs on failed submit in `src/app/(auth)/login/page.tsx` and `src/app/(auth)/join/[token]/page.tsx`
+- [x] T125 [US1] Refine hosteler daily submission feedback states (loading/success/error with retry guidance) and explicit no-submission-yet empty states in `src/app/(hosteler)/submit/page.tsx` and `src/app/(hosteler)/dashboard/page.tsx`
+- [x] T126 [US2] Improve owner dashboard scanability with quick-find controls and deterministic no-data messaging for pending/submitted sections in `src/app/admin/dashboard/page.tsx`
+- [x] T127 [US5] Improve hosteler management list UX with quick search/status controls and clearer destructive confirmation impact copy in `src/app/admin/hostelers/page.tsx`
+- [x] T128 [US10] Refine owner settings interaction model with clear pending-change summary and actionable empty/error state text in `src/app/(owner)/settings/page.tsx`
+- [x] T129 [US11] Refine install/offline shell cues for already completed screens so install availability, reconnect behavior, and offline limitations remain clear but non-blocking in `src/components/install-prompt.tsx`, `src/components/offline-indicator.tsx`, `src/app/layout.tsx`, `src/app/(hosteler)/layout.tsx`, and `src/app/(owner)/layout.tsx`
+
+**Test Coverage Required**:
+- [x] Component tests for auth validation focus behavior and retained input on failed submit
+- [x] Component tests for hosteler submit/dashboard state matrix (loading/success/error/empty)
+- [x] Component tests for owner list quick-find/filter behavior and deterministic no-data states
+- [x] Component tests for install/offline indicator visibility and non-blocking behavior
+
+**Checkpoint**: UX refinements for completed Phases 1-18 are implemented additively, tested, and validated without reopening already completed baseline tasks.
 
 ---
 
@@ -417,10 +473,10 @@
 - **US7 Food History (Phase 10)**: Depends on US1 (needs food preference data)
 - **US8 Hosteler Bill View (Phase 11)**: Depends on US6 (needs generated bills)
 - **US9 Owner Food History (Phase 12)**: Depends on US1 (needs food preference data) + US5 (needs deleted-record preserved-history and audit-only visibility semantics)
-- **Automation & E2E (Phase 13)**: Existing completed automation foundation for US1â€“US4; future story E2E tasks remain in each story phase
+- **Automation & Validation (Phase 13)**: Existing completed automation foundation for US1â€“US4; future story validation tasks remain in each story phase
 - **US11 Android PWA (Phase 14)**: Depends on Foundational; can run in parallel with story work after Phase 2, but must complete before production delivery
 - **US12 Auth Proxy (Phase 16)**: Depends on Foundational + US4 (PIN verify route must exist); can run in parallel with Phases 9â€“12
-- **Honest E2E Remediation Gate (Phase 17)**: Depends on completed US1, US2, US3, US4, US5, US10, and US12 surfaces; blocks acceptance of completed stories under FR-066 through FR-069 and blocks marking any future story phase complete
+- **Validation Remediation Gate (Phase 17)**: Depends on completed US1, US2, US3, US4, US5, US10, and US12 surfaces; blocks acceptance of completed stories under FR-066 through FR-069 and blocks marking any future story phase complete
 - **Android Mobile App Experience Remediation Gate (Phase 18)**: Depends on already-built/current user-facing screens and US11 standalone PWA capability for installed-context validation; blocks acceptance of those completed screens under FR-071 through FR-079, but does not defer future US6 through US11 mobile/PWA work out of their own story tasks
 - **Final Polish (Phase 15)**: Depends on desired user stories, US11, Phase 17, and Phase 18 for full quickstart validation
 
@@ -444,10 +500,10 @@ Phase 2 (Foundational)
   â”œâ”€â”€ Phase 8 (US10: Settings) â€” independent
   â”‚     â””â”€â”€ Phase 9 (US6: Monthly Bills) â€” needs US1 + US10
   â”‚           â””â”€â”€ Phase 11 (US8: Hosteler Bill View)
-  â”œâ”€â”€ Phase 13 (Automation & E2E) â€” after US1-US4 complete
+  â”œâ”€â”€ Phase 13 (Automation & Validation) â€” after US1-US4 complete
   â”œâ”€â”€ Phase 14 (US11: Android PWA) â€” independent after Foundational, required before production delivery
   â”œâ”€â”€ Phase 16 (US12: Auth Proxy) â€” depends on Foundational + US4; parallel with Phases 9â€“12
-  â”œâ”€â”€ Phase 17 (Honest E2E Remediation Gate) â€” depends on completed story surfaces US1/US2/US3/US4/US5/US10/US12; blocks acceptance and future phase completion
+  â”œâ”€â”€ Phase 17 (Validation Remediation Gate) â€” depends on completed story surfaces US1/US2/US3/US4/US5/US10/US12; blocks acceptance and future phase completion
   â”œâ”€â”€ Phase 18 (US13: Android Mobile App Experience) â€” remediates already-built/current user-facing screens and validates US11 standalone PWA context where applicable
   â””â”€â”€ Phase 15 (Final Polish) â€” validates completed story set after Phase 17 and Phase 18
 ```
@@ -458,7 +514,7 @@ Phase 2 (Foundational)
 - Services/lib before API routes
 - API routes before UI pages
 - Core implementation before integration/polish
-- For user-facing stories, mobile-first layout and 375 px Android validation are part of the story's own implementation and E2E/manual evidence, with standalone PWA validation where applicable
+- For user-facing stories, mobile-first layout and 375 px Android validation are part of the story's own implementation and validation/manual evidence, with standalone PWA validation where applicable
 - Story complete before moving to next priority
 
 ### Deprecation Policy (Phases 9–12 → Phases 19–24)
@@ -490,7 +546,7 @@ Phase 2 (Foundational)
 
 **Phase 14** (US11): T070, T071, T072, T073, T074, T075, T078, T079, and T081 can run in parallel where file ownership does not overlap; T076, T077, T080, T082, and T083 depend on the corresponding assets/components/tests existing first
 
-**Phase 17** (Honest E2E Remediation): T091, T092, T095, T096, and T101 can begin in parallel because they touch distinct files; T093 depends on T092, T094 depends on T093, T100 depends on T093 and T095, T097 depends on deterministic test data/helpers from T091, T098/T099 depend on T091 and the existing US12 auth proxy, and T102 depends on T091 through T101
+**Phase 17** (Validation Remediation): T091, T092, T095, T096, and T101 can begin in parallel because they touch distinct files; T093 depends on T092, T094 depends on T093, T100 depends on T093 and T095, T097 depends on deterministic test data/helpers from T091, T098/T099 depend on T091 and the existing US12 auth proxy, and T102 depends on T091 through T101
 
 **Phase 18** (Android Mobile App Experience Remediation Gate): T103, T104, and T108 can begin in parallel for already-built/current screens. T105 should land before screen-specific remediation in T106 and T107. T109 depends on the relevant remediation work and US11 installed PWA capability. T110 depends on T103 through T109. Future US6 through US11 screens are not queued into Phase 18; their mobile/PWA validation belongs to their own story tasks.
 
@@ -519,7 +575,7 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 1. **US2 (Owner Dashboard)** â€” Completes the owner's daily operational need
 2. **US5 (Hosteler Management)** â€” Enables ongoing hosteler lifecycle management
 3. **US10 (Settings)** â€” Enables deadline/rate configuration
-4. **Phase 17 (Honest E2E Remediation Gate)** â€” Required before accepting completed stories under FR-066 through FR-069 or marking future stories complete
+4. **Phase 17 (Validation Remediation Gate)** â€” Required before accepting completed stories under FR-066 through FR-069 or marking future stories complete
 5. **US6 (Monthly Bills)** â€” Monthly billing workflow, including 375 px Android mobile-first owner billing layout and applicable standalone PWA validation inside the story phase
 6. **US7, US8, US9** â€” Transparency and reporting features, each including 375 px Android mobile-first layouts and applicable standalone PWA validation inside the story phase
 7. **US11 (Android PWA)** â€” True PWA installability, offline app shell, 375 px app-shell validation, automated checks, Cloudflare build parity, and manual Android evidence if not already completed alongside MVP
@@ -528,15 +584,7 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 
 ---
 
-## Phase 19: Convergence
-
-- [ ] T111 [US11] Capture and record timed real-device Android evidence for install completion latency (SC-002 <=5 seconds from install action availability to completion) and installed-standalone offline app-shell load latency (SC-011 <=3 seconds) in `specs/001-dcastle-pg-management/pwa-android-validation.md` and `specs/001-dcastle-pg-management/quickstart.md` per SC-002/SC-011 (partial)
-- [ ] T112 [US11] Resolve the open manual-validation contradiction by completing real Android standalone verification that remains marked "pending real-device confirmation" in current evidence, then update `specs/001-dcastle-pg-management/pwa-android-validation.md` with final pass/fail proof for FR-076/FR-077/FR-078/FR-079 and SC-015 (contradicts)
-- [ ] T113 Add a deterministic backup-notification validation run that proves GitHub Actions failure notification is emitted within the SC-006 window and document reproducible evidence in `specs/001-dcastle-pg-management/quickstart.md` and `.github/workflows/backup.yml` per SC-006/FR-058 (partial)
-
----
-
-## Phase 20: Owner-Assisted PIN Reset Flow (FR-005b/c/d/e, FR-006b/c, FR-029e/f)
+## Phase 26: Owner-Assisted PIN Reset Flow (FR-005b/c/d/e, FR-006b/c, FR-029e/f)
 
 **Goal**: When an owner regenerates an invite for an active PIN-linked hosteler, the hosteler opens the link and sets a new PIN (owner-assisted forgot-PIN recovery). The old PIN is immediately invalidated on success. Google-linked hostelers see a redirect message. All error cases use the structured error taxonomy.
 
@@ -549,7 +597,7 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 
 ---
 
-## Phase 21: v1.3 Delta — Pending Hard Delete & Mobile Uniqueness Validation (FR-029a, FR-001a/FR-001b)
+## Phase 27: v1.3 Delta — Pending Hard Delete & Mobile Uniqueness Validation (FR-029a, FR-001a/FR-001b)
 
 **Goal**: Align the pending hosteler delete path to a complete SQL hard delete (no audit record, no deleted-tab entry, invite tokens removed, mobile number freed), add server-side mobile number uniqueness enforcement at the add-hosteler API, update the UI confirmation dialog and inline form error to match the new semantics, and ensure the deleted tab exclusively surfaces active-deletion records.
 
@@ -561,3 +609,7 @@ For a phone-first production delivery, complete **Phase 14 (US11 Android PWA)** 
 - [x] T121 [US5] Add inline phone-field error on the add-hosteler form: when the API returns `HTTP 409` with `error.code === 'phone_already_registered'`, display `error.message` as a field-level validation error beneath the phone input without clearing other form fields per FR-001a in `src/app/admin/hostelers/page.tsx`
 - [x] T122 [US5] Ensure `GET /api/hostelers?status=deleted` and the deleted-tab data query only return records where `deleted_from_status = 'active'` so pending hard-delete records never surface in the deleted tab per FR-029a/FR-029c in `src/app/api/hostelers/route.ts` and `src/app/admin/hostelers/page.tsx`
 - [x] T123 [P] [US5] Add unit and API integration tests covering: (a) pending-hosteler DELETE removes the hosteler row and its invite tokens with zero audit or deleted-tab records created, (b) `GET /api/hostelers?status=deleted` returns only `deleted_from_status = 'active'` records, (c) `POST /api/hostelers` returns `409 / phone_already_registered` when phone matches an active hosteler, (d) `POST /api/hostelers` returns `409 / phone_already_registered` when phone matches a pending hosteler, and (e) `POST /api/hostelers` succeeds when the phone was previously associated with a hard-deleted pending hosteler (row gone, no conflict) per FR-001a/FR-001b/FR-029a in `src/app/api/hostelers/route.test.ts` and `src/app/api/hostelers/[id]/route.test.ts`
+
+
+
+

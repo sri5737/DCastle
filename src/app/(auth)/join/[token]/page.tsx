@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -66,9 +66,12 @@ export default function JoinPage() {
   const [recoveryText, setRecoveryText] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ pin: string; confirmPin: string }>({ pin: '', confirmPin: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'choice' | 'pin' | 'google'>('choice');
+  const pinInputRef = useRef<HTMLInputElement>(null);
+  const confirmPinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     validateToken();
@@ -114,12 +117,21 @@ export default function JoinPage() {
   async function handlePinActivation() {
     setError('');
 
+    const nextErrors = { pin: '', confirmPin: '' };
     if (!/^\d{4}$/.test(pin)) {
-      setError('PIN must be exactly 4 digits');
-      return;
+      nextErrors.pin = 'PIN must be exactly 4 digits';
     }
     if (pin !== confirmPin) {
-      setError('PINs do not match');
+      nextErrors.confirmPin = 'PINs do not match';
+    }
+    setFieldErrors(nextErrors);
+
+    if (nextErrors.pin || nextErrors.confirmPin) {
+      if (nextErrors.pin) {
+        pinInputRef.current?.focus();
+      } else {
+        confirmPinInputRef.current?.focus();
+      }
       return;
     }
 
@@ -157,7 +169,9 @@ export default function JoinPage() {
       }
 
       emitUiDiagnostic({ page: '/join/[token]', action: 'invite.activate', state: 'navigation-intent', metadata: { flow: 'activation' } });
-      router.push('/dashboard');
+      // PIN activation creates credentials but does not establish a browser session.
+      // Route to login so first session is created before dashboard APIs are called.
+      router.push('/login?activated=success');
     } catch {
       emitUiDiagnostic({ page: '/join/[token]', action: 'invite.activate', state: 'submit-failure', metadata: { reason: 'network' } });
       setError('Network error. Please try again.');
@@ -361,28 +375,54 @@ export default function JoinPage() {
                 {flow === 'reset' ? 'Set your new PIN' : 'Create a 4-digit PIN'}
               </label>
               <Input
+                ref={pinInputRef}
                 type="password"
                 inputMode="numeric"
                 maxLength={4}
                 pattern="\d{4}"
                 placeholder="Enter 4-digit PIN"
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onChange={(e) => {
+                  setPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  if (fieldErrors.pin) {
+                    setFieldErrors((current) => ({ ...current, pin: '' }));
+                  }
+                }}
+                aria-invalid={fieldErrors.pin ? 'true' : 'false'}
+                aria-describedby={fieldErrors.pin ? 'pin-error' : undefined}
               />
+              {fieldErrors.pin && (
+                <p id="pin-error" className="mt-1 text-sm text-red-700" role="alert">
+                  {fieldErrors.pin}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Confirm PIN
               </label>
               <Input
+                ref={confirmPinInputRef}
                 type="password"
                 inputMode="numeric"
                 maxLength={4}
                 pattern="\d{4}"
                 placeholder="Re-enter PIN"
                 value={confirmPin}
-                onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onChange={(e) => {
+                  setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  if (fieldErrors.confirmPin) {
+                    setFieldErrors((current) => ({ ...current, confirmPin: '' }));
+                  }
+                }}
+                aria-invalid={fieldErrors.confirmPin ? 'true' : 'false'}
+                aria-describedby={fieldErrors.confirmPin ? 'confirm-pin-error' : undefined}
               />
+              {fieldErrors.confirmPin && (
+                <p id="confirm-pin-error" className="mt-1 text-sm text-red-700" role="alert">
+                  {fieldErrors.confirmPin}
+                </p>
+              )}
             </div>
 
             {error && (

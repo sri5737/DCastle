@@ -20,24 +20,33 @@ export default function HostelerDashboard() {
   const [serverTime, setServerTime] = useState('');
   const [deadlinePassed, setDeadlinePassed] = useState(false);
   const [date, setDate] = useState('');
+  const [error, setError] = useState('');
+
+  async function fetchStatus() {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/food/today-status');
+      if (!res.ok) {
+        setError('Unable to load your dashboard status right now. Please retry.');
+        return;
+      }
+      const data = await res.json();
+
+      setSubmitted(data.submitted);
+      setPreferences(data.preferences);
+      setDeadlineTime(data.deadline);
+      setServerTime(data.server_time_ist);
+      setDeadlinePassed(data.deadline_passed);
+      setDate(data.date);
+    } catch {
+      setError('Unable to load your dashboard status right now. Check your connection and retry.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchStatus() {
-      try {
-        const res = await fetch('/api/food/today-status');
-        if (!res.ok) return;
-        const data = await res.json();
-
-        setSubmitted(data.submitted);
-        setPreferences(data.preferences);
-        setDeadlineTime(data.deadline);
-        setServerTime(data.server_time_ist);
-        setDeadlinePassed(data.deadline_passed);
-        setDate(data.date);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchStatus();
   }, []);
 
@@ -46,6 +55,22 @@ export default function HostelerDashboard() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <p className="text-muted-foreground">Loading...</p>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Dashboard temporarily unavailable</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button onClick={fetchStatus} variant="outline" className="w-full sm:w-auto">
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -92,11 +117,11 @@ export default function HostelerDashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-muted-foreground text-sm">
+              <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
                 {deadlinePassed
-                  ? 'You did not submit preferences before the deadline.'
-                  : 'You haven\'t submitted your food preferences for tomorrow yet.'}
-              </p>
+                  ? 'No submission was recorded before the deadline for tomorrow.'
+                  : 'No submission yet for tomorrow. Submit now so your meals are counted.'}
+              </div>
               {!deadlinePassed && (
                 <Link href="/submit">
                   <Button className="w-full">Submit Preferences</Button>

@@ -2,6 +2,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
+import { sortCotsByBunkLabel } from '@/lib/cots';
 import { createServiceClient } from '@/lib/supabase/server';
 
 async function handleGet(request: NextRequest) {
@@ -50,7 +51,7 @@ async function handleGet(request: NextRequest) {
       .from('cots')
       .select('*')
       .in('room_id', roomIds)
-      .order('cot_id_label', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (cotError) {
       console.error('Error fetching cots:', cotError);
@@ -72,7 +73,7 @@ async function handleGet(request: NextRequest) {
 
   const roomsMap = new Map<string, any[]>();
   (rooms ?? []).forEach((room) => {
-    const roomCots = cotsMap.get(room.id) ?? [];
+    const roomCots = sortCotsByBunkLabel(cotsMap.get(room.id) ?? []);
     const occupiedCount = roomCots.filter((c) => c.hosteler_id).length;
     const freeCount = roomCots.filter((c) => !c.hosteler_id).length;
 

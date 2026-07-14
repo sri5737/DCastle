@@ -20,17 +20,17 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 
 **Testing Strategy**:
 - Unit tests cover invite activation, PIN verification and 5-attempt/15-minute lockout, deadline enforcement, hosteler lifecycle transitions, deleted-record visibility, future-preference cancellation, billing eligibility rules, and server-side auth proxy retry/error handling.
-- Existing and future E2E tests must be audited and corrected so each completed story proves at least one exact, falsifiable business outcome from its independent test using the real UI and real Next.js API routes. Route mocks, conditional skips, broad placeholder assertions, URL/heading-only checks, and direct cookie or localStorage session injection are not acceptable as core evidence for the feature being validated.
-- Cross-role E2E workflows must prove producer-to-consumer behavior in one test or an explicitly linked sequence. For food submission and owner dashboard validation, a hosteler must submit exact breakfast/lunch/dinner preferences through the UI, then the owner dashboard must show the exact resulting counts and move that hosteler from Pending to Submitted.
-- Owner dashboard E2E evidence must cover the initial fetched dashboard state, a live update caused by a real hosteler submission, and reload-stable state after the update. Counts and Pending/Submitted membership must remain exact across all three observations.
-- Auth E2E evidence must log owner and hosteler users in through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated surface, and verify the user remains on the correct role page. US12 proxy coverage must prove `/api/auth/login` and `/api/auth/pin/verify` are used without injected-session shortcuts.
-- E2E tests cover each documented story flow, including PIN lockout, pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, exclusion of those canceled rows from normal owner history/export, dashboards, and billing inputs, and scoped performance evidence for SC-001 and SC-010.
+- Existing and future automated tests must prove exact, falsifiable business outcomes through real business logic and API routes. Route mocks, conditional skips, broad placeholder assertions, URL/heading-only checks, and direct cookie or localStorage session injection are not acceptable as core evidence for feature validation.
+- Cross-role workflow validation must prove producer-to-consumer behavior through integration/component coverage. For food submission and owner dashboard validation, evidence must show exact breakfast/lunch/dinner preference impact and pending-to-submitted transitions.
+- Owner dashboard validation must cover the initial fetched state, live update from a real submission path, and reload-stable behavior with exact counts and Pending/Submitted membership.
+- Auth validation must verify owner and hosteler login through server-side auth routes, post-login client effects, and persisted-session behavior without injected-session shortcuts as core evidence.
+- Automated tests cover each documented story flow, including PIN lockout, pending delete, active delete, deleted-tab visibility, deleted-hosteler audit detail visibility for canceled future preferences, exclusion of those canceled rows from normal owner history/export, dashboards, billing inputs, and scoped performance evidence for SC-001 and SC-010.
 - PWA checks validate manifest metadata, icon metadata, service worker registration, offline app-shell behavior, and install-prompt gating.
 - Android mobile layout checks validate completed owner, hosteler, and auth screens at the 375 px Android Chrome baseline for no page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, unreadable text, unstable viewport jumps, desktop-only navigation, hover-only actions, or unsafe touch spacing.
 - Standalone PWA checks validate applicable installed-app flows for owner and hosteler navigation, viewport height, safe-area/keyboard/modal behavior, offline/online layout states, and primary action reachability.
 - Manual Android validation remains required for installability, app-drawer presence, standalone launch, installed offline-shell behavior, and any mobile app experience evidence that cannot be proven by desktop browser automation.
-- Per-story scripts must cover every documented story, including `npm run test:us12` for the server-side auth proxy. `/speckit.tasks` should refresh any missing scripts and ensure each story command runs the honest E2E evidence for that story in addition to relevant unit coverage.
-- CI quality gate remains `npm run test:run` and `npm run test:e2e` before build/deploy, and deployment readiness must also run `npm run build:cloudflare` so strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures are caught before production deployment.
+- Per-story scripts must cover every documented story, including `npm run test:us12` for the server-side auth proxy. `/speckit.tasks` should refresh any missing scripts and ensure each story command runs required unit/integration/component evidence.
+- CI quality gate remains `npm run test:run` before build/deploy, and deployment readiness must also run `npm run build:cloudflare` so strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures are caught before production deployment.
 
 **Target Platform**: Android mobile-first true PWA (375 px baseline as the primary experience), Android Chrome installability target, installed standalone PWA usage, Edge Runtime deployment on Cloudflare Pages
 
@@ -38,7 +38,7 @@ A mobile-first true Progressive Web App for Deekshana Castle PG that supports da
 
 **Performance Goals**: Food submission interaction completes in under 30 seconds using scoped browser or manual acceptance evidence for the documented login-and-submit flow, owner count updates propagate in under 3 seconds, owner can find a deleted record inside the deleted tab in under 30 seconds, and the system supports up to 100 hostelers with scoped seeded-data evidence and representative submission/dashboard checks rather than full load-testing infrastructure
 
-**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell, Android mobile app-like navigation/layout as the primary user experience, no page-level horizontal overflow at 375 px, touch-friendly controls, stable viewport behavior in browser and standalone PWA contexts, honest E2E acceptance evidence for every completed story, no injected-session shortcut as core auth proof, real UI/API execution for feature evidence, and scoped SC-001/SC-010 performance evidence without adding load-test infrastructure unless a future spec requires it
+**Constraints**: Edge Runtime only, zero-cost infrastructure, owner-visible deleted/audit records, deletion-effective-date semantics based on IST calendar date, canceled future food preferences after active deletion must remain visible only in the deleted-hosteler audit view and be excluded from normal owner history/export, dashboard counts, and billing queries, Android Chrome installability, standalone launch, maskable icons, cached offline app shell, Android mobile app-like navigation/layout as the primary user experience, no page-level horizontal overflow at 375 px, touch-friendly controls, stable viewport behavior in browser and standalone PWA contexts, required unit/integration/component acceptance evidence for every completed story, no injected-session shortcut as core auth proof, real UI/API execution for feature evidence, and scoped SC-001/SC-010 performance evidence without adding load-test infrastructure unless a future spec requires it
 
 **Scale/Scope**: Single-property deployment, about 40 active hostelers at launch and up to 100, owner and hosteler web surfaces in the current Next.js app, plus Supabase-backed API and data model changes for lifecycle and billing history
 
@@ -470,30 +470,31 @@ Phases 19–24 implement the comprehensive billing and operational management su
    - Constraints: `(owner_id, name)` unique (one owner cannot have duplicate building names)
 
 2. **Room**: Rentable unit within a building
-   - Fields: `id` (uuid), `building_id` (uuid, FK), `room_number` (text), `floor` (enum: 'ground'|'first'|'second'|null), `room_type_id` (uuid, FK), `current_rent` (numeric, decimal(10,2)), `created_at`, `updated_at`
+  - Fields: `id` (uuid), `building_id` (uuid, FK), `room_number` (text), `floor` (enum: 'ground'|'first'|'second'|null), `room_type_id` (uuid, FK), `active_sharing_capacity` (integer), `active_room_class` (enum: 'ac'|'non_ac'), `current_rent` (numeric, decimal(10,2), transitional/cache), `created_at`, `updated_at`
    - Constraints: `(building_id, room_number)` unique
-   - Note: `current_rent` denotes the active rent; historical changes are tracked in `room_rent_rate_history`
+  - Note: Room sharing/class is authoritative for billing; rent value is resolved from global room-rent config history by (sharing capacity, room class, effective date)
 
 3. **RoomType**: Classification for groups of identical rooms
-   - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (text, e.g., "2-sharing AC"), `description` (text, nullable), `base_rent` (numeric, decimal(10,2)), `cot_count` (integer), `created_at`, `updated_at`
-   - Constraints: `(owner_id, name)` unique
-   - Note: `base_rent` is a reference value; actual room rent is stored separately per room
+  - Fields: `id` (uuid), `owner_id` (uuid, FK), `name` (enum text: 'AC' | 'non-AC'), `description` (text, nullable), `sharing_capacity` (integer), `cot_count` (integer), `created_at`, `updated_at`
+  - Constraints: `(owner_id, name, sharing_capacity)` unique
+  - Note: room type is a fixed dropdown value plus sharing capacity; actual rent is resolved from global room-rent config history by sharing capacity + room class
 
 4. **Cot**: Bed/sleeping unit within a room
-   - Fields: `id` (uuid), `room_id` (uuid, FK), `cot_id_label` (text, e.g., "L1", "U2"), `cot_type` (enum: 'lower_cot'|'upper_cot'), `hosteler_id` (uuid, FK, nullable), `created_at`, `updated_at`
+  - Fields: `id` (uuid), `room_id` (uuid, FK), `cot_id_label` (text, e.g., "L1", "U1", "L2", "U2"), `cot_type` (enum: 'lower_cot'|'upper_cot'), `hosteler_id` (uuid, FK, nullable), `created_at`, `updated_at`
    - Constraints: `(room_id, cot_id_label)` unique
-   - Note: When a hosteler is deactivated or deleted, `hosteler_id` is set to null
+  - Note: When a hosteler is deactivated or deleted, `hosteler_id` is set to null
+  - Note: `room_type.cot_count` represents bunk count; cot generation creates 2 entries per bunk as `L{n}` + `U{n}`
 
-5. **RoomTypeHistory** (Q6 Clarification - Future/Current-Date Only Effective Dates): Immutable audit trail of room type attribute changes
-   - Fields: `id` (uuid), `room_type_id` (uuid, FK), `old_base_rent` (numeric, decimal(10,2), nullable), `new_base_rent` (numeric, decimal(10,2)), `old_cot_count` (integer, nullable), `new_cot_count` (integer), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
-   - Constraints: `(room_type_id, effective_date)` unique (one change per room type per date); `effective_date >= today()` (no retroactive changes per Q6)
-   - Note: Immutable record; never updated/deleted; INSERT-only after `effective_date`. Historical lookups return the room type attributes effective on a given date for accurate multi-date billing. Owner UI prevents past-date selection via date picker validation and API layer rejects effective_date < today() with HTTP 400 "Effective date cannot be in the past"
-   - Billing Impact: When generating a bill, room type changes are consulted via historical lookup; bills use the room type (and thus base_rent, cot_count) effective on each billing day
+5. **RoomConfigurationHistory**: Immutable audit trail of per-room configuration changes
+  - Fields: `id` (uuid), `room_id` (uuid, FK), `old_sharing_capacity` (integer, nullable), `new_sharing_capacity` (integer), `old_room_class` (enum: 'ac'|'non_ac', nullable), `new_room_class` (enum: 'ac'|'non_ac'), `old_rent` (numeric, decimal(10,2), nullable), `new_rent` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+  - Constraints: `(room_id, effective_date)` unique (one configuration change per room per date); `effective_date >= today()` (no retroactive changes)
+  - Note: Immutable record; never updated/deleted; INSERT-only. Historical lookups return sharing capacity + AC/non-AC + rent effective on a given date.
+  - Billing Impact: Bills use room configuration effective on each billing day, enabling dynamic transitions (for example 4-sharing to 2-sharing) without affecting historical bills
 
-6. **RoomRentRateHistory**: Immutable audit trail of room rent changes
-   - Fields: `id` (uuid), `room_id` (uuid, FK), `old_rent` (numeric, decimal(10,2), nullable), `new_rent` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
-   - Constraints: `(room_id, effective_date)` unique (one rate change per room per date)
-   - Note: Immutable record; never updated; only inserted for audit trail
+6. **RoomRentConfigHistory**: Immutable audit trail of global room rent config changes
+  - Fields: `id` (uuid), `owner_id` (uuid, FK), `sharing_capacity` (integer), `room_class` (enum: 'ac'|'non_ac'), `old_rent` (numeric, decimal(10,2), nullable), `new_rent` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
+  - Constraints: `(owner_id, sharing_capacity, room_class, effective_date)` unique (one config change per combination per date)
+  - Note: Immutable record; never updated; only inserted for audit trail
 
 7. **MealRateRateHistory**: Immutable audit trail of meal rate changes
    - Fields: `id` (uuid), `meal_type` (enum: 'breakfast'|'lunch'|'dinner'), `old_rate` (numeric, decimal(10,2), nullable), `new_rate` (numeric, decimal(10,2)), `effective_date` (date), `created_by` (uuid, FK to owner), `created_at` (timestamp)
@@ -534,7 +535,11 @@ Phases 19–24 implement the comprehensive billing and operational management su
 
 2. **FoodPreferences** table: Add columns
    - `canceled_by_deletion` (boolean, default false)
+  - `adjusted_by_owner_id` (uuid, nullable, FK to owner)
+  - `adjusted_at` (timestamp, nullable)
+  - `adjustment_reason` (text, nullable)
    - Note: Used to track when active-deletion cancels future-dated preferences; excluded from normal owner history/export
+  - Note: Owner current-month corrections are audit-tracked per day with reason and actor metadata
 
 3. **Settings** table: No changes needed (already supports deadline and meal rates)
 
@@ -551,9 +556,10 @@ Room 1──N Cot
 
 RoomType 1──N Room
         │
-        └──1 RoomTypeHistory (audit trail - Q6 clarification)
+  └──N Room (template/category reference)
 
-Room ──┬── RoomRentRateHistory (audit trail)
+Room ──┬── RoomConfigurationHistory (audit trail)
+       ├── RoomRentRateHistory (audit trail)
        │
        └── Cot (occupancy)
 
@@ -575,24 +581,26 @@ LineItemExpense ──── Owner
 MealRateRateHistory ──── (global, not per-owner)
                       (breakfast, lunch, dinner)
 
-RoomTypeHistory ──── RoomType (audit trail - Q6 clarification)
+RoomConfigurationHistory ──── Room (audit trail)
 ```
 
 ### Rate History & Effective-Date Lookup Patterns
 
-**Room Type Lookup for a Specific Date** (Q6 Clarification):
+**Room Configuration Lookup for a Specific Date**:
 ```sql
-SELECT new_base_rent, new_cot_count FROM room_type_history
-WHERE room_type_id = $room_type_id
+SELECT new_sharing_capacity, new_room_class, new_rent FROM room_configuration_history
+WHERE room_id = $room_id
   AND effective_date <= $lookup_date
 ORDER BY effective_date DESC
 LIMIT 1;
 ```
 
-**Room Rent Lookup for a Specific Date**:
+**Room Rent Config Lookup for a Specific Date**:
 ```sql
-SELECT new_rent FROM room_rent_rate_history
-WHERE room_id = $room_id
+SELECT new_rent FROM room_rent_config_history
+WHERE owner_id = $owner_id
+  AND sharing_capacity = $sharing_capacity
+  AND room_class = $room_class
   AND effective_date <= $lookup_date
 ORDER BY effective_date DESC
 LIMIT 1;
@@ -616,14 +624,31 @@ ORDER BY effective_date DESC
 LIMIT 1;
 ```
 
+### Cot Label Generation Rules
+
+- Cot configuration is deterministic and auto-generated; owners do not enter cot labels manually.
+- Owner selects cot configuration type during configure-cots: `bunker` or `normal`.
+- For `bunker`, for bunk index `n` from `1..cot_count`:
+  - create lower cot label `L{n}` with `cot_type='lower_cot'`
+  - create upper cot label `U{n}` with `cot_type='upper_cot'`
+- For `normal`, for index `n` from `1..cot_count`:
+  - create label `L{n}` with `cot_type='lower_cot'`
+- Example for `cot_count=2` in bunker mode: `L1`, `U1`, `L2`, `U2`.
+- Example for `cot_count=3` in normal mode: `L1`, `L2`, `L3`.
+- Label uniqueness remains constrained by `(room_id, cot_id_label)`.
+
 **Bill Calculation for Month**:
 For each day in the month:
 1. Look up meal rate effective for that day
 2. Count hosteler's meal preferences for that day
 3. Calculate daily meal charge: sum of (opted_count × day_rate) for each meal
-4. Look up room rent effective for that day
-5. Add daily room rent to total
-6. Sum all days in the month
+4. Resolve room assignment for that IST date (if multiple same-day changes exist, use latest assignment for that date)
+5. Resolve room sharing capacity and room class effective for that day for the resolved room
+6. Look up global room rent config effective for that day using owner + sharing capacity + room class
+7. Add daily room rent to total
+8. Sum all days in the month
+
+Note: Billing is day-granular (not hour-granular). No intra-day proration is applied.
 
 ### Bill Transmission & Visibility
 
@@ -665,25 +690,127 @@ For each day in the month:
 - Note: Hierarchical response includes rooms within each building
 
 **`POST /api/buildings/[id]/rooms`** — Add room to building
-- Body: `{ room_number, floor?, room_type_id, rent }`
-- Response: `{ id, building_id, room_number, floor, room_type_id, current_rent, cots: [ ... ] }`
+- Body: `{ room_number, floor?, room_type_id?, sharing_capacity, room_class, rent }`
+- Response: `{ id, building_id, room_number, floor, room_type_id, active_sharing_capacity, active_room_class, current_rent, cots: [ ... ] }`
 - Validation: `(building_id, room_number)` unique
 
 **`POST /api/room-types`** — Define room type
-- Body: `{ name, description?, base_rent, cot_count }`
-- Response: `{ id, owner_id, name, description, base_rent, cot_count }`
-- Validation: `(owner_id, name)` unique
+- Body: `{ name: 'AC'|'non-AC', description?, sharing_capacity, cot_count }`
+- Response: `{ id, owner_id, name, description, sharing_capacity, cot_count }`
+- Validation: `(owner_id, name, sharing_capacity)` unique
 
-**`POST /api/room-types/[id]/cots`** — Configure cots within room type
-- Body: `{ cot_id_label, cot_type }`
-- Response: `{ id, room_id, cot_id_label, cot_type, hosteler_id }`
+**`PATCH /api/room-types/[id]`** — Archive/unarchive room type
+- Body: `{ active: boolean }`
+- Response: `{ id, active, updated_at }`
+- Behavior: archived (`active=false`) room types are excluded from Add Room selectors but remain valid for existing room references
+
+**`DELETE /api/room-types/[id]`** — Safe delete room type
+- Body: none
+- Response: `{ deleted: true }`
+- Behavior: allowed only when no rooms reference the room type; otherwise returns blocked-delete error with guidance to archive
+
+**`POST /api/rooms/[id]/configuration-change`** — Schedule per-room sharing/AC/rent change
+- Body: `{ new_sharing_capacity, new_room_class, new_rent, effective_date }`
+- Response: `{ id, room_id, pending_change: { new_sharing_capacity, new_room_class, new_rent, effective_date } }`
+- Validation: `effective_date >= today`, `new_sharing_capacity >= 1`, sharing capacity must not exceed cot inventory
+
+**`POST /api/rooms/[id]/cots`** — Configure cots within room
+- Body: `{ cot_configuration_type: 'bunker'|'normal' }` (no manual cot labels)
+- Response: `{ cots: [ { id, room_id, cot_id_label, cot_type, hosteler_id } ] }`
+- Behavior:
+  - bunker: for each index, auto-create `L{n}` and `U{n}` mapped to lower/upper types
+  - normal: auto-create `L{n}` labels only, mapped to lower cot type
+
+**`POST /api/rooms/[id]/cots/reset`** — Room-level cot inventory reset
+- Body: `{ cot_configuration_type: 'bunker'|'normal' }`
+- Response: `{ cots: [ ... ] }`
+- Behavior: replaces cot inventory for a room using selected mode only when no cot in that room is assigned to an active hosteler
+- Constraint: per-cot hard delete is intentionally not exposed in owner workflows
+
+### Owner Buildings UI Interaction Plan (Phase 19 delta)
+
+- Keep building card as top-level container, but avoid rendering full configuration forms for every room simultaneously.
+- On building open:
+  - show compact room number list (search/filter optional)
+  - show an "Add Room" action at building level
+  - show building-level actions including "Delete Building"
+- On room selection:
+  - render a dedicated room detail panel for selected room only
+  - panel includes Configure Cots, Change Room Configuration, and cot table
+- Form UX rule:
+  - room configuration form must use explicit labels for all inputs (including sharing capacity), not placeholder-only identification
+- Delete behavior:
+  - UI delete action should call existing delete endpoint and surface API guardrail message when room assignments block deletion
+
+### Owner Buildings UX Refinements (Phase 19 follow-up)
+
+- Building delete safety:
+  - require explicit confirmation modal before delete request
+  - modal must summarize irreversible impact and current building name
+- Room-type lifecycle scalability:
+  - add search/filter control in room-type lifecycle panel
+  - when list is large, use pagination or lazy rendering strategy
+- Blocked room-type delete feedback:
+  - include count of rooms referencing the room type in error response/rendering when available
+  - include explicit guidance to archive instead of delete
+- Configure Cots reset clarity:
+  - show current cot mode and selected target mode in reset confirmation UI
+  - keep active-hosteler assignment guardrail visible in the panel
+- Room list usability:
+  - add in-building room search/filter so owners can jump quickly to a room number before opening details
+
+### UX Refinements for Phases 20-24
+
+- Phase 20 (Rate History UI):
+  - add pre-submit summary card (current value vs scheduled value vs effective date)
+  - show deterministic pending-change chips and conflict/duplicate-date feedback inline
+- Phase 22 (Billing UI):
+  - add table filters (status, building, hosteler search) with sticky month/scope context
+  - add compact mode for list-heavy screens and expandable detail sections for per-day breakdown
+- Phase 23 (Employee UI):
+  - add employee search/filter and sortable pending salary chips
+  - keep salary change modal lightweight with clear effective-date preview
+- Phase 24 (Dashboards):
+  - ensure every dashboard panel has explicit loading/empty/error states and retry action
+  - use progressive disclosure for large breakdown blocks to prevent scroll overload
+
+### UX Refinement Delta for Completed Phases 1-18
+
+- Scope and principle:
+  - preserve current business logic and API contracts; refine only interaction clarity, density management, and recoverability across already completed screens
+- Auth and invite (US3, US4):
+  - add first-invalid-field focus behavior and inline validation consistency
+  - preserve user-entered valid fields on validation failure and retryable API errors
+- Hosteler daily flow (US1):
+  - tighten save lifecycle messaging (loading, success, error with retry)
+  - ensure empty-state and no-submission-yet state remain explicit and actionable
+- Owner operational flow (US2, US5, US10):
+  - add/standardize quick search or status filters for dense lists
+  - align destructive-action confirmation language with short impact summary before commit
+- PWA shell and offline affordances (US11, US13):
+  - keep install/offline indicators visible but non-blocking
+  - provide reconnect guidance and avoid ambiguous no-data states
+
+### Phase 19 Simplification Delta: Inline Room Template in Add Room
+
+- Remove standalone lifecycle panel from Buildings page:
+  - eliminate separate "Room Type Lifecycle" section from primary screen
+  - keep backend lifecycle capabilities available for safe archive/delete flows via lightweight management entry point
+- Add Room as unified creation surface:
+  - Add Room form captures room number/floor plus room template attributes (`AC/non-AC`, sharing capacity, cot count)
+  - Add Room form includes cot configuration type (`bunker`/`normal`) at create-time
+  - on submit, API resolves or creates matching active room type and creates room atomically
+- Rent transition strategy:
+  - remove manual rent field from Add Room UI
+  - treat room rent as Phase 20 global-config-managed value
+  - until Phase 20 is fully live, mark unresolved rent state explicitly instead of forcing per-room rent entry
 
 #### Rate Management
 
-**`POST /api/rooms/[id]/rent-change`** — Initiate room rent change with effective date
-- Body: `{ new_rent, effective_date }`
-- Response: `{ id, room_id, new_rent, effective_date, status: 'pending' }`
-- Note: Inserts into `room_rent_rate_history` on effective date passing; no update to historical records
+**`POST /api/admin/room-rent-config/change`** — Initiate global room rent config change with effective date
+- Body: `{ sharing_capacity, room_class, new_rent, effective_date }`
+- Response: `{ id, owner_id, sharing_capacity, room_class, new_rent, effective_date, status: 'pending' }`
+- Note: Inserts into `room_rent_config_history`; no update to historical records
 
 **`POST /api/meal-rates/change`** — Initiate meal rate change
 - Body: `{ meal_type, new_rate, effective_date }`
@@ -691,6 +818,22 @@ For each day in the month:
 
 **`GET /api/meal-rates`** — Get current meal rates
 - Response: `{ breakfast: decimal, lunch: decimal, dinner: decimal }`
+
+#### Owner Food Entry Corrections (Current Month)
+
+**`PATCH /api/admin/food-preferences/adjust`** — Owner adjusts one hosteler's food entries for a current-month date range
+- Body: `{ hosteler_id, start_date, end_date, meals: { breakfast, lunch, dinner }, adjustment_reason }`
+- Response: `{ updated_days_count, hosteler_id, month, adjustment_applied_at }`
+- Validation:
+  - `start_date` and `end_date` must be within current IST month
+  - `start_date <= end_date`
+  - `adjustment_reason` is required
+  - If transmitted bill exists for `(hosteler_id, month)`, allow adjustment but mark month as requiring regenerate + retransmit before hosteler sees revised values
+  - Owner can only adjust hostelers they own (RLS)
+
+**`GET /api/admin/food-preferences/adjustments`** — View owner adjustment audit trail
+- Query: `?hosteler_id=...&month=YYYY-MM-01`
+- Response: `{ adjustments: [ { date, breakfast, lunch, dinner, adjusted_by_owner_id, adjusted_at, adjustment_reason } ] }`
 
 #### Billing
 
@@ -784,7 +927,7 @@ For each day in the month:
 - Database migrations for `buildings`, `rooms`, `room_types`, `cots` tables
 - CRUD API routes: building/room/room-type/cot management
 - Owner UI: building hierarchy view, room management forms
-- Hosteler assignment UI: select building → room → cot during registration
+- Hosteler registration remains identity-only (name + phone); accommodation assignment is moved to a dedicated phase/page
 - Validation tests for room uniqueness, cot allocation
 
 **Dependencies**: None (can start immediately after Phase 18)
@@ -796,14 +939,14 @@ For each day in the month:
 **Goal**: Implement effective-date-based rate change tracking for room rent and meal rates
 
 **Deliverables**:
-- Database migrations for `room_rent_rate_history`, `meal_rate_rate_history` tables
+- Database migrations for `room_rent_config_history`, `meal_rate_rate_history` tables
 - API routes: rate change endpoints with effective-date pickers
-- Owner UI: room rent change forms, meal rate change forms
+- Owner UI: global room-rent config forms, meal rate change forms
 - "Pending update on [date]" label display until effective date
 - Historical rate lookup queries and tests
 - Unit tests for prorating and date-based rate application
 
-**Dependencies**: Phase 19 (room structure required for room rent changes)
+**Dependencies**: Phase 19 (room sharing/class structure required for rent-config lookups)
 
 **Estimated Scope**: 4 tasks
 
@@ -851,6 +994,21 @@ For each day in the month:
 - Unit tests for salary history lookups
 
 **Dependencies**: None (independent feature)
+
+**Estimated Scope**: 3 tasks
+
+#### Phase 26: Hosteler Accommodation Assignment & Reassignment (US22)
+
+**Goal**: Provide a dedicated owner page for assigning and reassigning building/room/cot for existing hostelers.
+
+**Deliverables**:
+- API routes for assign/reassign/unassign accommodation on existing hosteler records
+- Owner UI page with hosteler search + cascading building/room/cot selectors
+- Atomic reassignment behavior (release old cot + assign new cot)
+- Guardrails preventing assignment to occupied cots
+- Component/API tests for assignment and reassignment workflows
+
+**Dependencies**: Phase 19 (building/room/cot infrastructure)
 
 **Estimated Scope**: 3 tasks
 
@@ -1010,11 +1168,11 @@ CREATE TABLE IF NOT EXISTS room_types (
   owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name text NOT NULL,
   description text,
-  base_rent numeric(10, 2),
+  sharing_capacity integer NOT NULL,
   cot_count integer NOT NULL,
   created_at timestamp DEFAULT now(),
   updated_at timestamp DEFAULT now(),
-  UNIQUE(owner_id, name)
+  UNIQUE(owner_id, name, sharing_capacity)
 );
 
 -- rooms table
@@ -1051,15 +1209,17 @@ ALTER TABLE hostelers ADD COLUMN IF NOT EXISTS availing_mess boolean DEFAULT tru
 
 **Migration 004: Rate History Tracking**
 ```sql
-CREATE TABLE IF NOT EXISTS room_rent_rate_history (
+CREATE TABLE IF NOT EXISTS room_rent_config_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_id uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  sharing_capacity integer NOT NULL CHECK (sharing_capacity >= 1),
+  room_class text NOT NULL CHECK (room_class IN ('ac', 'non_ac')),
   old_rent numeric(10, 2),
   new_rent numeric(10, 2) NOT NULL,
   effective_date date NOT NULL,
   created_by uuid NOT NULL REFERENCES auth.users(id),
   created_at timestamp DEFAULT now(),
-  UNIQUE(room_id, effective_date)
+  UNIQUE(owner_id, sharing_capacity, room_class, effective_date)
 );
 
 CREATE TABLE IF NOT EXISTS meal_rate_rate_history (

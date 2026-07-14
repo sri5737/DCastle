@@ -212,10 +212,72 @@ describe('Hosteler lifecycle route', () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  it('deactivates an active hosteler and releases cot assignment', async () => {
+    const hostelerUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const cotUpdateEq = vi.fn().mockResolvedValue({ error: null });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'hostelers') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: {
+                    id: 'h-1',
+                    name: 'Active User',
+                    status: 'active',
+                    auth_user_id: 'auth-user-1',
+                    deleted_at: null,
+                    deleted_from_status: null,
+                    deletion_effective_date: null,
+                  },
+                  error: null,
+                }),
+            }),
+          }),
+          update: () => ({
+            eq: hostelerUpdateEq,
+          }),
+        };
+      }
+
+      if (table === 'food_preferences') {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                gt: () => Promise.resolve({ count: 0, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        update: () => ({
+          eq: cotUpdateEq,
+        }),
+      };
+    });
+
+    const { PATCH } = await import('./route');
+    const response = await PATCH(createPatchRequest({ action: 'deactivate', confirmed: true }) as any, {
+      params: Promise.resolve({ id: 'h-1' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.hosteler.status).toBe('inactive');
+    expect(cotUpdateEq).toHaveBeenCalledWith('hosteler_id', 'h-1');
+    expect(mockSignOut).toHaveBeenCalledWith('auth-user-1', 'global');
+  });
+
   it('deletes an active hosteler, revokes auth, and cancels future preferences', async () => {
     const inviteEqFirst = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
     const cancelSelect = vi.fn().mockResolvedValue({ data: [{ id: 'fp-1' }, { id: 'fp-2' }], error: null });
     const hostelerUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const cotUpdateEq = vi.fn().mockResolvedValue({ error: null });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'hostelers') {
@@ -251,6 +313,14 @@ describe('Hosteler lifecycle route', () => {
         };
       }
 
+      if (table === 'cots') {
+        return {
+          update: () => ({
+            eq: cotUpdateEq,
+          }),
+        };
+      }
+
       return {
         select: () => ({
           eq: () => ({
@@ -282,6 +352,7 @@ describe('Hosteler lifecycle route', () => {
     expect(data.hosteler.deleted_from_status).toBe('active');
     expect(data.canceled_future_preferences).toBe(2);
     expect(cancelSelect).toHaveBeenCalledWith('id');
+    expect(cotUpdateEq).toHaveBeenCalledWith('hosteler_id', 'h-1');
     // Auth user deletion now uses REST API (fetch), not signOut
   });
 });

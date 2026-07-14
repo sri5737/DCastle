@@ -27,7 +27,7 @@ function createPostRequest(body: Record<string, unknown>) {
   });
 }
 
-const validBody = { name: 'Ravi Kumar', phone: '9876543210', room_number: '101' };
+const validBody = { name: 'Ravi Kumar', phone: '9876543210' };
 
 /**
  * Returns a mock that simulates a successful insert + invite token creation.
@@ -51,7 +51,7 @@ function makeInsertMock() {
                   id: 'h-new',
                   name: validBody.name,
                   phone: validBody.phone,
-                  room_number: validBody.room_number,
+                  room_number: 'UNASSIGNED',
                   status: 'pending',
                   created_at: '2026-07-10T00:00:00.000Z',
                 },
@@ -85,7 +85,7 @@ describe('POST /api/hostelers', () => {
             eq: () => ({
               in: () => ({
                 maybeSingle: () =>
-                  Promise.resolve({ data: { id: 'h-existing' }, error: null }),
+                  Promise.resolve({ data: { id: 'h-existing', status: 'active' }, error: null }),
               }),
             }),
           }),
@@ -115,7 +115,7 @@ describe('POST /api/hostelers', () => {
             eq: () => ({
               in: () => ({
                 maybeSingle: () =>
-                  Promise.resolve({ data: { id: 'h-pending' }, error: null }),
+                  Promise.resolve({ data: { id: 'h-pending', status: 'pending' }, error: null }),
               }),
             }),
           }),
@@ -130,6 +130,9 @@ describe('POST /api/hostelers', () => {
 
     expect(response.status).toBe(409);
     expect(data.error.code).toBe('phone_already_registered');
+    expect(data.error.message).toBe(
+      'This mobile number is already registered to a pending hosteler.'
+    );
   });
 
   // (e) Succeeds when the phone was previously associated with a hard-deleted pending hosteler (row gone)
@@ -142,7 +145,71 @@ describe('POST /api/hostelers', () => {
 
     expect(response.status).toBe(201);
     expect(data.hosteler.phone).toBe(validBody.phone);
+    expect(data.hosteler.room_number).toBe('UNASSIGNED');
     expect(data.invite.invite_url).toContain('/join/');
+  });
+
+  it('creates a hosteler with unassigned accommodation when assignment fields are omitted', async () => {
+    let insertedPayload: Record<string, unknown> | null = null;
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'hostelers') {
+        return {
+          select: () => ({
+            eq: () => ({
+              in: () => ({
+                maybeSingle: () => Promise.resolve({ data: null, error: null }),
+              }),
+            }),
+          }),
+          insert: (payload: Record<string, unknown>) => {
+            insertedPayload = payload;
+            return {
+              select: () => ({
+                single: () =>
+                  Promise.resolve({
+                    data: {
+                      id: 'h-new',
+                      name: validBody.name,
+                      phone: validBody.phone,
+                      room_number: 'UNASSIGNED',
+                      status: 'pending',
+                      building_id: null,
+                      room_id: null,
+                      cot_id: null,
+                      created_at: '2026-07-10T00:00:00.000Z',
+                    },
+                    error: null,
+                  }),
+              }),
+            };
+          },
+        };
+      }
+
+      return {
+        insert: () => Promise.resolve({ error: null }),
+      };
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(createPostRequest(validBody) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(insertedPayload).toMatchObject({
+      name: 'Ravi Kumar',
+      phone: '9876543210',
+      room_number: 'UNASSIGNED',
+      status: 'pending',
+      building_id: null,
+      room_id: null,
+      cot_id: null,
+    });
+    expect(data.hosteler.room_number).toBe('UNASSIGNED');
+    expect(data.hosteler.building_id).toBeNull();
+    expect(data.hosteler.room_id).toBeNull();
+    expect(data.hosteler.cot_id).toBeNull();
   });
 });
 

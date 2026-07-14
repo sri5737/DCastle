@@ -24,6 +24,23 @@ export function getTodayIST(): string {
 }
 
 /**
+ * Validate YYYY-MM-DD format.
+ */
+export function isIsoDate(dateStr: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
+
+/**
+ * Compare a date string (YYYY-MM-DD) to today's IST date.
+ */
+export function compareWithTodayIST(dateStr: string): -1 | 0 | 1 {
+  const today = getTodayIST();
+  if (dateStr < today) return -1;
+  if (dateStr > today) return 1;
+  return 0;
+}
+
+/**
  * Get tomorrow's date in IST as YYYY-MM-DD string.
  */
 export function getTomorrowDate(): string {

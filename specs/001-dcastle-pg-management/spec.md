@@ -265,7 +265,7 @@ The owner login and hosteler PIN login currently call Supabase Auth directly fro
 
 ### User Story 14 — Owner Manages Buildings, Rooms, and Room Types (Priority: P3)
 
-The owner creates hostel buildings, adds rooms within each building (optionally assigning to floors), and configures room types (e.g., 2-sharing AC, 4-sharing non-AC). Each room type has a base rent and specifies the number of cots. Cot assignments support different cot types (lower cot, upper cot). This structure enables the owner to track room inventory and assign hostelers to specific rooms and cot positions for accurate rent and facility tracking.
+The owner creates hostel buildings, adds rooms within each building (optionally assigning to floors), and configures room templates/types using a fixed dropdown with two values: AC and non-AC. Each room type also carries its sharing capacity (for example, 1-sharing, 2-sharing, 4-sharing). Each room has a dynamic effective configuration that can be changed over time: sharing capacity, AC/non-AC class, and rent inputs used for billing. Cot assignments support different cot types (lower cot, upper cot). This structure enables the owner to track room inventory, change commercial room configuration without altering past bills, and assign hostelers to specific rooms and cot positions for accurate rent and facility tracking.
 
 **Why this priority**: Room and building management is essential infrastructure for accurate billing and asset management, but it is a setup task performed infrequently (typically once during deployment and occasionally as the hostel expands).
 
@@ -274,28 +274,28 @@ The owner creates hostel buildings, adds rooms within each building (optionally 
 **Acceptance Scenarios**:
 
 1. **Given** the owner is on the buildings/rooms configuration page, **When** they click "Add Building", **Then** a form appears allowing building name entry and creation.
-2. **Given** a building has been created, **When** the owner clicks "Add Room" within that building, **Then** they can specify room number, floor (ground/first/second or null), room type, and base rent.
-3. **Given** the owner creates a new room type, **When** they define it, **Then** they specify name (e.g., "2-sharing AC"), base rent, and total cot count.
-4. **Given** a room type has been defined with a cot count, **When** the owner assigns cot details, **Then** they can configure individual cot IDs and cot types (lower cot, upper cot).
+2. **Given** a building has been created, **When** the owner clicks "Add Room" within that building, **Then** they can specify room number, floor (ground/first/second or null), and initial room configuration (sharing capacity and AC/non-AC).
+3. **Given** the owner creates a new room template/type, **When** they define it, **Then** they choose AC or non-AC from a dropdown and specify the sharing capacity for that room type.
+4. **Given** a room has active configuration and cot inventory, **When** the owner updates sharing capacity or AC/non-AC with an effective date, **Then** future billing uses the new room configuration while past billing remains unchanged.
 5. **Given** rooms and cot assignments are configured, **When** the owner views the buildings dashboard, **Then** they see a tree/hierarchical view showing buildings, their rooms, room types, and available cots.
 
 ---
 
-### User Story 15 — Owner Manages Room Rent with Effective Dates (Priority: P3)
+### User Story 15 — Owner Manages Global Room Rent Config with Effective Dates (Priority: P3)
 
-The owner can update room rent for existing rooms with an effective date (using a date picker). Until the effective date is reached, the UI shows a label: "Rent will be updated on [effective date]". Rate changes support previous calendar month, current calendar month, and future dates. On the effective date, the new rent applies for billing calculations for that date and forward.
+The owner can configure global room rent rules using: sharing capacity + room type (AC/non-AC) + effective date. Example: 1-sharing + AC = 20000. Until the effective date is reached, the UI shows a label: "Rent config will be updated on [effective date]". Rate changes support previous calendar month, current calendar month, and future dates. On the effective date, the new global rent config applies for billing calculations for that date and forward.
 
-**Why this priority**: Room rent management is periodic and critical for accurate billing, but it is not performed daily. Mid-month changes are supported to reflect seasonal adjustments or renovations.
+**Why this priority**: Rent configuration management is periodic and critical for accurate billing, but it is not performed daily. Mid-month changes are supported to reflect seasonal adjustments or policy changes.
 
-**Independent Test**: Can be tested by setting a future room rent change, verifying the pending-change label displays, then advancing the effective date and confirming bills generated after that date use the new rent.
+**Independent Test**: Can be tested by setting a future global rent config change for a sharing-capacity + room-type combination, verifying the pending-change label displays, then advancing the effective date and confirming bills generated after that date use the new configured rent for rooms matching that combination.
 
 **Acceptance Scenarios**:
 
-1. **Given** the owner views an existing room, **When** they click "Change Rent", **Then** a form appears with a date picker and new rent input field.
-2. **Given** the owner enters a future effective date and new rent amount, **When** they save, **Then** a "Rent will be updated on [date]" label appears on the room card until the effective date.
-3. **Given** the current date has reached the effective date of a pending rent change, **When** the owner views the room, **Then** the label disappears and the new rent is now active.
-4. **Given** the owner wants to change a rent that was previously changed, **When** they perform a subsequent rent change with a new effective date, **Then** the system tracks multiple rate history entries for accurate historical billing.
-5. **Given** rent changes exist for previous calendar months, current month, and future dates, **When** bills are generated, **Then** each day's rent is calculated using the rate effective on that specific date.
+1. **Given** the owner opens Room Rent Config, **When** they choose sharing capacity and room type, **Then** a form appears with a date picker and rent input field.
+2. **Given** the owner enters a future effective date and new rent amount, **When** they save, **Then** a "Rent config will be updated on [date]" label appears for that sharing-capacity + room-type combination until the effective date.
+3. **Given** the current date has reached the effective date of a pending rent config change, **When** billing looks up rent for that combination, **Then** the new configured rent is active.
+4. **Given** the owner updates the same sharing-capacity + room-type combination again, **When** they save a subsequent change with a new effective date, **Then** the system tracks multiple history entries for accurate historical billing.
+5. **Given** rent config changes exist for previous calendar months, current month, and future dates, **When** bills are generated, **Then** each day's rent is calculated using the config effective on that specific date for the room's sharing-capacity + room-type combination.
 
 ---
 
@@ -513,6 +513,11 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - **FR-032**: A monthly summary MUST show the total number of days each meal type was opted.
 - **FR-033**: The owner MUST be able to view food history for any non-deleted or preserved historical hosteler records, filterable by hosteler and date range. Canceled future-dated food preferences created by active-hosteler deletion MUST NOT appear in this normal owner food history view.
 - **FR-034**: The owner MUST be able to export the currently filtered food history as a CSV file. Canceled future-dated food preferences created by active-hosteler deletion MUST NOT be included in the normal owner history CSV export.
+- **FR-034a**: The owner MUST be able to edit food entries for an individual hosteler for a selected date range within the current IST calendar month only.
+- **FR-034b**: Owner food-entry edits MUST support per-meal ON/OFF updates (breakfast/lunch/dinner) and MUST apply only to dates inside the selected range that belong to the current month.
+- **FR-034c**: Owner food-entry edits MUST require an adjustment reason and MUST persist audit metadata (`adjusted_by_owner_id`, `adjusted_at`, `adjustment_reason`) for each modified day.
+- **FR-034d**: Owner food-entry edits MUST be allowed even if a transmitted bill already exists for the affected hosteler and month; direct mutation of the transmitted bill is not allowed, and updated values become hosteler-visible only after owner regenerate + retransmit.
+- **FR-034e**: Owner food-entry edits in the current month MUST be included in subsequent bill generation/regeneration for the affected hosteler-month; if a transmitted bill exists, regenerated output remains "Awaiting Transmission" until retransmitted.
 
 **Monthly Billing**
 
@@ -554,24 +559,24 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 
 **Automated Quality Gate**
 
-- **FR-059**: All automated tests (unit, integration, and E2E) MUST pass before any build or deployment can proceed.
+- **FR-059**: All automated tests (unit, integration, and component) MUST pass before any build or deployment can proceed.
 - **FR-060**: The deployment pipeline MUST be blocked if tests or the build step fail.
-- **FR-061**: Each user story MUST have corresponding E2E tests that verify its acceptance scenarios in a real browser environment.
+- **FR-061**: Each user story MUST have corresponding automated tests that verify its acceptance scenarios using the cheapest meaningful test type (unit, API integration, component). Browser E2E is optional and only required when explicitly requested.
 - **FR-062**: After completing any phase, all relevant automated tests MUST be executed and pass before the phase is considered done.
 - **FR-063**: Per-story test scripts MUST exist to allow running tests scoped to a specific user story independently.
-- **FR-064**: E2E tests MUST use a global setup that seeds required test data (test owner user, test hosteler user with known credentials) into Supabase before tests run, and a global teardown that cleans up test data after tests complete.
-- **FR-065**: E2E test credentials MUST be stored in environment variables (not hardcoded) and use a dedicated test owner account and test hosteler account that are pre-provisioned in the Supabase project.
-- **FR-066**: Existing and future E2E tests MUST be audited and corrected so each completed story proves at least one exact, falsifiable business outcome from its independent test, using the real UI and real Next.js API routes for the behavior under test. Route mocks, conditional skips, broad placeholder assertions, and direct cookie or localStorage session injection MUST NOT be accepted as core evidence for the feature being validated.
-- **FR-067**: Cross-role E2E workflows MUST prove producer-to-consumer behavior in the same test or an explicitly linked sequence. For food submission and owner dashboard validation, a hosteler MUST submit exact breakfast, lunch, and dinner preferences through the UI, and the owner dashboard MUST show the exact resulting meal counts and move that hosteler from Pending to Submitted.
-- **FR-068**: Owner dashboard E2E validation MUST cover both the initial fetched dashboard state and a live update caused by a real hosteler submission. The same resulting counts and Pending/Submitted membership MUST remain correct after a page reload so the accepted evidence proves both live and reload-stable behavior.
-- **FR-069**: Authentication E2E validation MUST log in owner and hosteler users through the real login UI and server-side auth routes, wait for post-login client effects, reload the authenticated page, and verify the user remains on the correct role surface. Direct cookie or localStorage injection is allowed only for documented setup helpers, never as the core proof that login works.
-- **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit tests or E2E tests may not exercise.
+- **FR-064**: Automated test suites that require seeded data MUST use deterministic setup and teardown so tests are independently runnable and repeatable.
+- **FR-065**: Test credentials MUST be stored in environment variables (not hardcoded) and use dedicated non-production accounts.
+- **FR-066**: Existing and future automated tests MUST be audited so each completed story proves at least one exact, falsifiable business outcome through real business logic and API behavior. Route mocks, conditional skips, broad placeholder assertions, and direct cookie or localStorage session injection MUST NOT be accepted as core evidence for feature validation.
+- **FR-067**: Cross-role workflows MUST prove producer-to-consumer behavior through automated validation (API integration/component tests, and browser tests only when explicitly requested). For food submission and owner dashboard validation, evidence MUST show exact breakfast/lunch/dinner count impact and pending-to-submitted transition.
+- **FR-068**: Owner dashboard validation MUST cover both initial fetched state and live update behavior from real submissions, and results MUST remain correct after reload.
+- **FR-069**: Authentication validation MUST verify owner and hosteler login behavior through server-side auth routes with persisted-session checks. Direct cookie or localStorage injection is allowed only for setup helpers, never as the core proof that login works.
+- **FR-070**: Local and CI deployment validation MUST include `npm run build:cloudflare` before any deployment or phase-complete claim. This gate MUST catch strict TypeScript, Next.js production build, and Cloudflare Pages adapter/runtime failures that unit, integration, or component tests may not exercise.
 
 **Building, Room, and Room Type Management**
 
 - **FR-084**: The owner MUST be able to create new hostel buildings with a name and optional description.
-- **FR-085**: The owner MUST be able to add rooms within a building, specifying: room number, optional floor (ground, first, second), associated room type, and base rent.
-- **FR-086**: The owner MUST be able to define custom room types with: name (e.g., "2-sharing AC"), description, base rent, and total cot count.
+- **FR-085**: The owner MUST be able to add rooms within a building, specifying: room number, optional floor (ground, first, second), associated room type, and initial effective configuration.
+- **FR-086**: The owner MUST be able to define room types using a fixed dropdown with only two values (AC and non-AC) plus a sharing capacity value; optional description may also be stored.
 - **FR-087**: The owner MUST be able to configure individual cots within a room type, specifying cot ID and cot type (lower cot, upper cot).
 - **FR-088**: The building/room/cot hierarchy MUST be queryable and displayable in a tree or hierarchical view showing all buildings, rooms within each building, room types, and cot assignments.
 - **FR-089**: When a hosteler is registered, the owner MUST be able to assign them to a specific building, room, and available cot.
@@ -579,12 +584,12 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 
 **Room Rent Management with Effective Dates**
 
-- **FR-091**: The owner MUST be able to change room rent for any existing room by specifying a new rent amount and an effective date (using a date picker).
+- **FR-091**: The owner MUST be able to configure room rent globally by sharing capacity and room type (AC/non-AC) by specifying a new rent amount and an effective date (using a date picker).
 - **FR-092**: Effective dates MUST support: previous calendar month, current calendar month, and all future dates.
-- **FR-093**: Until the effective date of a pending rent change is reached, the room display MUST show a label: "Rent will be updated on [effective date]".
-- **FR-094**: Once the effective date is reached, the label MUST disappear and the new rent MUST become active for billing calculations from that date forward.
-- **FR-095**: The system MUST maintain a complete historical record of all room rent changes with effective dates, enabling accurate billing for any month with rate changes.
-- **FR-096**: When bills are generated for a month containing room rent changes, the system MUST apply each room's rate that was effective on each individual date.
+- **FR-093**: Until the effective date of a pending rent config change is reached, the settings display MUST show a label: "Rent config will be updated on [effective date]".
+- **FR-094**: Once the effective date is reached, the label MUST disappear and the new configured rent MUST become active for billing calculations from that date forward.
+- **FR-095**: The system MUST maintain a complete historical record of all global room rent config changes keyed by sharing capacity and room type with effective dates, enabling accurate billing for any month with rate changes.
+- **FR-096**: When bills are generated for a month containing room rent config changes, the system MUST apply the configured rent effective on each individual date for the room's sharing-capacity + room-type combination.
 
 **Meal Rate Management with Effective Dates**
 
@@ -646,6 +651,46 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - **FR-137**: The owner MUST be able to expand/collapse buildings and rooms in the dashboard to focus on specific areas of the hostel.
 - **FR-138**: The available-cot dashboard MUST update in real time or on refresh to reflect current occupancy changes.
 
+**Dynamic Room Configuration for Sharing and AC/Non-AC**
+
+- **FR-139**: The owner MUST be able to configure each room's effective commercial configuration with: `sharing_capacity` (minimum 1), room class (`ac` or `non_ac`), and rent inputs used for billing.
+- **FR-140**: The owner MUST be able to schedule a room configuration change per room (not global room-type-only) using an effective date that is today or in the future; past dates are rejected.
+- **FR-141**: Billing MUST be calculated using the room configuration effective for each billable date for that room assignment: sharing capacity plus AC/non-AC class and the corresponding rent inputs.
+- **FR-142**: The system MUST maintain immutable room-configuration history per room so historical bills remain stable and auditable when sharing capacity or AC/non-AC changes later.
+- **FR-143**: The active sharing capacity for a room MUST NOT exceed configured cot inventory for that room; validation MUST block invalid configurations.
+- **FR-144**: Owner UI MUST show current room configuration and any pending effective-dated change label (for example, "Room configuration will update on [date]") until effective date is reached.
+- **FR-145**: Cot labels MUST be auto-generated per bunk pair using deterministic prefixes: `L{n}` for lower bed and `U{n}` for upper bed. For each configured bunk count `n`, the room MUST contain exactly two cot entries (`L{n}`, `U{n}`), and labels MUST remain unique within the room.
+- **FR-146**: During "Configure Cots", the owner MUST choose a cot configuration type: `bunker` or `normal`. For `normal`, labels MUST be generated as `L{n}` only (for example `L1`, `L2`, `L3`) and map to lower cot type semantics.
+- **FR-147**: The Buildings and Rooms UI MUST expose a visible delete action for each building, wired to existing delete API behavior and guardrails (for example, block deletion when active room assignments exist).
+- **FR-148**: All room-configuration form inputs in owner UI MUST include explicit visible labels (not placeholder-only), including the first field for sharing capacity.
+- **FR-149**: Building detail interaction MUST scale for large inventories (20-40 rooms per building) by separating room list navigation from room detail/configuration editing. Opening a building should first show room numbers list; full room configuration panels should appear only for the selected room.
+- **FR-150**: Room Type management MUST support safe delete and archive semantics: an unused room type can be deleted, but if any room references a room type, hard delete MUST be blocked and owner MUST be able to mark that room type inactive/archived so it is hidden from new room creation.
+- **FR-151**: Cot management MUST NOT expose per-cot hard delete as a standard owner action. Instead, owners MUST use room-level cot reconfiguration/reset flows, and destructive cot reset operations MUST be blocked when any cot in that room is assigned to an active hosteler.
+- **FR-152**: Building delete in owner UI MUST require explicit confirmation before sending delete request to prevent accidental destructive actions.
+- **FR-153**: Room Type lifecycle panel MUST support scalable browsing (search and/or filter with pagination or lazy list rendering) so owners can manage large room-type catalogs without excessive scrolling.
+- **FR-154**: When room-type delete is blocked due to room references, UI error feedback MUST include usage context (for example, number of rooms currently using that type) and direct owner guidance to archive instead.
+- **FR-155**: Configure Cots reset UX MUST present a clear destructive-action panel showing current cot mode, target mode, and guardrail note before confirmation.
+- **FR-156**: Building room list UX MUST include quick room search/filter controls to help owners navigate buildings with high room counts.
+- **FR-157**: Rate-change forms (global room rent and meal rates) MUST include a concise effective-date summary panel showing current value, scheduled value, and effective date before submit.
+- **FR-158**: Billing owner UI MUST support high-volume review with status filters, searchable hosteler list, and sticky month/scope context so owners can quickly find generated vs transmitted bills.
+- **FR-159**: Hosteler bill detail and owner bill detail views MUST provide an optional collapsed/expanded breakdown mode to reduce visual overload on small screens.
+- **FR-160**: Employee management UI MUST include quick search/filter and clear pending-change chips so owners can locate employees and upcoming salary updates without scanning full lists.
+- **FR-161**: Profit and available-cot dashboards MUST include explicit loading, empty, and error states with retry actions; large breakdown sections SHOULD support progressive disclosure (collapsed by default with expand controls).
+- **FR-162**: Completed hosteler daily-flow screens (login, dashboard, submit) MUST surface clearer action-state feedback including deterministic loading state, success confirmation, and recoverable error guidance without forcing manual page refresh.
+- **FR-163**: Completed owner operational screens (dashboard, hostelers, settings) MUST provide quick-find controls (search and/or status filter) for dense lists so common records can be located without full-list scanning.
+- **FR-164**: Invite activation and login forms MUST provide inline field-level validation messages with focus directed to the first invalid field and preserved non-invalid inputs after validation failure.
+- **FR-165**: Destructive or irreversible lifecycle actions in already completed phases (deactivate/delete/reset-like actions) MUST include concise impact summaries and explicit confirmation language before commit.
+- **FR-166**: Android PWA install and offline indicators on already completed shells MUST provide non-intrusive but persistent contextual guidance so users understand install availability, offline limitations, and reconnect behavior.
+- **FR-167**: Completed hosteler and owner pages MUST avoid blank-data ambiguity by rendering explicit empty-state messages with a next-best action (for example, retry, change filter, or navigate to setup action).
+- **FR-168**: Buildings page MUST remove the standalone "Room Type Lifecycle" management panel and shift room-type template creation into the Add Room workflow so owners can create/select room template data in a single flow.
+- **FR-169**: Add Room workflow MUST capture room template attributes directly: room class (`AC`/`non-AC`), sharing capacity, cot count, and cot configuration type (`bunker`/`normal`) before room creation.
+- **FR-170**: Add Room workflow MUST no longer require manual rent input; rent is managed by Phase 20 global room-rent configuration and unresolved rent state for newly created rooms MUST be handled explicitly until global config exists.
+- **FR-171**: Room creation flow MUST support cot mode selection at create-time so owner can choose `bunker` or `normal` inventory behavior without a separate immediate post-create cot setup step.
+- **FR-172**: Owner hosteler registration form MUST capture only core identity fields (name and phone) and MUST NOT require building, room, cot, or room-number assignment at registration time.
+- **FR-173**: Owner UI MUST provide a dedicated accommodation assignment page where building, room, and cot can be assigned or reassigned for an existing hosteler.
+- **FR-174**: Reassigning a hosteler to a different room/cot MUST atomically release the previous cot and assign the new cot, with guardrails preventing assignment to occupied cots.
+- **FR-175**: Hosteler records MUST support an explicit unassigned accommodation state until the owner performs assignment from the dedicated page.
+
 **Android Mobile and Tablet App Experience**
 
 - **FR-071**: Hosteler-facing screens MUST be optimized for Android mobile (375 px width) as the primary baseline. Hostelers access the app primarily on phones; all hosteler workflows must be usable at 375 px without horizontal scrolling or broken layouts.
@@ -677,9 +722,10 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - **Settings**: System-wide configuration values. Includes the daily submission deadline time, which is owner-configurable.
 - **Android Mobile App Experience**: The primary presentation and interaction mode for Deekshana Castle on Android phones, covering Android Chrome and installed standalone PWA usage. It includes mobile navigation, viewport-safe layout, touch-friendly controls, readable content, and validation at the 375 px mobile baseline.
 - **Building**: A physical structure within the hostel property that houses rooms. Contains name and optional description. Used for organizational grouping of rooms.
-- **Room**: A rentable unit within a building. Identified by room number and optionally associated with a floor (ground, first, second). Has an associated room type and current base rent.
-- **Room Type**: A classification for groups of identical rooms with the same configuration. Specifies: name (e.g., "2-sharing AC"), description, base rent, and total cot count. Used for inventory tracking and rate management.
-- **Cot**: A bed or sleeping unit within a room. Has a unique cot ID, associated cot type (lower cot, upper cot), and occupancy status (assigned to a hosteler or free). Each room has multiple cots based on its room type configuration.
+- **Room**: A rentable unit within a building. Identified by room number and optionally associated with a floor (ground, first, second). Has effective-dated commercial configuration (sharing capacity, AC/non-AC, and rent inputs) used directly by billing.
+- **Room Type**: A reusable template/category (for example AC/non-AC variants and defaults). Room-level effective configuration is authoritative for billing. Room types support active/inactive lifecycle for operational safety: inactive room types are excluded from new room creation but remain valid for historical room references.
+- **Room Configuration History**: Immutable per-room history of configuration changes over time. Each entry stores sharing capacity, AC/non-AC class, rent inputs, effective date, and creation metadata; historical lookups drive billing correctness.
+- **Cot**: A bed or sleeping unit within a room. Has a unique cot ID, associated cot type (lower cot, upper cot), and occupancy status (assigned to a hosteler or free). Labels are auto-generated based on selected cot configuration type: bunker mode uses paired labels `L{n}` and `U{n}` (for example `L1`, `U1`, `L2`, `U2`), while normal mode uses `L{n}` labels only (for example `L1`, `L2`, `L3`), unique within each room. Inventory changes are managed via room-level reconfiguration/reset workflows rather than per-cot hard delete.
 - **Room Rent Rate History**: A record of room rent changes over time. Each entry contains: room ID, new rent amount, effective date, and creation timestamp. Enables historical lookup for accurate billing when rent changes mid-month.
 - **Meal Rate History**: A record of meal rate changes over time. Each entry contains: meal type (breakfast/lunch/dinner), new rate, effective date, and creation timestamp. Enables historical lookup for accurate billing when rates change mid-month.
 - **Employee**: A hostel staff member record containing: name, job description, and current salary. Salary changes are tracked with effective dates to support expense calculations for profit margin analysis.
@@ -724,6 +770,17 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - **SC-028**: When the owner adds a line-item expense to the profit margin dashboard, the total expenses and profit margin are recalculated immediately.
 - **SC-029**: The available-cot dashboard shows all buildings, rooms, and cots with occupancy status (occupied with hosteler name / free); occupied cots become free immediately when their assigned hosteler is deactivated or deleted.
 - **SC-030**: For a past month with historical rate/salary changes, the profit margin dashboard correctly reflects the rates and salaries that were effective in that month, not current rates.
+- **SC-031**: When cot configuration is triggered for a room, generated labels follow the deterministic sequence `L1`,`U1`,`L2`,`U2`... based on bunk count, and each generated pair correctly maps to lower/upper cot types.
+- **SC-032**: When cot configuration type is set to `normal`, generated labels follow `L1`,`L2`,`L3`... with no `U` labels, and generated entries map to lower cot type semantics.
+- **SC-033**: For a building with at least 30 rooms, owner can find a room and open its full configuration panel in under 10 seconds without rendering all room configuration forms at once.
+- **SC-034**: Attempting to delete a room type currently referenced by at least one room returns a clear blocked-delete response, and archiving that room type removes it from Add Room selectors while preserving existing room references.
+- **SC-035**: For a building with at least 30 rooms, owner can locate a target room via room search/filter and open its detail panel in under 5 seconds on tablet baseline.
+- **SC-036**: In owner billing review for a month with at least 100 generated rows, an owner can filter to a target hosteler and open bill detail in under 10 seconds on tablet baseline.
+- **SC-037**: On settings and dashboard pages, loading/empty/error states render deterministically with a visible retry path and no blank-state dead ends.
+- **SC-038**: For completed Phase 1-18 auth and submission flows on Android 375 px baseline, users can recover from a validation or network error and complete the intended action in one retry attempt without losing previously entered valid fields.
+- **SC-039**: For completed owner list-heavy screens from Phase 1-18, owners can locate a target record (hosteler or settings item) in under 8 seconds using search/filter controls on tablet baseline.
+- **SC-040**: In Buildings flow, owner can create a room including class, sharing, cot count, and cot mode in a single submission without navigating a separate room-type lifecycle panel.
+- **SC-041**: Owner can assign or reassign accommodation (building -> room -> cot) for an existing hosteler in under 30 seconds from the dedicated assignment page.
 
 ---
 
@@ -750,7 +807,7 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - Infrastructure operates entirely on free service tiers; no recurring paid third-party services are required.
 - The repository's actual application stack, including Next.js 15.3.3, is treated as the intended implementation baseline. Any conflicting plan or constitution text must be aligned to that baseline through artifact/governance updates rather than downgrading the existing implementation.
 - Owner-assisted forgot-PIN in v1 is not self-service. It is initiated only by owner invite regeneration and is limited to active PIN-linked hostelers.
-- Buildings, rooms, room types, and cots are hostel infrastructure configured once at setup; room/building hierarchy changes are infrequent (typically at deployment or when hostel physically expands).
+- Buildings and physical room/cot structure changes are infrequent (typically at deployment or when hostel physically expands), but room commercial configuration (sharing capacity and AC/non-AC) is dynamic and may change based on occupancy and pricing decisions.
 - A single cot can only be occupied by one active hosteler at a time. When a hosteler is deleted or deactivated, their cot is immediately freed for reassignment.
 - Room rent and meal rates can change mid-month; the system tracks complete rate history to enable accurate billing for any month with changes.
 - Employee salary changes are tracked historically to enable accurate expense calculations for profit margin dashboards; salary does not retroactively change.
@@ -783,9 +840,9 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - Q: When an active hosteler is deleted, should future-dated food preferences remain for billing/audit or be canceled? → A: Preserve past and same-day history, but cancel any future-dated food preferences after the deletion takes effect so they no longer affect future counts or billing.
 - Q: After an active hosteler is deleted, where should canceled future-dated food preferences remain visible? → A: They remain visible only inside that deleted hosteler's dedicated deleted/audit view and are excluded from normal owner history/export, dashboard counts, and billing.
 - Q: After activation, can a hosteler log in with both Google and PIN, or only with the credential actually linked during activation? → A: Only the credential actually linked during activation is valid for login in v1. The system does not require the hosteler to add the second credential later.
-- Q: How should completed E2E tests be treated after adding Honest E2E Validation guardrails? → A: Existing and future E2E tests must be audited and corrected to prove exact business outcomes through the real UI and real Next.js API routes; broad render, route, placeholder, mock, or injected-session checks are not sufficient completion evidence.
-- Q: What must owner dashboard E2E evidence prove for food-count workflows? → A: A real hosteler UI submission must change the exact breakfast, lunch, and dinner counts, move that hosteler from Pending to Submitted, and remain correct for both initial fetch and live/reload-stable dashboard behavior.
-- Q: What must auth E2E evidence prove after the server-side auth proxy work? → A: Owner and hosteler login must use the real login UI and server-side auth routes, survive post-login client effects plus reload, and must not use direct cookie or localStorage injection as the core authentication proof.
+- Q: How should completed E2E tests be treated after adding Honest E2E Validation guardrails? → A: Superseded by later clarification. Going forward, browser E2E is optional and only run on explicit request.
+- Q: What must owner dashboard E2E evidence prove for food-count workflows? → A: Superseded by later clarification. Required coverage now relies on unit/API integration/component evidence for exact count and pending/submitted behavior.
+- Q: What must auth E2E evidence prove after the server-side auth proxy work? → A: Superseded by later clarification. Required coverage now relies on unit/API integration/component evidence for login and session persistence behavior.
 - Q: How is the Next.js version conflict resolved for this feature? → A: The actual repository stack, Next.js 15.3.3, is intended; planning and constitution artifacts must align to that baseline rather than downgrading the implementation.
 - Q: How should SC-001 and SC-010 be validated for v1 acceptance? → A: Treat them as scoped acceptance evidence tasks using representative browser/manual timing and seeded 100-hosteler scenarios; full load-testing infrastructure is not required unless explicitly documented later.
 - Q: How should Android mobile layout breakage be handled now that the app is already a PWA? → A: Treat Android mobile as the primary product experience. Completed user-facing screens must pass 375 px mobile baseline validation, and screens used from the installed app must also pass standalone PWA validation where applicable.
@@ -815,10 +872,14 @@ The owner can view a dashboard showing all rooms, their cot inventory, and occup
 - Q: What if the owner assigns a cot to a hosteler but then deletes that hosteler? Are cots freed for assignment? → A: Yes. Deleted or deactivated hostelers' assigned cots become immediately "Free" and can be reassigned to new hostelers.
 - Q: What is the bill lifecycle, and can bills be modified after transmission? → A: Bills can only be in two states: "Awaiting Transmission" (mutable, owner can regenerate) or "Transmitted" (immutable and permanent). Once transmitted, a bill cannot be edited. If a hosteler is deleted before transmission, their bill remains in "Awaiting Transmission" and can still be transmitted after deletion; the deleted hosteler's history is preserved in the bill.
 - Q: How should room rent be prorated when a hosteler's room assignment changes or a hosteler moves in/out mid-month? → A: **Option A - Prorate by date (SELECTED)**: Room rent is split based on how many days the hosteler occupied each room. For example, if a hosteler occupied Room A for 15 days and Room B for 16 days of a 31-day month, Room A's rent is divided by days occupied / total room days, and Room B's rent is calculated proportionally. Bills show the breakdown per room with the prorated amount.
+- Q: What happens if a hosteler's room assignment is changed multiple times within the same IST calendar day? → A: **Day-Granularity Rule (SELECTED)**: Billing remains day-granular (not hour-granular). For any date, only one room assignment is billable: the latest assignment recorded for that IST date is used for that day's room rent. No intra-day proration is applied.
 - Q: What should happen if a hosteler has no room assignment for part of the month? Should the owner be charged room rent for unassigned days? → A: **Option A - Skip billing for unassigned days (SELECTED)**: If a hosteler has no room assignment for any portion of the month, no room rent is charged for those days. Only days when a room assignment is active are subject to room rent billing.
+- Q: Should the owner be allowed to edit an individual hosteler's food entries for selected dates in the current month? → A: **Yes (SELECTED)**: Owner may edit current-month entries for an individual hosteler for a chosen date range, with mandatory adjustment reason and audit trail. Edits are allowed even if a transmitted bill exists; owner must regenerate and retransmit for revised values to become hosteler-visible.
 - Q: When a rate (room rent, meal rate, or salary) is changed with an effective date, should past bills be recalculated with the new rate, or remain locked with their original rates? → A: **Option A - Immutable Past Rates (SELECTED)**: Once a rate change takes effect, only future bills use the new rate. Past bills remain locked and cannot be recalculated. This ensures billing history is stable and prevents retroactive financial surprises.
 - Q: For the profit margin dashboard, should the owner be able to select only the current month, or any month in history? If selecting past months, should rates be recalculated with current rates or the historical rates that were effective during that month? → A: **Option B - Historical Month Selection (Full History) (SELECTED)**: The dashboard allows owner to select any past, current, or future month. When a past month is selected, the dashboard recalculates using the rates (room, meal, salary) that were effective during that specific month. This provides accurate historical profit analysis.
 - Q: Can the owner change a room type (e.g., from "2-sharing Non-AC" to "2-sharing AC") after the room has been created? If so, can the effective date be a past date? → A: **Option B - Change with Effective Date (Future/Current Only) (SELECTED)**: The owner can change a room type with an effective date that is today or in the future. Past room types cannot be changed retroactively (no backdated effective dates allowed) to maintain consistency with the immutable past rates decision. This prevents retroactive billing confusion: once a bill is generated using a room type, that room's historical type is locked and cannot be changed. Room type changes only affect future bills generated after the effective date.
+- Q: Can rooms of the same type have different sharing capacities dynamically, and should billing use the room's current sharing plus AC/non-AC configuration? → A: **Yes (SELECTED)**: Room-level configuration is authoritative and dynamic. The owner can update a specific room's sharing capacity and AC/non-AC configuration with effective dates (today/future only). Billing uses the effective room configuration for each date (sharing capacity + AC/non-AC + rent inputs). Past bills remain immutable through room configuration history.
+- Q: Is browser E2E mandatory for future implementation phases and task completion? → A: **No (SELECTED)**: Going forward, browser E2E is optional and runs only when explicitly requested. Required completion coverage is unit tests, API integration tests, and component tests with documented acceptance evidence.
 
 ### Session 2026-07-10-clarify
 
@@ -837,4 +898,8 @@ All 5 critical billing and dashboard decisions have been clarified and integrate
 5. **Q5: Profit Dashboard Allows Full Historical Month Selection** → The profit margin dashboard allows the owner to select any past, current, or future month for analysis. When a past month is selected, the dashboard recalculates income and expenses using the historical rates (room rent, meal rates, salaries) that were effective during that specific month. This provides accurate historical profit margin analysis and period-over-period comparison without retroactively modifying archived bills.
 
 6. **Q6: Room Type Changes with Future/Current Effective Dates Only** → The owner can change a room type (e.g., Non-AC to AC) with an effective date that is today or in the future. Past room types cannot be changed retroactively to maintain consistency with the immutable past rates decision. This ensures: (a) past bills remain accurate with their original room types, (b) no confusion about which room type was billed, (c) alignment with billing immutability principle. Changes apply to future bills only.
+
+7. **Q7: Same-Day Room Reassignment Billing Rule** → If a hosteler's room assignment changes multiple times within the same IST date, billing uses day-level granularity and charges only one room for that date: the latest assignment recorded on that IST date. No intra-day/hourly proration is applied.
+
+8. **Q8: Owner Current-Month Food Entry Corrections** → Owner can edit an individual hosteler's food entries for selected dates within the current IST month with a mandatory reason and audit trail. If the affected hosteler-month bill is already transmitted, edits are still allowed; owner must regenerate and retransmit so the revised bill replaces the previously transmitted version.
 

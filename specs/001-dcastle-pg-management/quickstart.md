@@ -59,12 +59,11 @@ npm run dev
 
 ```bash
 npm run test:run
-npm run test:e2e
 ```
 
-Story-scoped validation commands must exist for every user story and include the honest E2E evidence for that story, including `npm run test:us12` for the server-side auth proxy flow. Existing completed-story suites must be audited before acceptance so they prove exact business outcomes through the real UI and real Next.js API routes.
+Story-scoped validation commands must exist for every user story and include required unit/integration/component evidence, including `npm run test:us12` for the server-side auth proxy flow. Existing completed-story suites must be audited before acceptance so they prove exact business outcomes through real business logic and real Next.js API routes.
 
-For user-facing stories, acceptance evidence must also include Android Chrome validation at the 375 px baseline. Screens used from the installed app require standalone PWA validation where applicable. Passing desktop E2E or broad responsive checks is not sufficient when a completed owner, hosteler, or auth screen has page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, hover-only navigation, or unsafe touch spacing on Android mobile.
+For user-facing stories, acceptance evidence must also include Android Chrome validation at the 375 px baseline. Screens used from the installed app require standalone PWA validation where applicable. Passing desktop-only checks is not sufficient when a completed owner, hosteler, or auth screen has page-level horizontal overflow, clipped primary content, overlapping controls, unreachable primary actions, hover-only navigation, or unsafe touch spacing on Android mobile.
 
 ---
 

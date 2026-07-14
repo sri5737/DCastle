@@ -163,8 +163,9 @@ export interface RoomType {
   id: string;
   owner_id: string;
   name: string;
-  base_rent: number;
+  sharing_capacity: number;
   cot_count: number;
+  active: boolean;
   description: string | null;
   created_at: string;
   updated_at: string;

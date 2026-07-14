@@ -2,12 +2,13 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Users, Receipt, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Receipt, Settings, Building2, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const OWNER_NAV = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/hostelers', label: 'Hostelers', icon: Users },
+  { href: '/admin/buildings', label: 'Buildings', icon: Building2 },
   { href: '/admin/billing', label: 'Billing', icon: Receipt },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];

@@ -8,6 +8,7 @@ import type { DeletedFromStatus, HostelerStatus } from '@/types';
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const INVITE_EXPIRY_DAYS = 7;
+const UNASSIGNED_ROOM_NUMBER = 'UNASSIGNED';
 
 type HostelerListRow = {
   id: string;
@@ -137,9 +138,11 @@ async function handlePost(request: NextRequest) {
   if (!phone || !PHONE_REGEX.test(phone)) {
     return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
   }
-  if (!room_number || room_number.length < 1 || room_number.length > 10) {
+  if (room_number && (room_number.length < 1 || room_number.length > 10)) {
     return NextResponse.json({ error: 'Room number must be 1-10 characters' }, { status: 400 });
   }
+
+  const resolvedRoomNumber = room_number || UNASSIGNED_ROOM_NUMBER;
 
   // Validate building/room/cot if provided (all three must be provided together)
   if ((building_id || room_id || cot_id) && !(building_id && room_id && cot_id)) {
@@ -155,7 +158,7 @@ async function handlePost(request: NextRequest) {
   // Hard-deleted pending hostelers have no row, so their phone is naturally free.
   const { data: existingHosteler, error: phoneCheckError } = await supabase
     .from('hostelers')
-    .select('id')
+    .select('id, status')
     .eq('phone', phone)
     .in('status', ['active', 'pending'])
     .maybeSingle();
@@ -165,11 +168,14 @@ async function handlePost(request: NextRequest) {
   }
 
   if (existingHosteler) {
+    const isPendingConflict = existingHosteler.status === 'pending';
     return NextResponse.json(
       {
         error: {
           code: 'phone_already_registered',
-          message: 'This mobile number is already registered to an active hosteler.',
+          message: isPendingConflict
+            ? 'This mobile number is already registered to a pending hosteler.'
+            : 'This mobile number is already registered to an active hosteler.',
           recovery_action:
             'Deactivate or delete the existing hosteler before re-registering this phone number.',
         },
@@ -242,7 +248,7 @@ async function handlePost(request: NextRequest) {
     .insert({
       name,
       phone,
-      room_number,
+      room_number: resolvedRoomNumber,
       status: 'pending',
       building_id: building_id || null,
       room_id: room_id || null,
@@ -267,17 +273,24 @@ async function handlePost(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create hosteler' }, { status: 500 });
   }
 
-  // If cot was assigned, update the cot's hosteler_id
+  // If cot was assigned, claim the cot by conditional update.
+  // If the cot becomes occupied between validation and this update,
+  // roll back hosteler creation to keep assignment atomic at API level.
   if (cot_id && hosteler) {
-    const { error: cotUpdateError } = await supabase
+    const { data: claimedCot, error: cotUpdateError } = await supabase
       .from('cots')
-      .update({ hosteler_id: hosteler.id })
-      .eq('id', cot_id);
+      .update({ hosteler_id: hosteler.id, updated_at: new Date().toISOString() })
+      .eq('id', cot_id)
+      .is('hosteler_id', null)
+      .select('id')
+      .maybeSingle();
 
-    if (cotUpdateError) {
-      console.error('Error assigning cot to hosteler:', cotUpdateError);
-      // Don't fail the entire hosteler creation; just log the error
-      // The hosteler is created but cot assignment failed
+    if (cotUpdateError || !claimedCot) {
+      await supabase.from('hostelers').delete().eq('id', hosteler.id);
+      return NextResponse.json(
+        { error: 'Selected cot is no longer available. Please choose another cot.' },
+        { status: 409 },
+      );
     }
   }
 

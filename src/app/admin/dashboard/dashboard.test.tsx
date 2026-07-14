@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
@@ -126,6 +126,23 @@ describe('Owner Dashboard - Food Counts Aggregation', () => {
     const zeros = screen.getAllByText('0');
     expect(zeros.length).toBe(3);
     expect(screen.getByText('Pending (3)')).toBeInTheDocument();
+  });
+
+  it('supports quick-find filtering with deterministic no-data messages', async () => {
+    const OwnerDashboardPage = (await import('./page')).default;
+    render(<OwnerDashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading dashboard…')).not.toBeInTheDocument();
+    });
+
+    const quickFindInput = screen.getByLabelText('Quick find hostelers');
+    fireEvent.change(quickFindInput, { target: { value: 'zzz' } });
+
+    expect(screen.getByText('No pending hostelers match "zzz".')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Submitted (2)'));
+    expect(screen.getByText('No submitted hostelers match "zzz".')).toBeInTheDocument();
   });
 });
 

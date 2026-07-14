@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,9 +21,12 @@ function LoginForm() {
 
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ phone: string; pin: string }>({ phone: '', pin: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setHydrated(true);
@@ -31,18 +34,30 @@ function LoginForm() {
 
   // Handle error params from Google OAuth callback
   const callbackError = searchParams.get('error');
+  const activationStatus = searchParams.get('activated');
+  const resetStatus = searchParams.get('reset');
   const errorMessage = getCallbackErrorMessage(callbackError);
+  const successMessage = getSuccessMessage(activationStatus, resetStatus);
 
   async function handlePinLogin(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
+    const nextErrors = { phone: '', pin: '' };
     if (!/^[6-9]\d{9}$/.test(phone)) {
-      setError('Please enter a valid 10-digit phone number');
-      return;
+      nextErrors.phone = 'Please enter a valid 10-digit phone number';
     }
     if (!/^\d{4}$/.test(pin)) {
-      setError('PIN must be exactly 4 digits');
+      nextErrors.pin = 'PIN must be exactly 4 digits';
+    }
+    setFieldErrors(nextErrors);
+
+    if (nextErrors.phone || nextErrors.pin) {
+      if (nextErrors.phone) {
+        phoneInputRef.current?.focus();
+      } else {
+        pinInputRef.current?.focus();
+      }
       return;
     }
 
@@ -120,6 +135,12 @@ function LoginForm() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="mb-4 p-3 rounded-md bg-green-50 border border-green-200">
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+        )}
+
         {/* Error from form actions */}
         {error && (
           <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200">
@@ -171,16 +192,29 @@ function LoginForm() {
               Phone Number
             </label>
             <Input
+              ref={phoneInputRef}
               id="phone"
               type="tel"
               inputMode="numeric"
               placeholder="9876543210"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (fieldErrors.phone) {
+                  setFieldErrors((current) => ({ ...current, phone: '' }));
+                }
+              }}
               maxLength={10}
               disabled={loading || !hydrated}
               className="h-12 text-base"
+              aria-invalid={fieldErrors.phone ? 'true' : 'false'}
+              aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
             />
+            {fieldErrors.phone && (
+              <p id="phone-error" className="mt-1 text-sm text-red-700" role="alert">
+                {fieldErrors.phone}
+              </p>
+            )}
           </div>
 
           <div>
@@ -188,16 +222,29 @@ function LoginForm() {
               4-Digit PIN
             </label>
             <Input
+              ref={pinInputRef}
               id="pin"
               type="password"
               placeholder="••••"
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => {
+                setPin(e.target.value);
+                if (fieldErrors.pin) {
+                  setFieldErrors((current) => ({ ...current, pin: '' }));
+                }
+              }}
               maxLength={4}
               inputMode="numeric"
               disabled={loading || !hydrated}
               className="h-12 text-base"
+              aria-invalid={fieldErrors.pin ? 'true' : 'false'}
+              aria-describedby={fieldErrors.pin ? 'pin-error' : undefined}
             />
+            {fieldErrors.pin && (
+              <p id="pin-error" className="mt-1 text-sm text-red-700" role="alert">
+                {fieldErrors.pin}
+              </p>
+            )}
           </div>
 
           <Button type="submit" className="w-full h-12 text-base" disabled={loading || !hydrated}>
@@ -232,4 +279,16 @@ function getCallbackErrorMessage(error: string | null): string | null {
     default:
       return null;
   }
+}
+
+function getSuccessMessage(activated: string | null, reset: string | null): string | null {
+  if (activated === 'success') {
+    return 'Account activated successfully. Sign in with your phone number and PIN.';
+  }
+
+  if (reset === 'success') {
+    return 'PIN reset successful. Sign in with your updated PIN.';
+  }
+
+  return null;
 }

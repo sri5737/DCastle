@@ -3,7 +3,8 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/server';
-import type { RoomType } from '@/types';
+
+const ROOM_TYPE_NAMES = ['AC', 'non-AC'] as const;
 
 async function handleGet(request: NextRequest) {
   const authResult = await requireOwner();
@@ -16,6 +17,7 @@ async function handleGet(request: NextRequest) {
     .from('room_types')
     .select('*')
     .eq('owner_id', ownerId)
+    .order('active', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -39,19 +41,20 @@ async function handlePost(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { name, base_rent, cot_count, description } = body;
+  const { name, sharing_capacity, cot_count, description } = body;
 
   // Validation
-  if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 255) {
-    return NextResponse.json({ error: 'Invalid room type name' }, { status: 400 });
+  if (typeof name !== 'string' || !ROOM_TYPE_NAMES.includes(name as (typeof ROOM_TYPE_NAMES)[number])) {
+    return NextResponse.json({ error: 'Room type name must be AC or non-AC' }, { status: 400 });
   }
 
-  if (typeof base_rent !== 'number' || base_rent <= 0) {
-    return NextResponse.json({ error: 'Base rent must be a positive number' }, { status: 400 });
+  if (!Number.isInteger(sharing_capacity) || sharing_capacity < 1 || sharing_capacity > 10) {
+    return NextResponse.json({ error: 'Sharing capacity must be between 1 and 10' }, { status: 400 });
   }
 
-  if (typeof cot_count !== 'number' || cot_count <= 0 || cot_count > 10) {
-    return NextResponse.json({ error: 'Cot count must be between 1 and 10' }, { status: 400 });
+  // cot_count represents bunk pairs; each bunk creates one lower and one upper cot.
+  if (!Number.isInteger(cot_count) || cot_count <= 0 || cot_count > 10) {
+    return NextResponse.json({ error: 'Bunk count must be between 1 and 10' }, { status: 400 });
   }
 
   if (description && (typeof description !== 'string' || description.length > 1000)) {
@@ -60,12 +63,13 @@ async function handlePost(request: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // Check for uniqueness (owner_id, name)
+  // Check for uniqueness (owner_id, name, sharing_capacity)
   const { data: existing, error: checkError } = await supabase
     .from('room_types')
-    .select('id')
+    .select('id, active')
     .eq('owner_id', ownerId)
-    .eq('name', name.trim())
+    .eq('name', name)
+    .eq('sharing_capacity', sharing_capacity)
     .maybeSingle();
 
   if (checkError) {
@@ -74,9 +78,18 @@ async function handlePost(request: NextRequest) {
   }
 
   if (existing) {
+    if (existing.active === false) {
+      return NextResponse.json(
+        {
+          error:
+            'Room type with this name and sharing capacity already exists but is archived. Unarchive it from Room Type Lifecycle.',
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
-      { error: 'Room type with this name already exists' },
-      { status: 400 }
+      { error: 'Room type with this name and sharing capacity already exists' },
+      { status: 409 }
     );
   }
 
@@ -85,12 +98,13 @@ async function handlePost(request: NextRequest) {
     .from('room_types')
     .insert({
       owner_id: ownerId,
-      name: name.trim(),
-      base_rent,
+      name,
+      sharing_capacity,
       cot_count,
+      active: true,
       description: description?.trim() || null,
     })
-    .select()
+    .select('id, owner_id, name, sharing_capacity, cot_count, active, description, created_at, updated_at')
     .single();
 
   if (createError) {

@@ -10,6 +10,29 @@ function buildActiveDeleteMessage(futurePreferenceCount: number, effectiveDate: 
   return `Deleting this hosteler will revoke login access immediately, preserve past and same-day history, and cancel ${futurePreferenceCount} future-dated food preference row${futurePreferenceCount === 1 ? '' : 's'} after ${effectiveDate}. Delete anyway?`;
 }
 
+async function clearCotAssignmentForHosteler(
+  supabase: ReturnType<typeof createServiceClient>,
+  hostelerId: string
+) {
+  const now = new Date().toISOString();
+
+  const { error: cotClearError } = await supabase
+    .from('cots')
+    .update({ hosteler_id: null, updated_at: now })
+    .eq('hosteler_id', hostelerId);
+
+  if (cotClearError) {
+    return cotClearError;
+  }
+
+  const { error: hostelerClearError } = await supabase
+    .from('hostelers')
+    .update({ cot_id: null, updated_at: now })
+    .eq('id', hostelerId);
+
+  return hostelerClearError;
+}
+
 async function handleGet(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -154,6 +177,11 @@ async function handlePatch(
       return NextResponse.json({ error: 'Failed to deactivate hosteler' }, { status: 500 });
     }
 
+    const cotReleaseError = await clearCotAssignmentForHosteler(supabase, id);
+    if (cotReleaseError) {
+      return NextResponse.json({ error: 'Failed to release cot assignment' }, { status: 500 });
+    }
+
     // Invalidate all sessions
     if (hosteler.auth_user_id) {
       await supabase.auth.admin.signOut(hosteler.auth_user_id, 'global');
@@ -283,10 +311,19 @@ async function handlePatch(
     );
   }
 
+  const cotReleaseError = await clearCotAssignmentForHosteler(supabase, id);
+  if (cotReleaseError) {
+    return NextResponse.json(
+      { error: 'Failed to release cot assignment' },
+      { status: 500 }
+    );
+  }
+
   const { error: updateError } = await supabase
     .from('hostelers')
     .update({
       status: 'deleted',
+      cot_id: null,
       deleted_at: deletedAt,
       deleted_from_status: 'active',
       deletion_effective_date: deletionEffectiveDate,

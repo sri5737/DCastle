@@ -7,6 +7,7 @@ import { MealCountCard } from '@/components/meal-count-card';
 import { HostelerList, type HostelerListItem } from '@/components/hosteler-list';
 import { CountdownBanner } from '@/components/countdown-banner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface MealCounts {
   breakfast: number;
@@ -32,6 +33,7 @@ export default function OwnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [disconnected, setDisconnected] = useState(false);
   const [showSubmitted, setShowSubmitted] = useState(false);
+  const [quickFind, setQuickFind] = useState('');
   const disconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -116,6 +118,26 @@ export default function OwnerDashboardPage() {
     );
   }
 
+  const normalizedQuery = quickFind.trim().toLowerCase();
+  const matchesQuery = (hosteler: HostelerListItem) => {
+    if (!normalizedQuery) return true;
+    return (
+      hosteler.name.toLowerCase().includes(normalizedQuery) ||
+      hosteler.room_number.toLowerCase().includes(normalizedQuery)
+    );
+  };
+
+  const filteredPendingHostelers = pendingHostelers.filter(matchesQuery);
+  const filteredSubmittedHostelers = submittedHostelers.filter(matchesQuery);
+
+  const pendingEmptyMessage = normalizedQuery
+    ? `No pending hostelers match "${quickFind}".`
+    : 'All active hostelers are currently submitted.';
+
+  const submittedEmptyMessage = normalizedQuery
+    ? `No submitted hostelers match "${quickFind}".`
+    : 'No submissions yet.';
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -142,6 +164,20 @@ export default function OwnerDashboardPage() {
         <MealCountCard mealType="dinner" count={counts.dinner} label="Dinner" />
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Quick Find</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            value={quickFind}
+            onChange={(event) => setQuickFind(event.target.value)}
+            placeholder="Search by hosteler name or room"
+            aria-label="Quick find hostelers"
+          />
+        </CardContent>
+      </Card>
+
       {/* Pending hostelers list */}
       <Card data-testid="pending-hostelers">
         <CardHeader>
@@ -151,8 +187,8 @@ export default function OwnerDashboardPage() {
         </CardHeader>
         <CardContent>
           <HostelerList
-            hostelers={pendingHostelers}
-            emptyMessage="All hostelers have submitted!"
+            hostelers={filteredPendingHostelers}
+            emptyMessage={pendingEmptyMessage}
           />
         </CardContent>
       </Card>
@@ -173,8 +209,8 @@ export default function OwnerDashboardPage() {
         {showSubmitted && (
           <CardContent>
             <HostelerList
-              hostelers={submittedHostelers}
-              emptyMessage="No submissions yet"
+              hostelers={filteredSubmittedHostelers}
+              emptyMessage={submittedEmptyMessage}
             />
           </CardContent>
         )}

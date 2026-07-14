@@ -29,26 +29,29 @@ export function OwnerSettingsPage() {
     dinner: '',
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const tomorrow = getTomorrowDate();
 
-  useEffect(() => {
-    async function fetchSettings() {
-      const response = await fetch('/api/settings');
-      if (!response.ok) {
-        setError('Failed to load settings');
-        setLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-      setSettings(data);
-      setDeadlineTime(data.deadline_time);
+  async function fetchSettings() {
+    setLoadError('');
+    setLoading(true);
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      setLoadError('Could not load settings. Check your connection and retry.');
       setLoading(false);
+      return;
     }
 
+    const data = await response.json();
+    setSettings(data);
+    setDeadlineTime(data.deadline_time);
+    setLoading(false);
+  }
+
+  useEffect(() => {
     fetchSettings();
   }, []);
 
@@ -111,7 +114,7 @@ export function OwnerSettingsPage() {
       const data = await response.json();
       if (!response.ok) {
         emitUiDiagnostic({ page: '/admin/settings', action: 'settings.save', state: 'submit-failure', metadata: { status: response.status } });
-        setError(data.error || 'Failed to save settings');
+        setError((data.error || 'Failed to save settings') + ' Review your pending changes and retry.');
         return;
       }
 
@@ -144,6 +147,30 @@ export function OwnerSettingsPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          {loadError}
+        </div>
+        <Button onClick={fetchSettings} variant="outline" className="w-full sm:w-auto">
+          Retry loading settings
+        </Button>
+      </div>
+    );
+  }
+
+  const pendingChanges: string[] = [];
+  if (settings && deadlineTime !== settings.deadline_time) {
+    pendingChanges.push(`Deadline: ${settings.deadline_time} -> ${deadlineTime}`);
+  }
+  for (const mealType of MEAL_TYPES) {
+    const draft = rateDrafts[mealType].trim();
+    if (!draft) continue;
+    pendingChanges.push(`${MEAL_LABELS[mealType]} rate -> ${formatINR(Number(draft))} (effective ${tomorrow})`);
+  }
+
   return (
     <form onSubmit={handleSave} className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-1">
@@ -164,6 +191,23 @@ export function OwnerSettingsPage() {
           {success}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Pending Changes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {pendingChanges.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No pending changes. Update deadline or enter new rates to prepare a save.
+            </p>
+          ) : (
+            pendingChanges.map((change) => (
+              <p key={change} className="text-sm">- {change}</p>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

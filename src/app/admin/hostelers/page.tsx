@@ -84,16 +84,17 @@ export default function HostelerManagementPage() {
   const [counts, setCounts] = useState<Counts>({ active: 0, pending: 0, inactive: 0, deleted: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('active');
+  const [quickSearch, setQuickSearch] = useState('');
 
   // Add hosteler form
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [roomNumber, setRoomNumber] = useState('');
   const [addError, setAddError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [adding, setAdding] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // Deactivation confirmation dialog
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
@@ -130,14 +131,18 @@ export default function HostelerManagementPage() {
     e.preventDefault();
     setAddError('');
     setPhoneError('');
+
     setAdding(true);
     emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-start', metadata: { phone } });
 
-    const res = await fetch('/api/hostelers', {
+    const res = await fetch('/api/admin/hostelers', {
       method: 'POST',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), phone: phone.trim(), room_number: roomNumber.trim() }),
+      body: JSON.stringify({
+        name: name.trim(),
+        phone: phone.trim(),
+      }),
     });
 
     const data = await res.json();
@@ -153,7 +158,8 @@ export default function HostelerManagementPage() {
     }
 
     setInviteUrl(data.invite.invite_url);
-  emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-success', metadata: { hostelerId: data.hosteler.id } });
+    setInviteCopied(false);
+    emitUiDiagnostic({ page: '/admin/hostelers', action: 'hosteler.create', state: 'submit-success', metadata: { hostelerId: data.hosteler.id } });
     setShowInviteDialog(true);
 
     const createdHosteler: HostelerItem = {
@@ -169,7 +175,6 @@ export default function HostelerManagementPage() {
     setCounts(recalculateCounts(nextAllHostelers));
     setName('');
     setPhone('');
-    setRoomNumber('');
     setPhoneError('');
     setAdding(false);
     fetchHostelers();
@@ -393,20 +398,43 @@ export default function HostelerManagementPage() {
   }
 
   async function copyInviteUrl() {
+    let didCopy = false;
     try {
       await navigator.clipboard.writeText(inviteUrl);
+      didCopy = true;
     } catch {
       // Fallback for environments without clipboard API
-      const textArea = document.createElement('textarea');
-      textArea.value = inviteUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = inviteUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        didCopy = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch {
+        didCopy = false;
+      }
+    }
+
+    if (didCopy) {
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 2000);
     }
   }
 
-  const filteredHostelers = hostelers;
+  const normalizedSearch = quickSearch.trim().toLowerCase();
+  const filteredHostelers = hostelers.filter((hosteler) => {
+    if (!normalizedSearch) return true;
+    return (
+      hosteler.name.toLowerCase().includes(normalizedSearch) ||
+      hosteler.phone.includes(normalizedSearch) ||
+      hosteler.room_number.toLowerCase().includes(normalizedSearch)
+    );
+  });
+
+  const emptyMessage = normalizedSearch
+    ? `No ${activeTab} hostelers match "${quickSearch}".`
+    : `No hostelers in ${activeTab} status.`;
 
   if (loading) {
     return (
@@ -455,15 +483,6 @@ export default function HostelerManagementPage() {
                   <p id="phone-error" className="text-sm text-destructive" role="alert">{phoneError}</p>
                 )}
               </div>
-              <Input
-                placeholder="Room No."
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-                required
-                maxLength={10}
-                aria-label="Room number"
-                className="flex-1 min-w-0"
-              />
             </div>
             <Button type="submit" disabled={adding} className="w-full sm:w-auto">
               {adding ? 'Adding...' : 'Add Hosteler'}
@@ -474,6 +493,28 @@ export default function HostelerManagementPage() {
       </Card>
 
       {/* Status Tabs */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Search</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Input
+            placeholder="Search by name, phone, or room"
+            value={quickSearch}
+            onChange={(event) => setQuickSearch(event.target.value)}
+            aria-label="Quick search hostelers"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setQuickSearch('')}
+            disabled={!quickSearch}
+          >
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
           <TabsTrigger value="active" className="w-full">Active ({counts.active})</TabsTrigger>
@@ -485,6 +526,7 @@ export default function HostelerManagementPage() {
         <TabsContent value="active">
           <HostelerTable
             hostelers={filteredHostelers}
+            emptyMessage={emptyMessage}
             actions={(h) => (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -519,6 +561,7 @@ export default function HostelerManagementPage() {
         <TabsContent value="pending">
           <HostelerTable
             hostelers={filteredHostelers}
+            emptyMessage={emptyMessage}
             actions={(h) => (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -545,6 +588,7 @@ export default function HostelerManagementPage() {
         <TabsContent value="inactive">
           <HostelerTable
             hostelers={filteredHostelers}
+            emptyMessage={emptyMessage}
             actions={(h) => (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -571,6 +615,7 @@ export default function HostelerManagementPage() {
         <TabsContent value="deleted">
           <HostelerTable
             hostelers={filteredHostelers}
+            emptyMessage={emptyMessage}
             actions={(h) => (
               <Button variant="outline" size="sm" onClick={() => handleViewAudit(h)}>
                 View Audit
@@ -615,16 +660,16 @@ export default function HostelerManagementPage() {
             </DialogTitle>
             <DialogDescription>
               {deleteTarget?.status === 'pending'
-                ? 'This hosteler will be permanently deleted. Their invite link will be invalidated immediately. No record of this hosteler will be retained. This cannot be undone.'
+                ? 'This permanently removes the pending hosteler record and invalidates invite links immediately. They will not appear in deleted audit views. This cannot be undone.'
                 : deletePreview?.message}
             </DialogDescription>
           </DialogHeader>
           {deleteTarget?.status === 'active' && deletePreview ? (
             <div className="rounded-md border bg-muted/50 p-3 text-sm space-y-1">
               <p>Deletion effective date: {deletePreview.deletion_effective_date}</p>
-              <p>
-                Future preferences to cancel: {deletePreview.future_preference_count}
-              </p>
+              <p>Future preferences to cancel: {deletePreview.future_preference_count}</p>
+              <p>Impact: login access is revoked immediately.</p>
+              <p>Impact: preserved history through the effective date remains owner-visible.</p>
             </div>
           ) : null}
           <DialogFooter>
@@ -704,17 +749,32 @@ export default function HostelerManagementPage() {
       </Dialog>
 
       {/* Invite Link Dialog */}
-      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-        <DialogContent>
+      <Dialog
+        open={showInviteDialog}
+        onOpenChange={(open) => {
+          setShowInviteDialog(open);
+          if (!open) {
+            setInviteCopied(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Invite Link Generated</DialogTitle>
             <DialogDescription>
               Share this link with the hosteler to activate their account. The link expires in 7 days.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-2">
-            <Input value={inviteUrl} readOnly aria-label="Invite URL" />
-            <Button onClick={copyInviteUrl}>Copy</Button>
+          <div className="space-y-3">
+            <Input value={inviteUrl} readOnly aria-label="Invite URL" className="min-h-11 text-xs sm:text-sm" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+                {inviteCopied ? 'Copied to clipboard.' : 'Use Copy to share this invite link.'}
+              </p>
+              <Button type="button" onClick={copyInviteUrl} className="w-full sm:w-auto" aria-label="Copy invite link">
+                {inviteCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
@@ -752,15 +812,17 @@ function statusBadgeVariant(status: HostelerItem['status']) {
 
 function HostelerTable({
   hostelers,
+  emptyMessage,
   actions,
 }: {
   hostelers: HostelerItem[];
+  emptyMessage: string;
   actions: (h: HostelerItem) => React.ReactNode;
 }) {
   if (hostelers.length === 0) {
     return (
       <div className="py-8 text-center text-muted-foreground">
-        No hostelers in this category.
+        {emptyMessage}
       </div>
     );
   }

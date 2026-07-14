@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { UtensilsCrossed, History, Receipt, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InstallPrompt } from '@/components/install-prompt';
 
 const HOSTELER_NAV = [
   { href: '/submit', label: 'Submit', icon: UtensilsCrossed },
@@ -93,6 +94,8 @@ export default function HostelerLayout({
           })}
         </div>
       </nav>
+
+      <InstallPrompt />
     </div>
   );
 }

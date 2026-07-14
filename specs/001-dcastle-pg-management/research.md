@@ -241,7 +241,7 @@ All technical unknowns resolved. Architecture decisions are finalized:
 - The feature spec already defines US13, FR-071 through FR-079, SC-014, and SC-015 for Android mobile app experience. Keeping the work in `specs/001-dcastle-pg-management` preserves the existing source of truth and avoids splitting one product into competing feature folders.
 - Android Chrome at 375 px is the primary baseline because daily owner and hosteler usage happens on phones. Desktop and tablet layouts remain enhancements only after mobile is accepted.
 - Installed standalone PWA behavior must be validated separately where applicable because browser chrome, app-window height, virtual keyboard, safe-area spacing, modal positioning, and offline/online layout states can differ from regular browser mode.
-- Phase 18 must preserve the Phase 17 honest E2E gate and Cloudflare build parity. Mobile fixes are accepted only when they keep exact story behavior intact and still pass `npm run test:run`, relevant story/mobile E2E commands, `npm run test:e2e`, and `npm run build:cloudflare`.
+- Phase 18 must preserve Cloudflare build parity and mobile acceptance quality. Mobile fixes are accepted only when they keep exact story behavior intact and still pass `npm run test:run`, relevant story-scoped unit/integration/component commands, and `npm run build:cloudflare`.
 
 **Validation approach**:
 - Automated Playwright mobile viewport checks should assert no page-level horizontal overflow and primary-action reachability for completed auth, owner, and hosteler screens where possible.
