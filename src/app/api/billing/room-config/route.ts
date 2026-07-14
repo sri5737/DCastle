@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   if (roomError) {
     return NextResponse.json({ error: 'Failed to fetch room' }, { status: 500 });
   }
-  if (!room || room.building.owner_id !== ownerId) {
+  if (!room || !Array.isArray(room.building) || room.building[0].owner_id !== ownerId) {
     return NextResponse.json({ error: 'Room not found' }, { status: 404 });
   }
 
@@ -50,8 +50,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (!history) {
+    const roomTypeArray = Array.isArray(room.room_type) ? room.room_type : [room.room_type];
+    const cotCount = roomTypeArray[0]?.cot_count ?? 1;
     return NextResponse.json({
-      sharing_capacity: Number(room.room_type?.cot_count ?? 1),
+      sharing_capacity: Number(cotCount),
       room_class: 'non_ac',
       rent: Number(room.current_rent),
       effective_date: null,
