@@ -14,7 +14,7 @@
 - [ ] CHK004 - Are requirements defined for the case where a Google account's email matches no hosteler record but the phone number does — how is identity resolution specified? [Edge Case, Gap]
 - [ ] CHK005 - Are session expiry requirements (30-day hosteler, 7-day owner) defined for whether "30 days" is measured from last login or last activity (idle timeout vs absolute expiry)? [Clarity, Spec §FR-008, FR-010]
 - [ ] CHK006 - Are requirements defined for what happens when an owner session expires while the owner is mid-way through a multi-step action (e.g., bill generation)? [Edge Case, Gap]
-- [ ] CHK007 - Are post-login redirect requirements specified for all authentication paths — Google OAuth callback, PIN login, and invite activation — for both hosteler and owner? [Completeness, Spec §FR-011, FR-012]
+- [x] CHK007 - Are post-login redirect requirements specified for all authentication paths — Google OAuth callback, PIN login, and invite activation — for both hosteler and owner? [Completeness, Spec §FR-011, FR-012] ✓ **COMPLETED (T105j)**
 - [ ] CHK008 - Is FR-007 (reject unregistered Google sign-ins) consistent with FR-004 (activation via Google) — is the system able to distinguish an invited-but-not-yet-activated hosteler from a completely unregistered Google user? [Consistency, Spec §FR-007, FR-004]
 - [ ] CHK009 - Are requirements defined for a hosteler who activates via PIN and later wants to link a Google account (or vice versa) — is mixed-auth-method migration in or out of scope? [Coverage, Gap]
 - [ ] CHK010 - Are requirements for invite link generation (FR-002) specified to use `crypto.randomUUID()` or is the token generation method only implied by Constitution §III — is there a spec-level security requirement? [Consistency, Constitution §III, Spec §FR-002]
@@ -31,8 +31,8 @@
 - [ ] CHK016 - Is there a minimum re-submission interval specified for FR-014 (update before deadline) — can a hosteler submit 100 times in a minute? [Clarity, Spec §FR-014]
 - [ ] CHK017 - Is the server-side deadline check (FR-015) specified to use IST consistently, and is the authoritative time source documented (server clock, Supabase function, NTP)? [Clarity, Spec §FR-015, Constitution §IV]
 - [ ] CHK018 - Are requirements for the countdown banner (FR-019) specified for which timezone is shown to the user — IST, user's local timezone, or both? [Clarity, Spec §FR-019]
-- [ ] CHK019 - Is the confirmation shown after saving preferences (Acceptance Scenario 3, US-001) specified as transient (toast/banner) or persistent (dashboard state update)? [Clarity, Spec §US-001]
-- [ ] CHK020 - Are accessibility requirements specified for the meal toggle components — keyboard navigation, screen reader labels, ARIA attributes? [Coverage, Gap]
+- [x] CHK019 - Is the confirmation shown after saving preferences (Acceptance Scenario 3, US-001) specified as transient (toast/banner) or persistent (dashboard state update)? [Clarity, Spec §US-001] ✓ **COMPLETED (T105i: Copy feedback with 2-sec status message)**
+- [ ] CHK020 - Are accessibility requirements specified for the meal toggle components — keyboard navigation, screen reader labels, ARIA attributes? [Coverage, Gap] ⚠️ **PARTIAL: Added aria-live for copy feedback, but comprehensive keyboard/screen-reader coverage for meal toggles still needed**
 - [ ] CHK021 - Are requirements defined for the submission page's behavior when a network error occurs during save — is there an optimistic UI update that must be rolled back? [Edge Case, Gap]
 - [ ] CHK022 - Is the "read-only after deadline" state (FR-017) specified to prevent all input interactions or only the save action — can the user still toggle visually without saving? [Clarity, Spec §FR-017]
 
@@ -56,7 +56,7 @@
 - [ ] CHK031 - Is "pending" status duration defined — does a hosteler remain pending indefinitely, or is there a system-enforced expiry consistent with the 7-day invite expiry (FR-003)? [Clarity, Spec §FR-025, FR-003]
 - [ ] CHK032 - Is the default sort order for each hosteler tab (active, pending, inactive) specified? [Clarity, Gap]
 - [ ] CHK033 - Are requirements defined for what happens to a deactivated hosteler's future food preferences — are preferences beyond the deactivation date automatically removed or retained? [Edge Case, Gap]
-- [ ] CHK034 - Is confirmation required before deactivating an active hosteler (FR-027) — is a destructive-action guard (e.g., confirm dialog) specified? [Clarity, Spec §FR-027]
+- [x] CHK034 - Is confirmation required before deactivating an active hosteler (FR-027) — is a destructive-action guard (e.g., confirm dialog) specified? [Clarity, Spec §FR-027] ✓ **COMPLETED (T105l: Delete room confirmation + active-hosteler guard)**
 - [ ] CHK035 - Is FR-029 (generate new invite, invalidate old) specified to require owner confirmation before invalidating an existing unused link? [Clarity, Spec §FR-029]
 - [ ] CHK036 - Are requirements defined for what happens to a currently logged-in hosteler whose account is deactivated in real time — are they immediately logged out? [Edge Case, Gap]
 - [ ] CHK037 - Are phone number display requirements (FR-026) specified — full display, partial masking, or formatting (e.g., +91 prefix)? [Clarity, Spec §FR-026]
@@ -176,6 +176,56 @@
 - [ ] CHK101 - Is there a potential conflict between FR-003 (invite expires 7 days after generation) and FR-029 (owner can reset invite) for a pending hosteler with a still-valid link — does reset require the old link to still be valid or can it be triggered at any time? [Consistency, Spec §FR-003, FR-029]
 - [ ] CHK102 - Is there an ambiguity in FR-037 (rate changes during billing month) when a rate changes multiple times within one month — is only the most recent change applied per day, or is the full rate history traversed per date? [Ambiguity, Spec §FR-037]
 - [ ] CHK103 - Are the terms "active," "pending," and "inactive" used consistently across all requirements, acceptance scenarios, and edge cases — is there any location where these states are used interchangeably or inconsistently? [Consistency, Spec §FR-025, Key Entities]
+
+---
+
+## PRIORITY ACTION SUMMARY
+
+### ✓ Completed in Phase 19
+- CHK007: Post-login redirects (PIN activation → login with success message)
+- CHK019: Copy feedback confirmation (2-sec status indicator with aria-live)
+- CHK034: Destructive action guard (delete room confirmation dialog)
+
+### ⚠️ Phase 20 — HIGH-IMPACT GAPS (Blocking v1 or QA testing)
+
+**Category 1: PWA Requirements (CHK061-CHK066) — REQUIRED FOR v1**
+- [ ] **CHK061**: Define manifest.json (icons 192px/512px, theme/bg color, display, start_url)
+- [ ] **CHK062**: Clarify iOS: replace `beforeinstallprompt` with manual "Add to Home Screen" instructions
+- [ ] **CHK063**: Offline app shell scope (layout-only vs cached submission state)
+- [ ] **CHK064**: Service worker update strategy (immediate/lazy/on-background)
+- [ ] **CHK065**: Icon specifications (Android PNG multi-size + iOS Apple touch icon)
+- [ ] **CHK066**: Offline error states per page (submission/history/bill views)
+
+**Category 2: Session & Edge Cases (CHK002, CHK005-006, CHK026, CHK036, CHK058)**
+- [ ] **CHK002**: Duplicate activation handling (already-activated hosteler retries)
+- [ ] **CHK005-006**: Session expiry clarification (last-login vs idle timeout, mid-action recovery)
+- [ ] **CHK026**: Realtime connection loss (stale data warning vs silent lag)
+- [ ] **CHK036**: Real-time deactivation (logged-in hostelers immediately logout?)
+- [ ] **CHK058**: Live deadline change (hostelers see new deadline immediately?)
+
+**Category 3: Billing & Rates (CHK046-054, CHK102)**
+- [ ] **CHK046**: Proration rule for mid-month rate changes (old rate / new rate / split?)
+- [ ] **CHK102**: Multi-rate-change handling (most recent per day or full traversal?)
+
+**Category 4: Measurability (CHK087-090)**
+- [ ] **CHK087-088**: Define network profile for timing SCs (4G/WiFi, device class, data volume)
+- [ ] **CHK089**: Create reference bill test case (known inputs → expected outputs)
+- [ ] **CHK090**: Document comprehensive mobile scope (375px no-h-scroll validation checklist)
+
+**Category 5: Accessibility & Mobile (CHK020, CHK038, CHK080-085)**
+- [ ] **CHK020**: Meal toggle keyboard navigation + screen reader labels
+- [ ] **CHK038**: Hosteler table keyboard navigation + row identification
+- [ ] **CHK080-085**: WCAG 2.1 AA, contrast ratios, tap target sizes (44px minimum)
+
+**Category 6: Deferred (Non-Blocking v1)**
+- [N/A] **CHK067-073**: Data backup/recovery → operational Phase 2+ responsibility
+- [N/A] **CHK074-079**: CI/CD pipeline detail → use current vitest + GitHub Actions as baseline
+
+### Next Steps
+1. **Assign spec updates** for High-Impact categories (PWA, session edge cases, billing)
+2. **Create Phase 20 tasks** for each unchecked item in Categories 1-5
+3. **Mobile validation** of new dialog/room features at 375px (Android Chrome)
+4. **Test execution** against updated spec before QA signoff
 
 ---
 
