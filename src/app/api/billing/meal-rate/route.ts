@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { withApiDiagnostic } from '@/lib/diagnostics/events';
 
 export const runtime = 'edge';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let supabaseClient: SupabaseClient<any, 'public', any> | null = null;
+
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Supabase server environment is not configured.');
+    }
+
+    supabaseClient = createClient(supabaseUrl, serviceRoleKey);
+  }
+
+  return supabaseClient;
+}
+
+const supabase = new Proxy({} as SupabaseClient<any, 'public', any>, {
+  get(_target, property, receiver) {
+    return Reflect.get(getSupabaseClient() as object, property, receiver);
+  },
+});
 
 /**
  * GET /api/billing/meal-rate?meal_type=breakfast&date=2026-07-15
