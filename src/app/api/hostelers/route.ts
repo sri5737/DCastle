@@ -15,6 +15,9 @@ type HostelerListRow = {
   name: string;
   phone: string;
   room_number: string;
+  building_id: string | null;
+  room_id: string | null;
+  cot_id: string | null;
   status: HostelerStatus;
   activated_at: string | null;
   deleted_at: string | null;
@@ -39,7 +42,7 @@ async function handleGet(request: NextRequest) {
   let query = supabase
     .from('hostelers')
     .select(
-      'id, name, phone, room_number, status, activated_at, deleted_at, deleted_from_status, deletion_effective_date, created_at'
+      'id, name, phone, room_number, building_id, room_id, cot_id, status, activated_at, deleted_at, deleted_from_status, deletion_effective_date, created_at'
     )
     .order('created_at', { ascending: false });
 

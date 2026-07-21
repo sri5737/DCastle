@@ -21,6 +21,7 @@ export interface Hosteler {
   deleted_at: string | null;
   deleted_from_status: DeletedFromStatus | null;
   deletion_effective_date: string | null;
+  availing_mess?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +48,8 @@ export interface FoodPreference {
   updated_at: string;
   canceled_at: string | null;
   cancellation_reason: FoodPreferenceCancellationReason | null;
+  is_auto_submitted?: boolean;
+  submitted_by?: string | null;
 }
 
 export interface DeletedHostelerAudit {

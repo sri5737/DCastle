@@ -196,6 +196,13 @@ describe('POST /api/food/submit', () => {
       }
       if (table === 'food_preferences') {
         return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: null, error: null }),
+              }),
+            }),
+          }),
           upsert: () => ({
             select: () => ({
               single: () => Promise.resolve(mockUpsertResult),

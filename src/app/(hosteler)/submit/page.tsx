@@ -23,6 +23,8 @@ export default function SubmitFoodPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [statusError, setStatusError] = useState('');
+  const [availingMess, setAvailingMess] = useState(true);
+  const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
 
   // Pre-fill: fetch existing preference for tomorrow
   async function fetchStatus() {
@@ -39,6 +41,7 @@ export default function SubmitFoodPage() {
       setDeadlineTime(data.deadline);
       setServerTime(data.server_time_ist);
       setDeadlinePassed(data.deadline_passed);
+      setAvailingMess(data.availing_mess ?? true);
 
       if (data.preferences) {
         setMeals({
@@ -46,8 +49,17 @@ export default function SubmitFoodPage() {
           lunch: data.preferences.lunch,
           dinner: data.preferences.dinner,
         });
+        setIsAutoSubmitted(data.preferences.is_auto_submitted || false);
         setSubmitted(true);
       } else {
+        // If meal submission is enabled, set defaults to true for new meals
+        if (data.availing_mess !== false) {
+          setMeals({
+            breakfast: true,
+            lunch: true,
+            dinner: true,
+          });
+        }
         setSubmitted(false);
       }
     } catch {
@@ -114,6 +126,22 @@ export default function SubmitFoodPage() {
     );
   }
 
+  // Block access when meal submission is disabled
+  if (availingMess === false) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Meal Submission Disabled</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Meal submission is disabled. Please contact owner to enable meal facilities.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {serverTime && (
@@ -139,10 +167,11 @@ export default function SubmitFoodPage() {
           <FoodToggle
             meals={meals}
             onChange={setMeals}
-            disabled={deadlinePassed}
+            disabled={deadlinePassed || isAutoSubmitted}
+            isAutoSubmitted={isAutoSubmitted}
           />
 
-          {deadlinePassed && (
+          {deadlinePassed && !isAutoSubmitted && (
             <p className="text-sm text-red-600 dark:text-red-400 text-center">
               Submissions are closed for tomorrow. Deadline was {deadlineTime}.
             </p>
@@ -154,7 +183,7 @@ export default function SubmitFoodPage() {
             </p>
           )}
 
-          {!deadlinePassed && (
+          {!deadlinePassed && !isAutoSubmitted && (
             <Button
               onClick={handleSubmit}
               disabled={submitting}

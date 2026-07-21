@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,13 +16,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { emitUiDiagnostic } from '@/lib/diagnostics/events';
+import { MealAdjustmentModal } from '@/components/hostelers/meal-adjustment-modal';
 
 interface HostelerItem {
   id: string;
   name: string;
   phone: string;
   room_number: string;
+  building_id?: string | null;
+  room_id?: string | null;
+  cot_id?: string | null;
   status: 'active' | 'pending' | 'inactive' | 'deleted';
+  availing_mess?: boolean;
+  updated_at?: string;
   activated_at: string | null;
   deleted_at: string | null;
   deleted_from_status: 'pending' | 'active' | null;
@@ -57,6 +64,11 @@ interface AuditResponse {
       cancellation_reason: string | null;
     }>;
   };
+}
+
+interface ToastState {
+  type: 'success' | 'error';
+  message: string;
 }
 
 function applyHostelerUpsert(list: HostelerItem[], next: HostelerItem) {
@@ -108,6 +120,14 @@ export default function HostelerManagementPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditData, setAuditData] = useState<AuditResponse | null>(null);
 
+  // Meal submission toggle dialog
+  const [showMealToggleDialog, setShowMealToggleDialog] = useState(false);
+  const [mealToggleTarget, setMealToggleTarget] = useState<HostelerItem | null>(null);
+  const [mealToggleSaving, setMealToggleSaving] = useState(false);
+  const [showMealAdjustmentDialog, setShowMealAdjustmentDialog] = useState(false);
+  const [mealAdjustmentTarget, setMealAdjustmentTarget] = useState<HostelerItem | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
   const fetchHostelers = useCallback(async () => {
     setLoading(true);
     const res = await fetch('/api/hostelers', { cache: 'no-store' });
@@ -126,6 +146,12 @@ export default function HostelerManagementPage() {
   useEffect(() => {
     setHostelers(allHostelers.filter((hosteler) => hosteler.status === activeTab));
   }, [activeTab, allHostelers]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   async function handleAddHosteler(e: React.FormEvent) {
     e.preventDefault();
@@ -422,6 +448,46 @@ export default function HostelerManagementPage() {
     }
   }
 
+  async function handleToggleMealSubmission(hosteler: HostelerItem) {
+    setMealToggleTarget(hosteler);
+    setShowMealToggleDialog(true);
+  }
+
+  function openMealAdjustment(hosteler: HostelerItem) {
+    setMealAdjustmentTarget(hosteler);
+    setShowMealAdjustmentDialog(true);
+  }
+
+  async function confirmMealToggle(newValue: boolean) {
+    if (!mealToggleTarget) return;
+    
+    setMealToggleSaving(true);
+    const res = await fetch(`/api/hostelers/${mealToggleTarget.id}`, {
+      method: 'PATCH',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ availing_mess: newValue }),
+    });
+
+    setMealToggleSaving(false);
+    
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Failed to update meal submission status');
+      return;
+    }
+
+    const updatedHosteler: HostelerItem = {
+      ...mealToggleTarget,
+      availing_mess: newValue,
+      updated_at: new Date().toISOString(),
+    };
+    const nextAllHostelers = applyHostelerUpsert(allHostelers, updatedHosteler);
+    setAllHostelers(nextAllHostelers);
+    setMealToggleTarget(null);
+    setShowMealToggleDialog(false);
+  }
+
   const normalizedSearch = quickSearch.trim().toLowerCase();
   const filteredHostelers = hostelers.filter((hosteler) => {
     if (!normalizedSearch) return true;
@@ -446,7 +512,15 @@ export default function HostelerManagementPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Hosteler Management</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Hosteler Management</h1>
+        <Link
+          href="/admin/hostelers/accommodation"
+          className={buttonVariants({ variant: 'outline', className: 'w-full sm:w-auto' })}
+        >
+          Accommodation Assignment
+        </Link>
+      </div>
 
       {/* Add Hosteler Form */}
       <Card>
@@ -529,6 +603,22 @@ export default function HostelerManagementPage() {
             emptyMessage={emptyMessage}
             actions={(h) => (
               <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={h.availing_mess === false ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleToggleMealSubmission(h)}
+                  disabled={actionLoading === h.id}
+                  title={h.availing_mess === false ? 'Meal submission disabled' : 'Meal submission enabled'}
+                >
+                  {h.availing_mess === false ? 'Meals OFF' : 'Meals ON'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openMealAdjustment(h)}
+                >
+                  Adjust Meals
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -748,6 +838,31 @@ export default function HostelerManagementPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Meal Submission Toggle Dialog */}
+      <Dialog open={showMealToggleDialog} onOpenChange={setShowMealToggleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Toggle Meal Submission</DialogTitle>
+            <DialogDescription>
+              {mealToggleTarget?.availing_mess === false
+                ? `Enable meal submission for ${mealToggleTarget?.name}? They will be able to access the meal submission form and receive auto-submitted meals after the deadline.`
+                : `Disable meal submission for ${mealToggleTarget?.name}? They will not be able to access the meal submission form or receive auto-submitted meals.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMealToggleDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => confirmMealToggle(mealToggleTarget?.availing_mess === false)}
+              disabled={mealToggleSaving}
+            >
+              {mealToggleSaving ? 'Saving...' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Invite Link Dialog */}
       <Dialog
         open={showInviteDialog}
@@ -783,6 +898,36 @@ export default function HostelerManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MealAdjustmentModal
+        open={showMealAdjustmentDialog}
+        hosteler={mealAdjustmentTarget ? { id: mealAdjustmentTarget.id, name: mealAdjustmentTarget.name } : null}
+        onOpenChange={(open) => {
+          setShowMealAdjustmentDialog(open);
+          if (!open) {
+            setMealAdjustmentTarget(null);
+          }
+        }}
+        onSaved={() => {
+          fetchHostelers();
+        }}
+        onToast={(nextToast) => {
+          setToast(nextToast);
+        }}
+      />
+
+      {toast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={[
+            'fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-md px-4 py-3 text-sm shadow-lg',
+            toast.type === 'error' ? 'bg-destructive text-destructive-foreground' : 'bg-green-600 text-white',
+          ].join(' ')}
+        >
+          {toast.message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -848,7 +993,7 @@ function HostelerTable({
             <tr key={h.id} className="border-b last:border-b-0">
               <td className="p-3">{h.name}</td>
               <td className="p-3">{h.phone}</td>
-              <td className="p-3">{h.room_number}</td>
+              <td className="p-3">{h.room_number === 'UNASSIGNED' ? 'Unassigned' : h.room_number}</td>
               <td className="p-3">
                 <Badge variant={statusBadgeVariant(h.status)}>{h.status}</Badge>
                 {h.status === 'deleted' ? (

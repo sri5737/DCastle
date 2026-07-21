@@ -32,7 +32,17 @@ export async function GET(request: NextRequest) {
   if (roomError) {
     return NextResponse.json({ error: 'Failed to fetch room' }, { status: 500 });
   }
-  if (!room || !Array.isArray(room.building) || room.building[0].owner_id !== ownerId) {
+  if (!room) {
+    return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+  }
+  
+  // Handle building relationship (may be object or array from Supabase)
+  const building = room.building as unknown as { owner_id: string } | { owner_id: string }[] | null;
+  const buildingOwner = Array.isArray(building)
+    ? building[0]?.owner_id
+    : building?.owner_id;
+  
+  if (buildingOwner !== ownerId) {
     return NextResponse.json({ error: 'Room not found' }, { status: 404 });
   }
 

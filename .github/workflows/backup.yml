@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload to R2
         run: |
-          aws s3 cp "${{ env.BACKUP_FILE }}" "s3://${R2_BUCKET}/backups/${{ env.BACKUP_FILE }}" \
+          aws s3 cp "$BACKUP_FILE" "s3://${R2_BUCKET}/backups/$BACKUP_FILE" \
             --endpoint-url "$R2_ENDPOINT"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

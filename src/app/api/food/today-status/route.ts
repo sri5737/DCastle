@@ -15,6 +15,17 @@ async function handleGet() {
 
   const supabase = createServiceClient();
 
+  // Get hosteler's availing_mess status
+  const { data: hosteler, error: hostelerError } = await supabase
+    .from('hostelers')
+    .select('availing_mess')
+    .eq('id', session.hosteler_id)
+    .single();
+
+  if (hostelerError || !hosteler) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   // Get deadline from settings
   const { data: setting } = await supabase
     .from('settings')
@@ -27,10 +38,10 @@ async function handleGet() {
   const deadlinePassed = isPastDeadline(deadlineTime);
   const tomorrowDate = getTomorrowDate();
 
-  // Fetch existing preference for tomorrow
+  // Fetch existing preference for tomorrow (with auto-submitted status)
   const { data: preference } = await supabase
     .from('food_preferences')
-    .select('breakfast, lunch, dinner')
+    .select('breakfast, lunch, dinner, is_auto_submitted')
     .eq('hosteler_id', session.hosteler_id)
     .eq('date', tomorrowDate)
     .single();
@@ -43,8 +54,10 @@ async function handleGet() {
           breakfast: preference.breakfast,
           lunch: preference.lunch,
           dinner: preference.dinner,
+          is_auto_submitted: preference.is_auto_submitted || false,
         }
       : null,
+    availing_mess: hosteler.availing_mess ?? true,
     deadline: deadlineTime,
     deadline_passed: deadlinePassed,
     server_time_ist: serverTime,

@@ -166,4 +166,38 @@ describe('HostelerManagementPage', () => {
     fireEvent.change(screen.getByLabelText('Quick search hostelers'), { target: { value: 'zzz' } });
     expect(screen.getByText('No active hostelers match "zzz".')).toBeInTheDocument();
   });
+
+  it('renders UNASSIGNED room_number as a clear unassigned state label', async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.endsWith('/api/hostelers')) {
+        return jsonResponse({
+          hostelers: [
+            {
+              id: 'h-1',
+              name: 'Ravi Kumar',
+              phone: '9876543210',
+              room_number: 'UNASSIGNED',
+              status: 'active',
+              activated_at: null,
+              deleted_at: null,
+              deleted_from_status: null,
+              deletion_effective_date: null,
+              created_at: '2026-07-10T00:00:00.000Z',
+            },
+          ],
+          counts: { active: 1, pending: 0, inactive: 0, deleted: 0 },
+        });
+      }
+
+      return jsonResponse({ error: 'unexpected route' }, false, 404);
+    });
+
+    render(<HostelerManagementPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    });
+  });
 });

@@ -103,14 +103,40 @@ async function handlePatch(
   const { id } = await params;
   const supabase = createServiceClient();
 
-  let body: { action?: string; confirmed?: boolean };
+  let body: { action?: string; confirmed?: boolean; availing_mess?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { action, confirmed } = body;
+  const { action, confirmed, availing_mess } = body;
+
+  // Handle availing_mess toggle (meal submission enable/disable)
+  if (typeof availing_mess === 'boolean' && !action) {
+    const { data: hosteler, error: fetchError } = await supabase
+      .from('hostelers')
+      .select('id, name, availing_mess')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !hosteler) {
+      return NextResponse.json({ error: 'Hosteler not found' }, { status: 404 });
+    }
+
+    const { error: updateError } = await supabase
+      .from('hostelers')
+      .update({ availing_mess, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (updateError) {
+      return NextResponse.json({ error: 'Failed to update meal submission status' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      hosteler: { id: hosteler.id, name: hosteler.name, availing_mess },
+    });
+  }
 
   if (!action || !['deactivate', 'reactivate', 'delete'].includes(action)) {
     return NextResponse.json(
