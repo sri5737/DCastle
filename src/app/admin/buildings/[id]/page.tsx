@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+export const runtime = 'edge';
+
 export default function AdminBuildingDetailPage() {
   const params = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
