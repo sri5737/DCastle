@@ -19,6 +19,9 @@ BEGIN
   END LOOP;
 END $$;
 
+ALTER TABLE IF EXISTS public.monthly_bills
+  DROP CONSTRAINT IF EXISTS monthly_bills_status_check;
+
 ALTER TABLE IF EXISTS monthly_bills
   ADD CONSTRAINT monthly_bills_status_check
   CHECK (status IN ('generated', 'transmitted', 'needs_retransmission'));
